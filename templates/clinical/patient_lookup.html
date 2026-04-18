@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Buscar Paciente — VacunaTrack{% endblock %}
+{% block page_title %}Consulta de Paciente{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start">
+
+  
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-nfc" style="color:var(--primary)"></i> Escanear NFC</span>
+      </div>
+      <div class="nfc-scanner" style="padding:32px 24px">
+        <div class="nfc-ring" id="nfc-ring">
+          <span class="nfc-icon">📱</span>
+        </div>
+        <p style="font-weight:600;margin-bottom:6px">Acerca la pulsera o cartilla NFC</p>
+        <p class="text-muted fs-sm mb-16" id="nfc-status">Listo para escanear</p>
+
+        
+        <div class="form-group w-full mb-12">
+          <label class="form-label fs-sm">UID NFC (modo simulación)</label>
+          <input type="text" id="nfc-uid-input" class="form-control" placeholder="Ej: NFC-001">
+        </div>
+
+        <button id="btn-scan-nfc" class="btn btn-primary btn-full">
+          <i class="fa-solid fa-wifi"></i> Escanear / Buscar
+        </button>
+      </div>
+    </div>
+
+    
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-id-card" style="color:var(--secondary)"></i> Buscar por CURP</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">CURP del paciente</label>
+          <input type="text" id="curp-input" class="form-control"
+                 placeholder="XXXX000000XXXXXX00" maxlength="18"
+                 style="text-transform:uppercase;letter-spacing:1px">
+        </div>
+        <button id="btn-search-curp" class="btn btn-outline-primary btn-full">
+          <i class="fa-solid fa-magnifying-glass"></i> Buscar paciente
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-file-certificate" style="color:var(--success)"></i> Buscar por Certificado de Nacimiento</span>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label class="form-label">N° Certificado de Nacimiento</label>
+          <input type="text" id="cert-nac-input" class="form-control"
+                 placeholder="Ej: CN-2024-001">
+        </div>
+        <button id="btn-search-cert" class="btn btn-outline-primary btn-full">
+          <i class="fa-solid fa-magnifying-glass"></i> Buscar paciente
+        </button>
+      </div>
+    </div>
+
+    <button id="btn-register" class="btn btn-success btn-full btn-lg"
+            data-url="{{ url_for('clinical.register_application') }}"
+            style="display:none">
+      <i class="fa-solid fa-syringe"></i> Registrar Aplicación
+    </button>
+
+  </div>
+
+  
+  <div id="patient-result">
+    <div class="card">
+      <div class="card-body text-center" style="padding:80px 20px">
+        <div style="font-size:64px;margin-bottom:16px">🔍</div>
+        <div style="font-size:1.1rem;font-weight:600;margin-bottom:8px;color:var(--text-secondary)">
+          Esperando búsqueda
+        </div>
+        <p class="text-muted">Escanea el NFC del paciente, ingresa su CURP o su N° de Certificado de Nacimiento para ver su historial.</p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px;font-size:0.8rem">
+          <span class="badge badge-aplicada">✓ Aplicada</span>
+          <span class="badge badge-aplicable">⏰ Aplicable</span>
+          <span class="badge badge-cerca_limite">⚠ Cerca del límite</span>
+          <span class="badge badge-atrasada">✕ Atrasada</span>
+          <span class="badge badge-proxima">→ Próxima</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

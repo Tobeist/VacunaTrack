@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% block title %}Registrar Aplicación — VacunaTrack{% endblock %}
+{% block page_title %}Registrar Aplicación de Vacuna{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-syringe" style="color:var(--success)"></i> Nueva aplicación</span>
+    </div>
+    <div class="card-body">
+
+      <form method="POST" action="{{ url_for('clinical.register_application') }}">
+
+        <div class="form-group">
+          <label class="form-label">Paciente <span class="required">*</span></label>
+          <select name="paciente_id" class="form-select" required>
+            <option value="">— Selecciona paciente —</option>
+            {% for p in pacientes %}
+            <option value="{{ p.paciente_id }}"
+              {% if request.args.get('paciente_id')|int == p.paciente_id %}selected{% endif %}>
+              {{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}
+              {% if p.paciente_apellido_mat %} {{ p.paciente_apellido_mat|cap }}{% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-hint">Puedes buscarlo primero por NFC o CURP en "Buscar Paciente".</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Inventario / Lote <span class="required">*</span></label>
+          <select name="inventario_id" class="form-select" required>
+            <option value="">— Selecciona inventario —</option>
+            {% for inv in inventarios %}
+            <option value="{{ inv.inventario_id }}">
+              {{ inv.vacuna_nombre }} — Lote {{ inv.lote_codigo }}
+              ({{ inv.inventario_stock_actual }} dosis · {{ inv.centro_nombre }})
+            </option>
+            {% endfor %}
+          </select>
+          {% if not inventarios %}
+          <div class="form-error">⚠ Sin inventario activo con stock en tu centro. Contacta al administrador.</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Dosis <span class="required">*</span></label>
+          <select name="dosis_id" class="form-select" required>
+            <option value="">— Selecciona dosis —</option>
+            {% for d in dosis_list %}
+            <option value="{{ d.dosis_id }}">
+              {{ d.vacuna_nombre }} — {{ d.dosis_tipo }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observaciones</label>
+          <textarea name="observaciones" class="form-textarea"
+                    placeholder="Reacciones, notas clínicas, observaciones del paciente…"></textarea>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-top:20px">
+          <button type="submit" class="btn btn-success btn-lg" style="flex:1">
+            <i class="fa-solid fa-check"></i> Registrar Aplicación
+          </button>
+          <a href="{{ url_for('clinical.lookup') }}" class="btn btn-secondary btn-lg">
+            <i class="fa-solid fa-xmark"></i> Cancelar
+          </a>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <div class="card mt-16">
+    <div class="card-body" style="font-size:0.85rem;color:var(--text-secondary)">
+      <i class="fa-solid fa-circle-info" style="color:var(--secondary);margin-right:6px"></i>
+      Al registrar la aplicación, el stock del inventario seleccionado se decrementará automáticamente.
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VacunaTrack — Control digital de vacunación infantil</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+</head>
+<body style="margin:0;background:var(--bg)">
+
+<nav style="background:#fff;border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)">
+  <div style="display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;color:var(--primary)">
+    <span style="font-size:22px">💉</span> VacunaTrack
+  </div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <a href="{{ url_for('public.schemes') }}" class="btn btn-secondary btn-sm">
+      <i class="fa-solid fa-list-check"></i> Esquemas
+    </a>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm">
+      <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+    </a>
+  </div>
+</nav>
+
+<section class="hero">
+  <h1>Control inteligente de vacunación infantil</h1>
+  <p>Registra, monitorea y asegura el esquema de vacunación de cada niño. Tecnología NFC, GPS y Beacon para centros de salud y familias.</p>
+  <div class="hero-btns">
+    <a href="{{ url_for('auth.login') }}" class="btn btn-white btn-lg">
+      <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+    </a>
+    <a href="{{ url_for('public.schemes') }}" class="btn btn-outline-white btn-lg">
+      <i class="fa-solid fa-list-check"></i> Ver esquemas oficiales
+    </a>
+  </div>
+
+  
+  <div style="display:flex;gap:40px;justify-content:center;margin-top:48px;flex-wrap:wrap">
+    {% set stat_items = [
+      (stats.aplicaciones, 'Aplicaciones registradas', 'fa-syringe'),
+      (stats.centros, 'Centros de salud activos', 'fa-hospital'),
+      (stats.esquemas, 'Esquemas de vacunación', 'fa-calendar-check'),
+    ] %}
+    {% for val, label, icon in stat_items %}
+    <div style="text-align:center">
+      <div style="font-size:2.4rem;font-weight:800">{{ val }}</div>
+      <div style="font-size:0.85rem;opacity:0.8;margin-top:4px">{{ label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section>
+  <div style="text-align:center;padding:40px 20px 0">
+    <h2 style="font-size:1.7rem;font-weight:800">¿Por qué VacunaTrack?</h2>
+    <p class="text-muted" style="margin-top:8px">Todo lo que necesitas para un seguimiento clínico riguroso y accesible</p>
+  </div>
+  <div class="features-grid" style="max-width:1100px;margin:0 auto">
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--primary-bg);color:var(--primary)"><i class="fa-solid fa-nfc"></i></div>
+      <h3>Identificación NFC</h3>
+      <p>Cada niño cuenta con un tag NFC único. El responsable clínico lo escanea para acceder al historial al instante.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--secondary-bg);color:var(--secondary)"><i class="fa-solid fa-map-location-dot"></i></div>
+      <h3>Centros cercanos GPS</h3>
+      <p>El tutor puede localizar centros de salud cercanos con stock disponible de la vacuna que su hijo necesita.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--success-bg);color:var(--success)"><i class="fa-solid fa-bluetooth"></i></div>
+      <h3>Alertas por Beacon</h3>
+      <p>Al entrar a un centro, el tutor recibe notificación automática con las vacunas disponibles y la espera estimada.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--warning-bg);color:var(--warning)"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <h3>Motor de alertas</h3>
+      <p>Detecta dosis atrasadas, esquemas incompletos, lotes por caducar y stock bajo de forma automática.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:var(--orange-bg);color:var(--orange)"><i class="fa-solid fa-chart-bar"></i></div>
+      <h3>Reportes oficiales</h3>
+      <p>Genera análisis poblacionales por zona, centro y periodo. Exporta datos para instituciones de salud.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon" style="background:#F3E8FF;color:#7C3AED"><i class="fa-solid fa-shield-heart"></i></div>
+      <h3>Integridad Clínica</h3>
+      <p>Validaciones por edad mínima, intervalos entre dosis y límites de edad para garantizar la seguridad del paciente.</p>
+    </div>
+  </div>
+</section>
+
+<section style="background:#fff;padding:40px 32px;margin-top:40px">
+  <div style="max-width:1100px;margin:0 auto">
+    <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:24px">Estadísticas públicas de vacunación</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fa-solid fa-chart-column"></i> Aplicaciones por mes</span></div>
+        <div class="card-body"><canvas id="chart-public-bar" style="max-height:260px"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fa-solid fa-chart-pie"></i> Cobertura por vacuna</span></div>
+        <div class="card-body"><canvas id="chart-public-pie" style="max-height:260px"></canvas></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer style="background:var(--text);color:rgba(255,255,255,0.7);padding:28px 32px;text-align:center;font-size:0.85rem">
+  <div style="font-weight:700;color:#fff;font-size:1rem;margin-bottom:6px">💉 VacunaTrack</div>
+  <div>Sistema digital y seguimiento de vacunación infantil — México</div>
+  <div style="margin-top:8px;opacity:0.5">Universidad de Monterrey · Ingeniería en Tecnologías Computacionales · 2026</div>
+</footer>
+
+<script>
+const COLORS = ['#7C3AED','#2563EB','#16A34A','#D97706','#EA580C','#DC2626','#8B5CF6','#0891B2'];
+document.addEventListener('DOMContentLoaded', () => {
+  fetch('/api/stats-publicas')
+    .then(r => r.json())
+    .then(data => {
+      new Chart(document.getElementById('chart-public-bar').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: data.por_mes.map(r => r.mes),
+          datasets: [{ label: 'Aplicaciones', data: data.por_mes.map(r => r.total),
+            backgroundColor: 'rgba(124,58,237,0.75)', borderColor: '#7C3AED',
+            borderWidth: 1, borderRadius: 4 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+      new Chart(document.getElementById('chart-public-pie').getContext('2d'), {
+        type: 'pie',
+        data: {
+          labels: data.top_vacunas.map(r => r.vacuna_nombre),
+          datasets: [{ data: data.top_vacunas.map(r => r.total),
+            backgroundColor: COLORS.slice(0, data.top_vacunas.length),
+            borderWidth: 2, borderColor: '#fff' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+      });
+    })
+    .catch(err => console.error('Error cargando estadísticas:', err));
+});
+</script>
+</body>
+</html>

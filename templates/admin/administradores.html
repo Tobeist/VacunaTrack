@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Administradores — VacunaTrack{% endblock %}
+{% block page_title %}Administradores del Sistema{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Nuevo Administrador</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.administradores') }}">
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
+            <input type="text" name="prim_nombre" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Segundo nombre</label>
+            <input type="text" name="seg_nombre" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Apellido paterno <span class="required">*</span></label>
+            <input type="text" name="apellido_pat" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Apellido materno</label>
+            <input type="text" name="apellido_mat" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">RFC <span class="required">*</span></label>
+            <input required type="text" name="rfc" class="form-control" maxlength="13" style="text-transform:uppercase"></div>
+          <div class="form-group"><label class="form-label">CURP <span class="required">*</span></label>
+            <input required type="text" name="curp" class="form-control" maxlength="18" style="text-transform:uppercase"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Correo electrónico <span class="required">*</span></label>
+          <input type="email" name="email" class="form-control" required></div>
+        <div class="form-group"><label class="form-label">Teléfono<span class="required">*</span></label>
+          <input required type="tel" name="telefono" class="form-control"></div>
+        <div class="flash-msg info mt-8" style="font-size:0.8rem;padding:10px 14px">
+          <i class="fa-solid fa-key"></i> Contraseña temporal generada automáticamente.
+        </div>
+        <button type="submit" class="btn btn-primary btn-full mt-12">
+          <i class="fa-solid fa-plus"></i> Crear Administrador
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Administradores ({{ admins|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar…" data-search-table="tabla-admins">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-admins">
+        <thead><tr><th>Nombre</th><th>RFC</th><th>Correo electrónico</th><th>CURP</th><th>Acciones</th></tr></thead>
+        <tbody>
+          {% for a in admins %}
+          <tr>
+            <td class="fw-600">{{ a.admin_prim_nombre|cap }} {{ a.admin_apellido_pat|cap }}</td>
+            <td class="fs-sm" style="font-family:monospace">{{ a.admin_rfc or '—' }}</td>
+            <td>{{ a.admin_email }}</td>
+            <td class="fs-sm" style="font-family:monospace">{{ a.admin_curp or '—' }}</td>
+            <td>
+              {% if a.admin_id != session.user_id %}
+              <form method="POST" action="{{ url_for('admin.eliminar_admin', aid=a.admin_id) }}" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm"
+                        data-confirm="¿Eliminar al administrador {{ a.admin_prim_nombre|cap }}?">🗑</button>
+              </form>
+              {% else %}
+              <span class="badge badge-gray">Tú</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted" style="padding:40px">No administradores.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

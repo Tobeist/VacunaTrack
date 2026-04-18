@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Esquemas de Vacunación — VacunaTrack</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body style="background:var(--bg)">
+
+<nav style="background:#fff;border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)">
+  <a href="{{ url_for('public.landing') }}" style="display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;color:var(--primary);text-decoration:none">
+    <span style="font-size:22px">💉</span> VacunaTrack
+  </a>
+  <div style="display:flex;gap:12px">
+    <a href="{{ url_for('public.landing') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
+    <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión</a>
+  </div>
+</nav>
+
+<div style="max-width:1100px;margin:0 auto;padding:32px">
+  <div class="page-header">
+    <div>
+      <div class="page-title">Esquemas Oficiales de Vacunación Infantil</div>
+      <div class="page-subtitle">México · Niños de 0 a 9 años · Sin necesidad de iniciar sesión</div>
+    </div>
+  </div>
+
+  <div class="search-bar mb-20">
+    <div class="search-input-wrap">
+      <i class="fa-solid fa-magnifying-glass search-icon"></i>
+      <input type="text" id="scheme-search" class="form-control" placeholder="Buscar esquema…">
+    </div>
+  </div>
+
+  <div id="schemes-container">
+    {% if esquemas %}
+      {% for e in esquemas %}
+      <div class="card mb-16 scheme-row">
+        <div class="card-header" style="cursor:pointer" onclick="toggleScheme({{ e.esquema_id }}, this)">
+          <span class="card-title">
+            <i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i>
+            {{ e.esquema_nombre }}
+            <span class="badge badge-primary" style="margin-left:8px">{{ e.total_dosis }} dosis</span>
+          </span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="text-muted fs-sm">Vigente desde {{ e.esquema_fecha_vigencia|format_date }}</span>
+            <i class="fa-solid fa-chevron-down toggle-icon" id="icon-{{ e.esquema_id }}" style="color:var(--primary);transition:0.2s"></i>
+          </div>
+        </div>
+        <div id="dosis-{{ e.esquema_id }}" style="display:none">
+          <div class="card-body" style="padding-top:0">
+            <div style="padding:12px 0 4px;color:var(--text-secondary);font-size:0.8rem">Cargando dosis…</div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card">
+        <div class="card-body text-center">
+          <p class="text-muted">No esquemas registrados aún.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+const loadedEsquemas = {};
+
+async function toggleScheme(id, header) {
+  const panel = document.getElementById(`dosis-${id}`);
+  const icon  = document.getElementById(`icon-${id}`);
+
+  if (panel.style.display === 'none') {
+    panel.style.display = 'block';
+    icon.style.transform = 'rotate(180deg)';
+    if (!loadedEsquemas[id]) {
+      loadedEsquemas[id] = true;
+      const res  = await fetch(`/esquemas/${id}/dosis`);
+      const data = await res.json();
+      const rows = data.map(d => `
+        <tr>
+          <td class="fw-600">${d.vacuna_nombre}</td>
+          <td><span class="badge badge-primary">${d.dosis_tipo}</span></td>
+          <td>${d.edad_texto || '—'}</td>
+          <td>${d.dosis_limite_edad_dias ? days_to_human(d.dosis_limite_edad_dias) : '—'}</td>
+          <td>${d.dosis_intervalo_min_dias ? d.dosis_intervalo_min_dias + ' días' : '—'}</td>
+          <td>${d.dosis_area_aplicacion || '—'}</td>
+          <td>${d.dosis_cant_ml ? d.dosis_cant_ml + ' ml' : '—'}</td>
+        </tr>
+      `).join('');
+      panel.querySelector('.card-body').innerHTML = `
+        <div class="table-wrapper">
+          <table class="table">
+            <thead><tr>
+              <th>Vacuna</th><th>Tipo de Dosis</th><th>Edad Recomendada</th>
+              <th>Límite de Edad</th><th>Intervalo mínimo</th>
+              <th>Área de aplicación</th><th>Volumen</th>
+            </tr></thead>
+            <tbody>${rows || '<tr><td colspan="7" class="text-center text-muted">Sin dosis asignadas</td></tr>'}</tbody>
+          </table>
+        </div>
+      `;
+    }
+  } else {
+    panel.style.display = 'none';
+    icon.style.transform = 'rotate(0)';
+  }
+}
+
+function days_to_human(days) {
+  if (!days) return '—';
+  if (days < 30) return days + ' días';
+  if (days < 365) return Math.floor(days/30) + ' meses';
+  return Math.floor(days/365) + ' año(s)';
+}
+
+// Buscar
+document.getElementById('scheme-search').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorTodas('.scheme-row').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
+</body>
+</html>

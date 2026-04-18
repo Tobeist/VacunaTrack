@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Mi Perfil — VacunaTrack{% endblock %}
+{% block page_title %}Mi Perfil de Administrador{% endblock %}
+
+{% block content %}
+<div style="max-width:640px">
+
+  
+  <div class="card mb-20">
+    <div style="background:linear-gradient(135deg,#5B21B6,var(--primary));padding:28px;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
+      <div style="display:flex;align-items:center;gap:18px">
+        <form method="POST" action="{{ url_for('admin.subir_foto_perfil') }}" enctype="multipart/form-data" style="position:relative;cursor:pointer" title="Cambiar foto de perfil">
+          <input type="file" name="foto" accept="image/*" style="display:none" id="foto-admin-input" onchange="this.form.submit()">
+          <label for="foto-admin-input" style="cursor:pointer;display:block">
+            {% if admin.admin_imagen %}
+            <img src="{{ url_for('static', filename=admin.admin_imagen) }}" alt="Foto" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3)">
+            {% else %}
+            <div style="width:64px;height:64px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff">
+              🛡️
+            </div>
+            {% endif %}
+            <div style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+              <i class="fa-solid fa-camera" style="font-size:10px;color:#fff"></i>
+            </div>
+          </label>
+        </form>
+        <div>
+          <div style="font-size:1.25rem;font-weight:800;color:#fff">
+            {{ admin.admin_prim_nombre|cap }}
+            {% if admin.admin_seg_nombre %}{{ admin.admin_seg_nombre|cap }} {% endif %}
+            {{ admin.admin_apellido_pat|cap }}
+            {% if admin.admin_apellido_mat %}{{ admin.admin_apellido_mat|cap }}{% endif %}
+          </div>
+          <div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:4px">
+            Administrador del Sistema
+          </div>
+          <div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-top:2px">
+            <i class="fa-regular fa-envelope"></i> {{ admin.admin_email }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;font-size:0.875rem">
+        <div>
+          <div class="text-muted">RFC</div>
+          <div class="fw-600">{{ admin.admin_rfc or '—' }}</div>
+        </div>
+        <div>
+          <div class="text-muted">CURP</div>
+          <div class="fw-600" style="font-size:0.8rem;font-family:monospace">{{ admin.admin_curp or '—' }}</div>
+        </div>
+        <div>
+          <div class="text-muted">Teléfono</div>
+          <div class="fw-600">{{ admin.admin_telefono or '—' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-20">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-key" style="color:var(--warning)"></i> Permisos</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.875rem">
+        {% set perms = [
+          ('fa-users', 'Gestión de tutores'),
+          ('fa-user-doctor', 'Gestión de responsables'),
+          ('fa-user-shield', 'Gestión de administradores'),
+          ('fa-baby', 'Gestión de pacientes'),
+          ('fa-hospital', 'Gestión de centros'),
+          ('fa-syringe', 'Gestión de vacunas'),
+          ('fa-calendar-check', 'Gestión de esquemas'),
+          ('fa-warehouse', 'Control de inventario'),
+          ('fa-chart-bar', 'Acceso a reportes'),
+          ('fa-earth-americas', 'Catálogo geográfico'),
+        ] %}
+        {% for icon, label in perms %}
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--success-bg);border-radius:var(--radius-sm)">
+          <i class="fa-solid {{ icon }}" style="color:var(--success);width:16px"></i>
+          <span>{{ label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--primary)"></i> Seguridad</span></div>
+    <div class="card-body">
+      <p class="text-muted fs-sm mb-16">Cambia tu contraseña regularmente para mantener la seguridad de tu cuenta.</p>
+      <a href="{{ url_for('auth.change_password') }}" class="btn btn-primary">
+        <i class="fa-solid fa-lock"></i> Cambiar contraseña
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

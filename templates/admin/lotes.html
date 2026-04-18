@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Lotes — VacunaTrack{% endblock %}
+{% block page_title %}Lotes e Inventario{% endblock %}
+
+{% block content %}
+
+<div class="tabs" id="lotes-tabs">
+  <button class="tab-btn active" data-tab="tab-lotes">📦 Lotes</button>
+  <button class="tab-btn" data-tab="tab-asignar">🏥 Asignar a Centro</button>
+</div>
+
+<div class="tab-panel active" id="tab-lotes">
+  <div class="crud-layout">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-boxes-stacked" style="color:var(--warning)"></i> Registrar Lote</span></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.lotes') }}">
+          <input type="hidden" name="accion" value="nuevo_lote">
+          <div class="form-group"><label class="form-label">Código de lote <span class="required">*</span></label>
+            <input type="text" name="codigo" class="form-control" placeholder="Ej: LOT-2024-001" required></div>
+          <div class="form-group"><label class="form-label">Vacuna <span class="required">*</span></label>
+            <select name="vacuna_id" class="form-select" required>
+              <option value="">— Selecciona vacuna —</option>
+              {% for v in vacunas %}
+              <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Fabricante <span class="required">*</span></label>
+            <select name="fabricante_id" class="form-select" required>
+              <option value="">— Selecciona fabricante —</option>
+              {% for f in fabricantes %}
+              <option value="{{ f.fabricante_id }}">{{ f.fabricante_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Proveedor <span class="required">*</span></label>
+            <select name="proveedor_id" class="form-select" required>
+              <option value="">— Selecciona proveedor —</option>
+              {% for pv in proveedores %}
+              <option value="{{ pv.proveedor_id }}">{{ pv.proveedor_prim_nombre|cap }} {{ pv.proveedor_apellido_pat|cap }}{% if pv.proveedor_empresa %} — {{ pv.proveedor_empresa }}{% endif %}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-row form-row-2">
+            <div class="form-group"><label class="form-label">Fecha de fabricación <span class="required">*</span></label>
+              <input type="date" name="fecha_fab" class="form-control" required></div>
+            <div class="form-group"><label class="form-label">Fecha de caducidad <span class="required">*</span></label>
+              <input type="date" name="fecha_cad" class="form-control" required></div>
+          </div>
+          <div class="form-group"><label class="form-label">Cantidad inicial <span class="required">*</span></label>
+            <input type="number" name="cantidad" class="form-control" min="1" placeholder="Ej: 500" required></div>
+          <button type="submit" class="btn btn-primary btn-full mt-8">
+            <i class="fa-solid fa-plus"></i> Registrar Lote
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-boxes-stacked" style="color:var(--warning)"></i> Lotes registrados ({{ lotes|length }})</span>
+      </div>
+      <div class="card-body" style="padding:16px 22px 12px">
+        <input type="text" class="form-control" placeholder="🔍 Buscar lote…" data-search-table="tabla-lotes">
+      </div>
+      <div class="table-wrapper">
+        <table class="table" id="tabla-lotes">
+          <thead><tr>
+            <th>Código</th><th>Vacuna</th><th>Fabricante</th>
+            <th>Fabricación</th><th>Caducidad</th><th>Cant. inicial</th>
+          </tr></thead>
+          <tbody>
+            {% for l in lotes %}
+            {% set is_expired = l.lote_fecha_caducidad < today if today is defined else False %}
+            <tr class="{{ 'inv-expired' if is_expired else '' }}">
+              <td class="fw-600" style="font-family:monospace">{{ l.lote_codigo }}</td>
+              <td>{{ l.vacuna_nombre }}</td>
+              <td>{{ l.fabricante_nombre }}</td>
+              <td class="fs-sm">{{ l.lote_fecha_fabricacion|format_date }}</td>
+              <td class="fs-sm">
+                {{ l.lote_fecha_caducidad|format_date }}
+                {% if is_expired %}<span class="badge badge-caducado" style="margin-left:4px">Caducado</span>{% endif %}
+              </td>
+              <td class="fw-600">{{ l.lote_cant_inicial }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No lotes registrados.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-asignar">
+  <div class="crud-layout">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Asignar lote a centro</span></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.lotes') }}">
+          <input type="hidden" name="accion" value="asignar_inventario">
+          <div class="form-group"><label class="form-label">Lote <span class="required">*</span></label>
+            <select name="lote_id" class="form-select" required>
+              <option value="">— Selecciona lote —</option>
+              {% for l in lotes %}
+              <option value="{{ l.lote_id }}">{{ l.lote_codigo }} — {{ l.vacuna_nombre }} (cad. {{ l.lote_fecha_caducidad|format_date }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Centro de salud <span class="required">*</span></label>
+            <select name="centro_id" class="form-select" required>
+              <option value="">— Selecciona centro —</option>
+              {% for c in centros %}
+              <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Stock a asignar (dosis) <span class="required">*</span></label>
+            <input type="number" name="stock" class="form-control" min="1" required></div>
+          <div class="flash-msg info" style="font-size:0.8rem;padding:10px 14px;margin-top:8px">
+            <i class="fa-solid fa-circle-info"></i>
+            El inventario se marcará como activo. Se desactivará automáticamente si el stock llega a cero o el lote caduca.
+          </div>
+          <button type="submit" class="btn btn-success btn-full mt-12">
+            <i class="fa-solid fa-warehouse"></i> Asignar al Inventario
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> ¿Cómo funciona el inventario?</span></div>
+      <div class="card-body" style="font-size:0.875rem;color:var(--text-secondary)">
+        <p class="mb-8">Cada lote puede asignarse a múltiples centros. El stock se maneja de forma independiente por centro.</p>
+        <p class="mb-8">Cuando un responsable clínico registra una aplicación, el stock del inventario seleccionado se reduce en 1.</p>
+        <p class="mb-8">Si el stock llega a 0 o la fecha de caducidad del lote es pasada, el inventario se <strong>desactiva automáticamente</strong> y deja de estar disponible para nuevas aplicaciones.</p>
+        <p>Puedes monitorear alertas de bajo stock y caducidad en la sección <a href="{{ url_for('admin.inventario') }}">Inventario y Alertas</a>.</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tab switching for this page
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#lotes-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#lotes-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Iniciar Sesión — VacunaTrack</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+<div class="login-wrapper">
+  <div class="login-card">
+
+    <div class="login-logo">
+      <div class="licon">💉</div>
+      <h1>VacunaTrack</h1>
+      <p>Control digital de vacunación infantil</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-msg {{ category }}" style="margin-bottom:16px">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+      <div class="form-group">
+        <label class="form-label" for="email">
+          Correo electrónico <span class="required">*</span>
+        </label>
+        <div style="position:relative">
+          <i class="fa-regular fa-envelope" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+          <input type="email" id="email" name="email" class="form-control"
+                 style="padding-left:36px" placeholder="usuario@correo.com" required autofocus>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">
+          Contraseña <span class="required">*</span>
+        </label>
+        <div style="position:relative">
+          <i class="fa-solid fa-lock" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted)"></i>
+          <input type="password" id="password" name="password" class="form-control"
+                 style="padding-left:36px;padding-right:40px" placeholder="Tu contraseña" required>
+          <button type="button" id="toggle-pwd"
+                  style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px">
+            <i class="fa-regular fa-eye"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:8px">
+        <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
+      </button>
+    </form>
+
+    <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);text-align:center">
+      <a href="{{ url_for('public.schemes') }}" class="text-muted fs-sm">
+        <i class="fa-solid fa-list-check"></i> Ver esquemas de vacunación sin cuenta
+      </a>
+    </div>
+
+    <div style="margin-top:12px;text-align:center">
+      <a href="{{ url_for('public.landing') }}" class="text-muted fs-sm">
+        <i class="fa-solid fa-arrow-left"></i> Volver a home
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+  document.getElementById('toggle-pwd').addEventListener('click', function() {
+    const input = document.getElementById('password');
+    const icon  = this.querySelector('i');
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.className = 'fa-regular fa-eye-slash';
+    } else {
+      input.type = 'password';
+      icon.className = 'fa-regular fa-eye';
+    }
+  });
+</script>
+</body>
+</html>

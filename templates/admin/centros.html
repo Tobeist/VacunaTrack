@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Centros de Salud — VacunaTrack{% endblock %}
+{% block page_title %}Centros de Salud{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Registrar Centro</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.centros') }}">
+        <div class="form-group"><label class="form-label">Nombre del centro <span class="required">*</span></label>
+          <input type="text" name="nombre" class="form-control" required></div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Calle <span class="required">*</span></label>
+            <input type="text" name="calle" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Número<span class="required">*</span></label>
+            <input required type="text" name="numero" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">C.P.<span class="required">*</span></label>
+            <input required type="text" name="cp" class="form-control" maxlength="5"></div>
+          <div class="form-group"><label class="form-label">Ciudad <span class="required">*</span><span class="required">*</span></label>
+            <select name="ciudad_id" class="form-select" required>
+              <option value="">— Selecciona —</option>
+              {% for c in ciudades %}
+              <option value="{{ c.ciudad_id }}">{{ c.ciudad_nombre }} ({{ c.estado_nombre }})</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Horario inicio <span class="required">*</span></label>
+            <input required type="time" name="horario_inicio" class="form-control"></div>
+          <div class="form-group"><label class="form-label">Horario fin<span class="required">*</span></label>
+            <input required type="time" name="horario_fin" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Latitud<span class="required">*</span></label>
+            <input required type="number" name="latitud" class="form-control" step="any"></div>
+          <div class="form-group"><label class="form-label">Longitud<span class="required">*</span></label>
+            <input required type="number" name="longitud" class="form-control" step="any"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Teléfono<span class="required">*</span></label>
+            <input required type="tel" name="telefono" class="form-control"></div>
+          <div class="form-group"><label class="form-label">UID Beacon (Bluetooth)<span class="required">*</span></label>
+            <input required type="text" name="beacon" class="form-control" placeholder="Ej: BEACON-001"></div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full mt-8">
+          <i class="fa-solid fa-plus"></i> Registrar Centro
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Centros ({{ centros|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar centro…" data-search-table="tabla-centros">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-centros">
+        <thead><tr><th>Nombre</th><th>Dirección</th><th>Ciudad</th><th>Horario</th><th>Beacon</th><th>Acciones</th></tr></thead>
+        <tbody>
+          {% for c in centros %}
+          <tr>
+            <td class="fw-600">{{ c.centro_nombre }}</td>
+            <td class="fs-sm">{{ c.centro_calle }} {{ c.centro_numero or '' }}</td>
+            <td>{{ c.ciudad_nombre }}</td>
+            <td class="fs-sm">{{ c.centro_horario_inicio|format_time }} – {{ c.centro_horario_fin|format_time }}</td>
+            <td class="fs-sm" style="font-family:monospace">{{ c.centro_beacon or '—' }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.eliminar_centro', cid=c.centro_id) }}" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm" data-confirm="¿Eliminar {{ c.centro_nombre }}?">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No centros registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard — VacunaTrack{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="stats-grid">
+  <div class="stat-card">
+    <div class="sc-icon purple"><i class="fa-solid fa-baby" style="font-size:18px"></i></div>
+    <div class="sc-label">Pacientes</div>
+    <div class="sc-value">{{ stats.pacientes }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon blue"><i class="fa-solid fa-users" style="font-size:18px;color:var(--secondary)"></i></div>
+    <div class="sc-label">Tutores</div>
+    <div class="sc-value">{{ stats.tutores }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon green"><i class="fa-solid fa-user-doctor" style="font-size:18px;color:var(--success)"></i></div>
+    <div class="sc-label">Responsables</div>
+    <div class="sc-value">{{ stats.responsables }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon blue"><i class="fa-solid fa-hospital" style="font-size:18px;color:var(--secondary)"></i></div>
+    <div class="sc-label">Centros de Salud</div>
+    <div class="sc-value">{{ stats.centros }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon green"><i class="fa-solid fa-syringe" style="font-size:18px;color:var(--success)"></i></div>
+    <div class="sc-label">Aplicaciones hoy</div>
+    <div class="sc-value">{{ stats.aplicaciones_hoy }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon orange"><i class="fa-solid fa-triangle-exclamation" style="font-size:18px;color:var(--orange)"></i></div>
+    <div class="sc-label">Alertas inventario</div>
+    <div class="sc-value">{{ stats.alertas_inv }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon red"><i class="fa-solid fa-bell" style="font-size:18px;color:var(--danger)"></i></div>
+    <div class="sc-label">Alertas dosis</div>
+    <div class="sc-value">{{ stats.alertas_dosis }}</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--primary)"></i> Aplicaciones (últimos 12 meses)</span>
+      <a href="{{ url_for('admin.reportes') }}" class="btn btn-secondary btn-sm">Ver más</a>
+    </div>
+    <div class="card-body">
+      <div style="position:relative;height:280px">
+        <canvas id="dash-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-bell" style="color:var(--danger)"></i> Alertas recientes</span>
+      <a href="{{ url_for('admin.inventario') }}" class="btn btn-secondary btn-sm">Todas</a>
+    </div>
+    <div class="card-body" style="padding:0">
+      {% if alertas %}
+        {% for a in alertas %}
+        <div style="padding:12px 18px;border-bottom:1px solid var(--border-light);display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:18px;margin-top:1px">{{ '📦' if a.tipo == 'inventario' else '💉' }}</span>
+          <div>
+            <div class="fw-600 fs-sm">
+              {% if a.tipo == 'inventario' %}
+                <span class="badge badge-{{ a.subtipo }}">{{ a.subtipo|replace('_',' ')|title }}</span>
+              {% else %}
+                Dosis {{ a.subtipo|replace('_',' ') }}
+                {% if a.paciente %} — {{ a.paciente }}{% endif %}
+              {% endif %}
+            </div>
+            <div class="text-muted" style="font-size:0.75rem;margin-top:2px">{{ a.ts|format_datetime }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-center" style="padding:32px;color:var(--text-muted)">
+          <i class="fa-solid fa-circle-check" style="font-size:28px;color:var(--success)"></i>
+          <p class="mt-8">Sin alertas recientes</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:20px">
+  {% set shortcuts = [
+    (url_for('admin.pacientes'),    'fa-baby',        'var(--primary)',   'Nuevo Paciente'),
+    (url_for('admin.tutores'),      'fa-users',       'var(--secondary)', 'Nuevo Tutor'),
+    (url_for('admin.responsables'), 'fa-user-doctor', 'var(--success)',   'Nuevo Responsable'),
+    (url_for('admin.lotes'),        'fa-boxes-stacked','var(--warning)',  'Nuevo Lote'),
+    (url_for('admin.reportes'),     'fa-chart-bar',   'var(--orange)',    'Ver Reportes'),
+    (url_for('admin.inventario'),   'fa-warehouse',   'var(--danger)',    'Ver Inventario'),
+  ] %}
+  {% for href, icon, color, label in shortcuts %}
+  <a href="{{ href }}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-decoration:none;transition:var(--transition);box-shadow:var(--shadow-sm)"
+     onmouseenter="this.style.boxShadow='var(--shadow)';this.style.transform='translateY(-2px)'"
+     onmouseleave="this.style.boxShadow='var(--shadow-sm)';this.style.transform='none'">
+    <div style="width:42px;height:42px;background:{{ color }}22;border-radius:var(--radius);display:flex;align-items:center;justify-content:center">
+      <i class="fa-solid {{ icon }}" style="color:{{ color }};font-size:17px"></i>
+    </div>
+    <span style="font-size:0.8rem;font-weight:600;color:var(--text);text-align:center">{{ label }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+new Chart(document.getElementById('dash-chart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: {{ chart_labels | safe }},
+    datasets: [{ label: 'Aplicaciones', data: {{ chart_data | safe }},
+      backgroundColor: 'rgba(124,58,237,0.75)', borderColor: '#7C3AED', borderWidth: 1, borderRadius: 4 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}Responsables — VacunaTrack{% endblock %}
+{% block page_title %}Responsables Clínicos{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-user-doctor" style="color:var(--secondary)"></i> Registrar Personal Clínico</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.responsables') }}">
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
+            <input type="text" name="prim_nombre" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Segundo nombre</label>
+            <input type="text" name="seg_nombre" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Apellido paterno <span class="required">*</span></label>
+            <input type="text" name="apellido_pat" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Apellido materno</label>
+            <input type="text" name="apellido_mat" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">RFC <span class="required">*</span></label>
+            <input required type="text" name="rfc" class="form-control" maxlength="13" style="text-transform:uppercase"></div>
+          <div class="form-group"><label class="form-label">CURP <span class="required">*</span></label>
+            <input required type="text" name="curp" class="form-control" maxlength="18" style="text-transform:uppercase"></div>
+        </div>
+        <div class="form-group"><label class="form-label">Correo electrónico <span class="required">*</span></label>
+          <input type="email" name="email" class="form-control" required></div>
+        <div class="form-group"><label class="form-label">Teléfono<span class="required">*</span></label>
+          <input required type="tel" name="telefono" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Centro de salud <span class="required">*</span></label>
+          <select name="centro_id" class="form-select" required>
+            <option value="">— Selecciona centro de salud —</option>
+            {% for c in centros %}
+            <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        
+        <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:8px">
+          <div style="font-weight:600;font-size:0.85rem;margin-bottom:12px;color:var(--text-secondary)">
+            <i class="fa-solid fa-graduation-cap"></i> Cédulas profesionales
+          </div>
+          <div id="cedulas-container">
+            <div class="form-row form-row-2 mb-8">
+              <input  required type="text" name="cedula_numero" class="form-control" placeholder="N° cédula">
+              <input required type="text" name="cedula_especialidad" class="form-control" placeholder="Especialidad">
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="addCedula()">
+            <i class="fa-solid fa-plus"></i> Agregar cédula
+          </button>
+        </div>
+
+        <div class="flash-msg info mt-16" style="font-size:0.8rem;padding:10px 14px">
+          <i class="fa-solid fa-key"></i> Se generará contraseña temporal automáticamente.
+        </div>
+        <button type="submit" class="btn btn-primary btn-full mt-12">
+          <i class="fa-solid fa-plus"></i> Registrar Personal Clínico
+        </button>
+      </form>
+    </div>
+  </div>
+
+  
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-user-doctor" style="color:var(--secondary)"></i> Responsables ({{ responsables|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" id="search-resp" class="form-control" placeholder="🔍 Buscar responsable…" data-search-table="tabla-resp">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-resp">
+        <thead><tr><th>Nombre</th><th>RFC</th><th>Correo electrónico</th><th>Centro</th><th>Cédulas</th><th>Acciones</th></tr></thead>
+        <tbody>
+          {% for r in responsables %}
+          <tr>
+            <td class="fw-600">{{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}</td>
+            <td class="fs-sm" style="font-family:monospace">{{ r.responsable_rfc }}</td>
+            <td>{{ r.responsable_email }}</td>
+            <td>{{ r.centro_nombre or '—' }}</td>
+            <td><span class="badge badge-primary">{{ r.cedulas|length }}</span></td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm"
+                        data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}?">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No responsables registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function addCedula() {
+  const container = document.getElementById('cedulas-container');
+  const div = document.createElement('div');
+  div.className = 'form-row form-row-2 mb-8';
+  div.innerHTML = `<input type="text" name="cedula_numero" class="form-control" placeholder="N° cédula">
+                   <input type="text" name="cedula_especialidad" class="form-control" placeholder="Especialidad">`;
+  container.appendChild(div);
+}
+</script>
+{% endblock %}

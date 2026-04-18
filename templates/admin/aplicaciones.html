@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Aplicaciones — VacunaTrack{% endblock %}
+{% block page_title %}Registro de Aplicaciones{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-syringe" style="color:var(--success)"></i> Nueva Aplicación</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.aplicaciones') }}">
+
+        <div class="form-group">
+          <label class="form-label">Paciente <span class="required">*</span></label>
+          <select name="paciente_id" class="form-select" required>
+            <option value="">— Selecciona paciente —</option>
+            {% for p in pacientes %}
+            <option value="{{ p.paciente_id }}">{{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }} {% if p.paciente_apellido_mat %}{{ p.paciente_apellido_mat|cap }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Personal Clínico <span class="required">*</span></label>
+          <select name="responsable_id" class="form-select" required>
+            <option value="">— Selecciona responsable —</option>
+            {% for r in responsables %}
+            <option value="{{ r.responsable_id }}">{{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }} {% if r.responsable_apellido_mat %}{{ r.responsable_apellido_mat|cap }}{% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Inventario / Lote <span class="required">*</span></label>
+          <select name="inventario_id" class="form-select" required>
+            <option value="">— Selecciona lote disponible —</option>
+            {% for inv in inventarios %}
+            <option value="{{ inv.inventario_id }}">
+              {{ inv.vacuna_nombre }} · Lote {{ inv.lote_codigo }} · {{ inv.centro_nombre }}
+              ({{ inv.inventario_stock_actual }} dosis)
+            </option>
+            {% endfor %}
+          </select>
+          {% if not inventarios %}
+          <div class="form-error">⚠ No inventario activo con stock. Registra y asigna lotes primero.</div>
+          {% endif %}
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Dosis <span class="required">*</span></label>
+          <select name="dosis_id" class="form-select" required>
+            <option value="">— Selecciona dosiss —</option>
+            {% for d in dosis_list %}
+            <option value="{{ d.dosis_id }}">{{ d.vacuna_nombre }} — {{ d.dosis_tipo }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observaciones</label>
+          <textarea name="observaciones" class="form-textarea" placeholder="Notas clínicas, reacciones, observaciones…"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success btn-full">
+          <i class="fa-solid fa-check"></i> Registrar Aplicación
+        </button>
+      </form>
+    </div>
+  </div>
+
+  
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-notes-medical" style="color:var(--success)"></i> Historial ({{ aplicaciones|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar aplicación…" data-search-table="tabla-aplic">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-aplic">
+        <thead><tr>
+          <th>Fecha</th><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Responsable</th><th>Centro</th>
+        </tr></thead>
+        <tbody>
+          {% for a in aplicaciones %}
+          <tr>
+            <td class="fs-sm">{{ a.aplicacion_timestamp|format_datetime }}</td>
+            <td class="fw-600">{{ a.paciente }}</td>
+            <td>{{ a.vacuna_nombre }}</td>
+            <td><span class="badge badge-aplicada">{{ a.dosis_tipo }}</span></td>
+            <td class="fs-sm">{{ a.responsable }}</td>
+            <td class="fs-sm">{{ a.centro_nombre }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted" style="padding:40px">Sin aplicaciones registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

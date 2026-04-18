@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block title %}Mi Perfil — VacunaTrack{% endblock %}
+{% block page_title %}Mi Perfil{% endblock %}
+
+{% block content %}
+<div style="max-width:680px">
+
+  
+  <div class="card mb-20">
+    <div style="background:linear-gradient(135deg,var(--primary),var(--primary-dark));padding:28px 28px 20px;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
+      <div style="display:flex;align-items:center;gap:18px">
+        <form method="POST" action="{{ url_for('public.subir_foto_tutor') }}" enctype="multipart/form-data" style="position:relative;cursor:pointer" title="Cambiar foto de perfil">
+          <input type="file" name="foto" accept="image/*" style="display:none" id="foto-tutor-input" onchange="this.form.submit()">
+          <label for="foto-tutor-input" style="cursor:pointer;display:block">
+            {% if tutor.tutor_imagen %}
+            <img src="{{ url_for('static', filename=tutor.tutor_imagen) }}" alt="Foto" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3)">
+            {% else %}
+            <div style="width:64px;height:64px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff">
+              {{ tutor.tutor_prim_nombre[0]|upper }}{{ tutor.tutor_apellido_pat[0]|upper }}
+            </div>
+            {% endif %}
+            <div style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+              <i class="fa-solid fa-camera" style="font-size:10px;color:#fff"></i>
+            </div>
+          </label>
+        </form>
+        <div>
+          <div style="font-size:1.2rem;font-weight:700;color:#fff">
+            {{ tutor.tutor_prim_nombre|cap }} {% if tutor.tutor_seg_nombre %}{{ tutor.tutor_seg_nombre|cap }} {% endif %}{{ tutor.tutor_apellido_pat|cap }} {% if tutor.tutor_apellido_mat %}{{ tutor.tutor_apellido_mat|cap }}{% endif %}
+          </div>
+          <div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:3px">
+            <i class="fa-regular fa-envelope"></i> {{ tutor.tutor_email }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:0.875rem">
+        <div><span class="text-muted">Teléfono</span><br><strong>{{ tutor.tutor_telefono or '—' }}</strong></div>
+        <div><span class="text-muted">CURP</span><br><strong>{{ tutor.tutor_curp or '—' }}</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-key" style="color:var(--warning)"></i> Seguridad</span></div>
+    <div class="card-body">
+      <p class="text-muted fs-sm mb-16">Mantén tu contraseña segura y cámbiala periódicamente.</p>
+      <a href="{{ url_for('auth.change_password') }}" class="btn btn-primary">
+        <i class="fa-solid fa-lock"></i> Cambiar contraseña
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

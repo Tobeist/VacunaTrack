@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Inicio — VacunaTrack{% endblock %}
+{% block page_title %}Mis Hijos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Bienvenido, {{ session.user_name.split()[0] }} 👋</div>
+    <div class="page-subtitle">Seguimiento de vacunación de tus hijos registrados</div>
+  </div>
+</div>
+
+{% if hijos %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px">
+    {% for hijo in hijos %}
+    {% set nombre_completo = (hijo.paciente_prim_nombre|cap) ~ ' ' ~ ((hijo.paciente_nombre or '')|cap) ~ ' ' ~ (hijo.paciente_apellido_pat|cap) ~ ' ' ~ ((hijo.paciente_apellido_mat or '')|cap) %}
+    <div class="card" style="transition:var(--transition)" onmouseenter="this.style.boxShadow='var(--shadow-lg)'" onmouseleave="this.style.boxShadow='var(--shadow-sm)'">
+      <div style="background:linear-gradient(135deg,var(--primary-bg),var(--secondary-bg));padding:20px 22px;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:1px solid rgba(124,58,237,0.15)">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0">
+            {{ '👦' if hijo.paciente_sexo == 'M' else '👧' }}
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:1.05rem;color:var(--primary-dark)">{{ nombre_completo.strip() }}</div>
+            <div class="text-muted fs-sm">
+              📅 {{ hijo.paciente_fecha_nac|format_date }}
+              &nbsp;·&nbsp;
+              <span class="badge badge-primary">{{ hijo.esquema_nombre }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a href="{{ url_for('public.child_history', paciente_id=hijo.paciente_id) }}"
+             class="btn btn-primary btn-sm" style="flex:1;justify-content:center">
+            <i class="fa-solid fa-notes-medical"></i> Ver Historial
+          </a>
+          <a href="{{ url_for('public.find_centers') }}"
+             class="btn btn-outline-primary btn-sm" style="flex:1;justify-content:center">
+            <i class="fa-solid fa-map-location-dot"></i> Buscar Centro
+          </a>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div class="card">
+    <div class="card-body text-center" style="padding:60px 20px">
+      <div style="font-size:56px;margin-bottom:16px">👶</div>
+      <div style="font-size:1.1rem;font-weight:600;margin-bottom:8px">No tienes hijos registrados aún</div>
+      <p class="text-muted">Un administrador debe registrar a tu hijo y vincularlo con tu cuenta.</p>
+    </div>
+  </div>
+{% endif %}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:28px">
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> ¿Cómo funciona?</span></div>
+    <div class="card-body" style="font-size:0.875rem;color:var(--text-secondary)">
+      <p class="mb-8">1. Selecciona a tu hijo para ver su historial de vacunación.</p>
+      <p class="mb-8">2. Revisa qué dosis están pendientes, atrasadas o próximas.</p>
+      <p class="mb-8">3. Usa el mapa para localizar el centro de salud más cercano.</p>
+      <p>4. Al llegar al centro, recibirás una notificación automática por Bluetooth.</p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-palette" style="color:var(--warning)"></i> Colores de estado</span></div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:0.875rem">
+        <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-aplicada">Aplicada</span> Dosis aplicada</div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-aplicable">Aplicable</span> Lista para aplicarse</div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-cerca_limite">Cerca del límite</span> Urgente, actúa pronto</div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-atrasada">Atrasada</span> Pasó el límite de edad</div>
+        <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-proxima">Próxima</span> Aún no es tiempo</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

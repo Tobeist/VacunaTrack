@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}Relaciones Paciente-Tutor — VacunaTrack{% endblock %}
+{% block page_title %}Relaciones Paciente ↔ Tutor{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-link" style="color:var(--primary)"></i> Crear Relación</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.relaciones') }}" id="form-relacion">
+
+        <div class="form-group">
+          <label class="form-label">Paciente <span class="required">*</span></label>
+          <div style="position:relative">
+            <input type="text" id="buscar-paciente" class="form-control" placeholder="Escribe nombre, CURP o N° Cert. Nac. del paciente..." autocomplete="off">
+            <input type="hidden" name="paciente_id" id="paciente-id-hidden" required>
+            <div id="lista-pacientes" class="autocomplete-dropdown" style="display:none"></div>
+          </div>
+          <div id="paciente-seleccionado" class="selected-chip" style="display:none"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Tutor <span class="required">*</span></label>
+          <div style="position:relative">
+            <input type="text" id="buscar-tutor" class="form-control" placeholder="Escribe nombre, CURP o correo del tutor..." autocomplete="off">
+            <input type="hidden" name="tutor_id" id="tutor-id-hidden" required>
+            <div id="lista-tutores" class="autocomplete-dropdown" style="display:none"></div>
+          </div>
+          <div id="tutor-seleccionado" class="selected-chip" style="display:none"></div>
+        </div>
+
+        <div class="flash-msg info" style="font-size:0.8rem;padding:10px 14px">
+          <i class="fa-solid fa-circle-info"></i>
+          Un paciente puede tener múltiples tutores, y un tutor puede tener múltiples pacientes.
+        </div>
+        <button type="submit" class="btn btn-primary btn-full mt-12" id="btn-crear-relacion" disabled>
+          <i class="fa-solid fa-link"></i> Crear Relación
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-link" style="color:var(--primary)"></i> Relaciones registradas ({{ relaciones|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="Buscar..." data-search-table="tabla-relaciones">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-relaciones">
+        <thead><tr><th>Paciente</th><th>Tutor</th><th>Acciones</th></tr></thead>
+        <tbody>
+          {% for r in relaciones %}
+          <tr>
+            <td class="fw-600">{{ r.paciente }}</td>
+            <td>{{ r.tutor }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.eliminar_relacion', rid=r.pac_tut_id) }}" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm"
+                        data-confirm="¿Eliminar la relación entre {{ r.paciente }} y {{ r.tutor }}?">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No relaciones registradas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<style>
+.autocomplete-dropdown {
+  position:absolute; top:100%; left:0; right:0; z-index:50;
+  background:#fff; border:1px solid var(--border); border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);
+  max-height:220px; overflow-y:auto; box-shadow:var(--shadow);
+}
+.autocomplete-dropdown .ac-item {
+  padding:10px 14px; cursor:pointer; font-size:0.875rem;
+  border-bottom:1px solid var(--border-light); display:flex; justify-content:space-between; align-items:center;
+}
+.autocomplete-dropdown .ac-item:hover { background:var(--primary-bg); }
+.autocomplete-dropdown .ac-item .ac-sub { font-size:0.75rem; color:var(--text-muted); }
+.autocomplete-dropdown .ac-empty { padding:14px; text-align:center; color:var(--text-muted); font-size:0.85rem; }
+.selected-chip {
+  margin-top:8px; padding:8px 14px; background:var(--primary-bg); border:1px solid var(--primary);
+  border-radius:var(--radius); font-size:0.875rem; display:flex; align-items:center; justify-content:space-between;
+}
+.selected-chip .chip-remove {
+  cursor:pointer; color:var(--danger); font-weight:700; margin-left:12px; font-size:1.1rem;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const pacientes = {{ pacientes_json | safe }};
+const tutores   = {{ tutores_json   | safe }};
+
+function setupAutocomplete(inputId, listId, hiddenId, chipId, items, labelFn, subFn, btnCheck) {
+  const input   = document.getElementById(inputId);
+  const list    = document.getElementById(listId);
+  const hidden  = document.getElementById(hiddenId);
+  const chip    = document.getElementById(chipId);
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    if (q.length < 2) { list.style.display = 'none'; return; }
+    const matches = items.filter(it => {
+      const txt = (labelFn(it) + ' ' + subFn(it)).toLowerCase();
+      return txt.includes(q);
+    }).slice(0, 15);
+
+    if (matches.length === 0) {
+      list.innerHTML = '<div class="ac-empty">Sin resultados</div>';
+    } else {
+      list.innerHTML = matches.map(it =>
+        `<div class="ac-item" data-id="${it.id}">
+          <span>${labelFn(it)}</span>
+          <span class="ac-sub">${subFn(it)}</span>
+        </div>`
+      ).join('');
+    }
+    list.style.display = 'block';
+  });
+
+  list.addEventListener('click', e => {
+    const item = e.target.closest('.ac-item');
+    if (!item) return;
+    const id = item.dataset.id;
+    const label = item.querySelector('span').textContent;
+    hidden.value = id;
+    input.style.display = 'none';
+    chip.innerHTML = `<span><i class="fa-solid fa-check" style="color:var(--success);margin-right:6px"></i>${label}</span><span class="chip-remove" title="Cambiar">✕</span>`;
+    chip.style.display = 'flex';
+    list.style.display = 'none';
+    btnCheck();
+
+    chip.querySelector('.chip-remove').addEventListener('click', () => {
+      hidden.value = '';
+      input.value = '';
+      input.style.display = '';
+      chip.style.display = 'none';
+      btnCheck();
+    });
+  });
+
+  document.addEventListener('click', e => {
+    if (!input.contains(e.target) && !list.contains(e.target)) list.style.display = 'none';
+  });
+}
+
+function checkBtn() {
+  document.getElementById('btn-crear-relacion').disabled =
+    !(document.getElementById('paciente-id-hidden').value && document.getElementById('tutor-id-hidden').value);
+}
+
+setupAutocomplete('buscar-paciente', 'lista-pacientes', 'paciente-id-hidden', 'paciente-seleccionado',
+  pacientes,
+  p => p.nombre,
+  p => p.curp || p.cert || '',
+  checkBtn
+);
+
+setupAutocomplete('buscar-tutor', 'lista-tutores', 'tutor-id-hidden', 'tutor-seleccionado',
+  tutores,
+  t => t.nombre,
+  t => t.curp || t.email || '',
+  checkBtn
+);
+</script>
+{% endblock %}

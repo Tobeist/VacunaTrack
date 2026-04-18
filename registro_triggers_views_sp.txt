@@ -1,0 +1,400 @@
+================================================================================
+  VACUNATRACK — Registro de Triggers, Views, Stored Procedures y Constraints
+  Base de datos: vacunatrack (PostgreSQL 16, puerto 5433)
+  Fecha de generacion: 2026-04-15
+================================================================================
+
+
+================================================================================
+1. TRIGGERS (8 triggers activos)
+================================================================================
+
+Tabla: aplicaciones
+-------------------
+
+  a) trg_validar_intervalo_dosis
+     Timing:    BEFORE INSERT
+     Funcion:   fn_validar_intervalo_dosis()
+     Proposito: Antes de insertar una aplicacion, valida que haya transcurrido
+                el intervalo minimo de dias entre dosis de la misma vacuna
+                para el mismo paciente. Si no se cumple, lanza excepcion con
+                el detalle de cuantos dias faltan.
+
+  b) trg_descontar_inventario
+     Timing:    AFTER INSERT
+     Funcion:   fn_descontar_inventario()
+     Proposito: Despues de registrar una aplicacion, busca el inventario activo
+                con stock disponible para el centro + lote correspondiente y
+                decrementa el stock en 1. Si no encuentra inventario activo
+                con stock, lanza excepcion.
+
+
+Tabla: pacientes
+----------------
+
+  c) trg_historial_esquema
+     Timing:    AFTER INSERT OR UPDATE
+     Funcion:   fn_registrar_historial_esquema()
+     Proposito: Al insertar un nuevo paciente, registra automaticamente la
+                asignacion inicial del esquema en esquemas_pacientes.
+                Al actualizar el esquema_id, cierra el periodo anterior y
+                abre uno nuevo con motivo "Cambio de esquema nacional vigente".
+
+  d) trg_normalizar_nombres_paciente
+     Timing:    BEFORE INSERT OR UPDATE
+     Funcion:   fn_normalizar_nombres_paciente()
+     Proposito: Convierte automaticamente a minusculas y elimina espacios
+                en blanco al inicio/fin de: paciente_prim_nombre,
+                paciente_seg_nombre, paciente_apellido_pat, paciente_apellido_mat.
+                La capitalizacion se realiza al mostrar en la interfaz web
+                mediante el filtro Jinja2 |cap (title case).
+
+
+Tabla: usuarios
+---------------
+
+  e) trg_normalizar_nombres_usuario
+     Timing:    BEFORE INSERT OR UPDATE
+     Funcion:   fn_normalizar_nombres_usuario()
+     Proposito: Convierte automaticamente a minusculas y elimina espacios
+                en blanco al inicio/fin de: usuario_prim_nombre,
+                usuario_seg_nombre, usuario_apellido_pat, usuario_apellido_mat.
+                La capitalizacion se realiza al mostrar en la interfaz web
+                mediante el filtro Jinja2 |cap (title case).
+
+
+================================================================================
+2. FUNCIONES / STORED PROCEDURES (6 funciones)
+================================================================================
+
+  a) fn_validar_intervalo_dosis()
+     Tipo:      Trigger function (RETURNS trigger)
+     Lenguaje:  PL/pgSQL
+     Definicion:
+       - Obtiene dosis_intervalo_min_dias y vacuna_id de la dosis a aplicar.
+       - Si el intervalo es NULL o 0, permite la insercion.
+       - Busca la ultima aplicacion del mismo paciente para la misma vacuna.
+       - Si han pasado menos dias que el intervalo minimo, lanza RAISE EXCEPTION
+         con mensaje detallado.
+
+  b) fn_descontar_inventario()
+     Tipo:      Trigger function (RETURNS trigger)
+     Lenguaje:  PL/pgSQL
+     Definicion:
+       - Busca el inventario activo (inventario_activo_desde IS NOT NULL)
+         con stock > 0 para el centro_id + lote_id de la nueva aplicacion.
+       - Decrementa inventario_stock_actual en 1.
+       - Si no hay inventario disponible, lanza RAISE EXCEPTION.
+
+  c) fn_registrar_historial_esquema()
+     Tipo:      Trigger function (RETURNS trigger)
+     Lenguaje:  PL/pgSQL
+     Definicion:
+       - INSERT: Crea registro en esquemas_pacientes con esq_pac_desde = CURRENT_DATE
+         y motivo "Asignacion inicial al registrar paciente".
+       - UPDATE (cambio de esquema_id): Cierra el registro anterior poniendo
+         esq_pac_hasta = CURRENT_DATE, luego inserta nuevo registro.
+
+  d) fn_normalizar_nombres_usuario()
+     Tipo:      Trigger function (RETURNS trigger)
+     Lenguaje:  PL/pgSQL
+     Definicion:
+       - Aplica LOWER(TRIM(...)) a los campos de nombre del usuario
+         antes de INSERT o UPDATE.
+
+  e) fn_normalizar_nombres_paciente()
+     Tipo:      Trigger function (RETURNS trigger)
+     Lenguaje:  PL/pgSQL
+     Definicion:
+       - Aplica LOWER(TRIM(...)) a los campos de nombre del paciente
+         antes de INSERT o UPDATE.
+
+  f) sp_stock_disponible(p_centro_id INTEGER, p_lote_id INTEGER)
+     Tipo:      Stored procedure / Funcion escalar (RETURNS integer)
+     Lenguaje:  SQL puro
+     Definicion:
+       - Retorna COALESCE(SUM(inventario_stock_actual), 0)
+         del inventario activo para un centro + lote.
+     Uso:
+       SELECT sp_stock_disponible(1, 3);  -- Stock disponible en centro 1 del lote 3
+
+
+================================================================================
+3. VIEWS (0 vistas)
+================================================================================
+
+  Actualmente no hay vistas definidas en el esquema publico.
+  Todas las consultas de reportes se ejecutan directamente desde
+  el repositorio de datos (repository.py) usando JOINs.
+
+
+================================================================================
+4. CHECK CONSTRAINTS (21 restricciones de verificacion)
+================================================================================
+
+Tabla: usuarios
+  - chk_usuarios_curp_o_rfc
+    CHECK ((usuario_curp IS NOT NULL) OR (usuario_rfc IS NOT NULL))
+    Proposito: Al menos uno de los dos identificadores (CURP o RFC) debe estar presente.
+
+Tabla: pacientes
+  - pacientes_check
+    CHECK ((paciente_num_cert_nac IS NOT NULL) OR (paciente_curp IS NOT NULL))
+    Proposito: Al menos CURP o N. Certificado de Nacimiento debe estar presente.
+  - pacientes_paciente_fecha_nac_check
+    CHECK (paciente_fecha_nac <= CURRENT_DATE)
+    Proposito: La fecha de nacimiento no puede ser futura.
+
+Tabla: aplicaciones
+  - aplicaciones_aplicacion_timestamp_check
+    CHECK (aplicacion_timestamp <= CURRENT_TIMESTAMP)
+    Proposito: No se pueden registrar aplicaciones en el futuro.
+
+Tabla: centros_salud
+  - centros_salud_centro_latitud_check
+    CHECK (centro_latitud >= -90 AND centro_latitud <= 90)
+  - centros_salud_centro_longitud_check
+    CHECK (centro_longitud >= -180 AND centro_longitud <= 180)
+  - centros_salud_check
+    CHECK (centro_horario_fin > centro_horario_inicio)
+    Proposito: El horario de cierre debe ser posterior al de apertura.
+
+Tabla: dosis
+  - dosis_check (vigencia)
+    CHECK ((dosis_vigente_hasta IS NULL) OR (dosis_vigente_hasta > dosis_vigente_desde))
+  - dosis_dosis_cant_ml_check
+    CHECK (dosis_cant_ml > 0)
+  - dosis_dosis_edad_oportuna_dias_check
+    CHECK (dosis_edad_oportuna_dias >= 0)
+  - dosis_dosis_intervalo_min_dias_check
+    CHECK (dosis_intervalo_min_dias >= 0)
+  - dosis_dosis_limite_edad_dias_check
+    CHECK (dosis_limite_edad_dias >= 0)
+
+Tabla: esquemas
+  - esquemas_check
+    CHECK ((esquema_vigente_hasta IS NULL) OR (esquema_vigente_hasta > esquema_vigente_desde))
+
+Tabla: esquemas_pacientes
+  - esquemas_pacientes_check
+    CHECK ((esq_pac_hasta IS NULL) OR (esq_pac_hasta > esq_pac_desde))
+
+Tabla: eventos_gps
+  - eventos_gps_evento_latitud_check
+    CHECK (evento_latitud >= -90 AND evento_latitud <= 90)
+  - eventos_gps_evento_longitud_check
+    CHECK (evento_longitud >= -180 AND evento_longitud <= 180)
+
+Tabla: inventarios
+  - inventarios_inventario_stock_actual_check
+    CHECK (inventario_stock_actual >= 0)
+  - inventarios_inventario_stock_inicial_check
+    CHECK (inventario_stock_inicial >= 0)
+
+Tabla: lotes
+  - lotes_check
+    CHECK (lote_fecha_caducidad > lote_fecha_fabricacion)
+  - lotes_lote_cant_inicial_check
+    CHECK (lote_cant_inicial > 0)
+
+Tabla: transferencias_inventario
+  - transferencias_inventario_check
+    CHECK (inv_origen_id <> inv_destino_id)
+    Proposito: No se puede transferir inventario al mismo registro.
+
+
+================================================================================
+5. CODIGO FUENTE SQL COMPLETO DE FUNCIONES
+================================================================================
+
+-- =========================================
+-- fn_validar_intervalo_dosis()
+-- =========================================
+CREATE OR REPLACE FUNCTION public.fn_validar_intervalo_dosis()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_intervalo_min integer;
+    v_vacuna_id integer;
+    v_ultima_app timestamp;
+    v_dias_desde integer;
+BEGIN
+    SELECT d.dosis_intervalo_min_dias, d.vacuna_id
+    INTO v_intervalo_min, v_vacuna_id
+    FROM dosis d
+    WHERE d.dosis_id = NEW.dosis_id;
+
+    IF v_intervalo_min IS NULL OR v_intervalo_min = 0 THEN
+        RETURN NEW;
+    END IF;
+
+    SELECT MAX(a.aplicacion_timestamp)
+    INTO v_ultima_app
+    FROM aplicaciones a
+    JOIN dosis d ON a.dosis_id = d.dosis_id
+    WHERE a.paciente_id = NEW.paciente_id
+    AND d.vacuna_id = v_vacuna_id;
+
+    IF v_ultima_app IS NOT NULL THEN
+        v_dias_desde := EXTRACT(DAY FROM (NEW.aplicacion_timestamp - v_ultima_app))::integer;
+        IF v_dias_desde < v_intervalo_min THEN
+            RAISE EXCEPTION
+                'Intervalo minimo no cumplido: han transcurrido % dias desde la ultima '
+                'dosis de esta vacuna, pero se requieren al menos % dias. Faltan % dias.',
+                v_dias_desde, v_intervalo_min, (v_intervalo_min - v_dias_desde);
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$function$;
+
+-- Trigger asociado:
+CREATE TRIGGER trg_validar_intervalo_dosis
+    BEFORE INSERT ON aplicaciones
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_validar_intervalo_dosis();
+
+
+-- =========================================
+-- fn_descontar_inventario()
+-- =========================================
+CREATE OR REPLACE FUNCTION public.fn_descontar_inventario()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+DECLARE
+    v_inventario_id integer;
+BEGIN
+    SELECT inventario_id INTO v_inventario_id
+    FROM inventarios
+    WHERE centro_id = NEW.centro_id
+      AND lote_id   = NEW.lote_id
+      AND inventario_activo_desde IS NOT NULL
+      AND inventario_stock_actual > 0
+    ORDER BY inventario_activo_desde DESC
+    LIMIT 1;
+
+    IF v_inventario_id IS NULL THEN
+        RAISE EXCEPTION
+            'No hay inventario activo con stock disponible para el lote % en el centro %.',
+            NEW.lote_id, NEW.centro_id;
+    END IF;
+
+    UPDATE inventarios
+    SET inventario_stock_actual = inventario_stock_actual - 1
+    WHERE inventario_id = v_inventario_id;
+
+    RETURN NEW;
+END;
+$function$;
+
+-- Trigger asociado:
+CREATE TRIGGER trg_descontar_inventario
+    AFTER INSERT ON aplicaciones
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_descontar_inventario();
+
+
+-- =========================================
+-- fn_registrar_historial_esquema()
+-- =========================================
+CREATE OR REPLACE FUNCTION public.fn_registrar_historial_esquema()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO esquemas_pacientes(paciente_id, esquema_id, esq_pac_desde, esq_pac_motivo_cambio)
+        VALUES(NEW.paciente_id, NEW.esquema_id, current_date, 'Asignacion inicial al registrar paciente');
+
+    ELSIF TG_OP = 'UPDATE' AND OLD.esquema_id IS DISTINCT FROM NEW.esquema_id THEN
+        UPDATE esquemas_pacientes
+        SET esq_pac_hasta = current_date
+        WHERE paciente_id = OLD.paciente_id
+        AND esquema_id = OLD.esquema_id
+        AND esq_pac_hasta IS NULL;
+
+        INSERT INTO esquemas_pacientes(paciente_id, esquema_id, esq_pac_desde, esq_pac_motivo_cambio)
+        VALUES(NEW.paciente_id, NEW.esquema_id, current_date, 'Cambio de esquema nacional vigente');
+    END IF;
+
+    RETURN NEW;
+END;
+$function$;
+
+-- Trigger asociado:
+CREATE TRIGGER trg_historial_esquema
+    AFTER INSERT OR UPDATE ON pacientes
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_registrar_historial_esquema();
+
+
+-- =========================================
+-- fn_normalizar_nombres_usuario()
+-- =========================================
+CREATE OR REPLACE FUNCTION public.fn_normalizar_nombres_usuario()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    NEW.usuario_prim_nombre  := LOWER(TRIM(NEW.usuario_prim_nombre));
+    NEW.usuario_seg_nombre   := LOWER(TRIM(NEW.usuario_seg_nombre));
+    NEW.usuario_apellido_pat := LOWER(TRIM(NEW.usuario_apellido_pat));
+    NEW.usuario_apellido_mat := LOWER(TRIM(NEW.usuario_apellido_mat));
+    RETURN NEW;
+END;
+$function$;
+
+-- Trigger asociado:
+CREATE TRIGGER trg_normalizar_nombres_usuario
+    BEFORE INSERT OR UPDATE ON usuarios
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_normalizar_nombres_usuario();
+
+
+-- =========================================
+-- fn_normalizar_nombres_paciente()
+-- =========================================
+CREATE OR REPLACE FUNCTION public.fn_normalizar_nombres_paciente()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+    NEW.paciente_prim_nombre  := LOWER(TRIM(NEW.paciente_prim_nombre));
+    NEW.paciente_seg_nombre   := LOWER(TRIM(NEW.paciente_seg_nombre));
+    NEW.paciente_apellido_pat := LOWER(TRIM(NEW.paciente_apellido_pat));
+    NEW.paciente_apellido_mat := LOWER(TRIM(NEW.paciente_apellido_mat));
+    RETURN NEW;
+END;
+$function$;
+
+-- Trigger asociado:
+CREATE TRIGGER trg_normalizar_nombres_paciente
+    BEFORE INSERT OR UPDATE ON pacientes
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_normalizar_nombres_paciente();
+
+
+-- =========================================
+-- sp_stock_disponible()
+-- =========================================
+CREATE OR REPLACE FUNCTION public.sp_stock_disponible(p_centro_id integer, p_lote_id integer)
+ RETURNS integer
+ LANGUAGE sql
+AS $function$
+    SELECT COALESCE(SUM(inventario_stock_actual), 0)
+    FROM inventarios
+    WHERE centro_id              = p_centro_id
+      AND lote_id                = p_lote_id
+      AND inventario_activo_desde IS NOT NULL;
+$function$;
+
+-- Ejemplo de uso:
+-- SELECT sp_stock_disponible(1, 3);
+
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================

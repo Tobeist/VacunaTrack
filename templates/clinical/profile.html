@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% block title %}Mi Perfil — VacunaTrack{% endblock %}
+{% block page_title %}Mi Perfil Clínico{% endblock %}
+
+{% block content %}
+<div style="max-width:680px">
+
+  <div class="card mb-20">
+    <div style="background:linear-gradient(135deg,var(--secondary),#1D4ED8);padding:28px;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
+      <div style="display:flex;align-items:center;gap:18px">
+        <form method="POST" action="{{ url_for('clinical.subir_foto_perfil') }}" enctype="multipart/form-data" style="position:relative;cursor:pointer" title="Cambiar foto de perfil">
+          <input type="file" name="foto" accept="image/*" style="display:none" id="foto-resp-input" onchange="this.form.submit()">
+          <label for="foto-resp-input" style="cursor:pointer;display:block">
+            {% if responsable.responsable_imagen %}
+            <img src="{{ url_for('static', filename=responsable.responsable_imagen) }}" alt="Foto" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.3)">
+            {% else %}
+            <div style="width:64px;height:64px;background:rgba(255,255,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;color:#fff">
+              🩺
+            </div>
+            {% endif %}
+            <div style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;background:var(--secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+              <i class="fa-solid fa-camera" style="font-size:10px;color:#fff"></i>
+            </div>
+          </label>
+        </form>
+        <div>
+          <div style="font-size:1.2rem;font-weight:700;color:#fff">
+            {{ responsable.responsable_prim_nombre|cap }}
+            {% if responsable.responsable_seg_nombre %}{{ responsable.responsable_seg_nombre|cap }}{% endif %}
+            {{ responsable.responsable_apellido_pat|cap }}
+            {% if responsable.responsable_apellido_mat %}{{ responsable.responsable_apellido_mat|cap }}{% endif %}
+          </div>
+          <div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:4px">
+            Responsable Clínico
+            {% if responsable.centro_nombre %} · {{ responsable.centro_nombre }}{% endif %}
+          </div>
+          <div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-top:2px">
+            <i class="fa-regular fa-envelope"></i> {{ responsable.responsable_email }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;font-size:0.875rem">
+        <div><span class="text-muted">RFC</span><br><strong>{{ responsable.responsable_rfc or '—' }}</strong></div>
+        <div><span class="text-muted">CURP</span><br><strong>{{ responsable.responsable_curp or '—' }}</strong></div>
+        <div><span class="text-muted">Teléfono</span><br><strong>{{ responsable.responsable_telefono or '—' }}</strong></div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="card mb-20">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-graduation-cap" style="color:var(--secondary)"></i> Cédulas Profesionales</span></div>
+    <div class="card-body">
+      {% if cedulas %}
+        <div class="table-wrapper">
+          <table class="table">
+            <thead><tr><th>N° Cédula</th><th>Especialidad</th></tr></thead>
+            <tbody>
+              {% for c in cedulas %}
+              <tr>
+                <td class="fw-600">{{ c.cedula_numero }}</td>
+                <td>{{ c.cedula_especialidad or '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted">No hay cédulas registradas.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-key" style="color:var(--warning)"></i> Seguridad</span></div>
+    <div class="card-body">
+      <a href="{{ url_for('auth.change_password') }}" class="btn btn-primary">
+        <i class="fa-solid fa-lock"></i> Cambiar contraseña
+      </a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

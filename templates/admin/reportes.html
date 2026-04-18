@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Reportes — VacunaTrack{% endblock %}
+{% block page_title %}Reportes y Análisis{% endblock %}
+
+{% block content %}
+
+<div class="card mb-24">
+  <div class="card-header"><span class="card-title"><i class="fa-solid fa-filter" style="color:var(--primary)"></i> Filtros de reporte</span></div>
+  <div class="card-body">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+      <div class="form-group mb-0" style="min-width:160px">
+        <label class="form-label">Fecha desde</label>
+        <input type="date" id="filter-desde" class="form-control" value="2024-01-01">
+      </div>
+      <div class="form-group mb-0" style="min-width:160px">
+        <label class="form-label">Fecha hasta</label>
+        <input type="date" id="filter-hasta" class="form-control">
+      </div>
+      <div class="form-group mb-0" style="min-width:200px">
+        <label class="form-label">Centro (opcional)</label>
+        <select id="filter-centro" class="form-select">
+          <option value="">Todos los centros</option>
+          {% for c in centros %}
+          <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group mb-0" style="min-width:200px">
+        <label class="form-label">Vacuna (opcional)</label>
+        <select id="filter-vacuna" class="form-select">
+          <option value="">Todas las vacunas</option>
+          {% for v in vacunas %}
+          <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--primary)"></i> Aplicaciones por mes</span>
+    </div>
+    <div class="card-body">
+      <div style="position:relative;height:300px">
+        <canvas id="chart-por-mes"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-chart-pie" style="color:var(--secondary)"></i> Top vacunas aplicadas</span>
+    </div>
+    <div class="card-body">
+      <div style="position:relative;height:300px">
+        <canvas id="chart-top-vacunas"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> Resumen del período</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:32px;font-size:0.875rem;flex-wrap:wrap">
+      <div><div class="text-muted">Período</div><div class="fw-600" id="res-periodo">—</div></div>
+      <div><div class="text-muted">Total aplicaciones</div><div class="fw-600" id="res-total">—</div></div>
+      <div><div class="text-muted">Centros activos</div><div class="fw-600">{{ centros|length }}</div></div>
+      <div><div class="text-muted">Vacunas registradas</div><div class="fw-600">{{ vacunas|length }}</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title"><i class="fa-solid fa-palette" style="color:var(--warning)"></i> Estados de dosis</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+      <div><span class="badge badge-aplicada">✅ Aplicada</span><p class="text-muted fs-sm mt-4">Dosis ya administrada</p></div>
+      <div><span class="badge badge-aplicable">⏰ Aplicable</span><p class="text-muted fs-sm mt-4">Lista para aplicarse ahora</p></div>
+      <div><span class="badge badge-atrasada">⚠ Atrasada</span><p class="text-muted fs-sm mt-4">30+ días desde edad oportuna</p></div>
+      <div><span class="badge badge-cerca_limite">🔶 Cerca del límite</span><p class="text-muted fs-sm mt-4">Menos de 15 días para el límite</p></div>
+      <div><span class="badge badge-faltante">✕ Faltante</span><p class="text-muted fs-sm mt-4">Límite alcanzado o previa faltante</p></div>
+      <div><span class="badge badge-proxima">🔵 Próxima</span><p class="text-muted fs-sm mt-4">Aún no llega a edad oportuna</p></div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const COLORS = ['#7C3AED','#2563EB','#16A34A','#D97706','#EA580C','#DC2626','#8B5CF6','#0891B2'];
+
+document.getElementById('filter-hasta').value = new Date().toISOString().split('T')[0];
+
+let chartMes = null;
+let chartVac = null;
+
+function buildCharts(data) {
+  const mesLabels = data.por_mes.map(r => r.mes);
+  const mesDatos  = data.por_mes.map(r => r.total);
+  const vacLabels = data.top_vacunas.map(r => r.vacuna_nombre);
+  const vacDatos  = data.top_vacunas.map(r => r.total);
+
+  const desde = document.getElementById('filter-desde').value;
+  const hasta = document.getElementById('filter-hasta').value;
+  document.getElementById('res-periodo').textContent = desde + ' → ' + hasta;
+  document.getElementById('res-total').textContent = data.total ?? mesDatos.reduce((a,b)=>a+b,0);
+
+  if (chartMes) chartMes.destroy();
+  chartMes = new Chart(document.getElementById('chart-por-mes').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: mesLabels,
+      datasets: [{ label: 'Aplicaciones', data: mesDatos,
+        backgroundColor: 'rgba(124,58,237,0.75)', borderColor: '#7C3AED',
+        borderWidth: 1, borderRadius: 4 }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+  });
+
+  if (chartVac) chartVac.destroy();
+  chartVac = new Chart(document.getElementById('chart-top-vacunas').getContext('2d'), {
+    type: 'pie',
+    data: {
+      labels: vacLabels,
+      datasets: [{ data: vacDatos,
+        backgroundColor: COLORS.slice(0, vacLabels.length),
+        borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { font: { size: 11 } } } } }
+  });
+}
+
+function fetchData() {
+  const desde    = document.getElementById('filter-desde').value;
+  const hasta    = document.getElementById('filter-hasta').value;
+  const centro   = document.getElementById('filter-centro').value;
+  const vacuna   = document.getElementById('filter-vacuna').value;
+  const params   = new URLSearchParams({ desde, hasta });
+  if (centro) params.set('centro', centro);
+  if (vacuna) params.set('vacuna', vacuna);
+
+  fetch('/admin/api/reporte-datos?' + params)
+    .then(r => r.json())
+    .then(buildCharts)
+    .catch(err => console.error('Error cargando datos:', err));
+}
+
+// Cargar al abrir y al cambiar filtros
+document.addEventListener('DOMContentLoaded', fetchData);
+['filter-desde','filter-hasta','filter-centro','filter-vacuna'].forEach(id => {
+  document.getElementById(id).addEventListener('change', fetchData);
+});
+</script>
+{% endblock %}

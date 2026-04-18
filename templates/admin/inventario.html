@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+{% block title %}Inventario y Alertas — VacunaTrack{% endblock %}
+{% block page_title %}Inventario y Alertas{% endblock %}
+
+{% block content %}
+
+<div class="stats-grid" style="margin-bottom:24px">
+  <div class="stat-card">
+    <div class="sc-icon green"><i class="fa-solid fa-check-circle" style="font-size:18px;color:var(--success)"></i></div>
+    <div class="sc-label">Inventarios activos</div>
+    <div class="sc-value">{{ inventario|selectattr('inventario_activo','equalto',True)|list|length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon red"><i class="fa-solid fa-circle-xmark" style="font-size:18px;color:var(--danger)"></i></div>
+    <div class="sc-label">Inventarios inactivos</div>
+    <div class="sc-value">{{ inventario|selectattr('inventario_activo','equalto',False)|list|length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon orange"><i class="fa-solid fa-triangle-exclamation" style="font-size:18px;color:var(--orange)"></i></div>
+    <div class="sc-label">Alertas de inventario</div>
+    <div class="sc-value">{{ alertas_inv|length }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="sc-icon red"><i class="fa-solid fa-bell" style="font-size:18px;color:var(--danger)"></i></div>
+    <div class="sc-label">Alertas dosis</div>
+    <div class="sc-value">{{ alertas_dosis|length }}</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px;font-size:0.8rem;color:var(--text-secondary)">
+  <span><strong>Leyenda filas:</strong></span>
+  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#F0FDF4;border:1px solid #86EFAC;display:inline-block;border-radius:2px"></span> Stock suficiente</span>
+  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFFBEB;border:1px solid #FDE68A;display:inline-block;border-radius:2px"></span> Stock bajo</span>
+  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFF5F5;border:1px solid #FCA5A5;display:inline-block;border-radius:2px"></span> Caducado / Sin stock</span>
+</div>
+
+<div class="tabs" id="inv-tabs">
+  <button class="tab-btn active" data-tab="tab-inv">📦 Inventario</button>
+  <button class="tab-btn" data-tab="tab-alertas-inv">⚠️ Alertas Inventario ({{ alertas_inv|length }})</button>
+  <button class="tab-btn" data-tab="tab-alertas-dosis">💉 Alertas Dosis ({{ alertas_dosis|length }})</button>
+</div>
+
+<div class="tab-panel active" id="tab-inv">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-warehouse" style="color:var(--warning)"></i> Stock por centro</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar en inventario…" data-search-table="tabla-inv">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-inv">
+        <thead><tr>
+          <th>Centro</th><th>Vacuna</th><th>Lote</th><th>Fabricante</th>
+          <th>Caducidad</th><th>Stock inicial</th><th>Stock actual</th><th>Estado</th>
+        </tr></thead>
+        <tbody>
+          {% for inv in inventario %}
+          {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
+          {% set row_class = 'inv-expired' if not inv.inventario_activo else ('inv-low' if pct < 20 else 'inv-ok') %}
+          <tr class="{{ row_class }}">
+            <td class="fw-600">{{ inv.centro_nombre }}</td>
+            <td>{{ inv.vacuna_nombre }}</td>
+            <td class="fs-sm" style="font-family:monospace">{{ inv.lote_codigo }}</td>
+            <td class="fs-sm">{{ inv.fabricante_nombre }}</td>
+            <td class="fs-sm">{{ inv.lote_fecha_caducidad|format_date }}</td>
+            <td class="text-center">{{ inv.inventario_stock_inicial }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="flex:1;background:var(--border);border-radius:3px;height:6px;min-width:60px">
+                  <div style="width:{{ [pct,100]|min }}%;height:100%;background:{{ 'var(--danger)' if pct < 10 else ('var(--warning)' if pct < 30 else 'var(--success)') }};border-radius:3px"></div>
+                </div>
+                <span class="fw-600">{{ inv.inventario_stock_actual }}</span>
+              </div>
+            </td>
+            <td>
+              {% if inv.inventario_activo %}
+                <span class="badge badge-aplicada">Activo</span>
+              {% else %}
+                <span class="badge badge-atrasada">Inactivo</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="8" class="text-center text-muted" style="padding:40px">No inventario registrado.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-alertas-inv">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--orange)"></i> Alertas de inventario</span>
+    </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Tipo</th><th>Vacuna</th><th>Centro</th><th>Fecha</th></tr></thead>
+        <tbody>
+          {% for a in alertas_inv %}
+          <tr>
+            <td>
+              <span class="badge badge-{{ a.alerta_inv_tipo }}">
+                {{ a.alerta_inv_tipo|replace('_',' ')|title }}
+              </span>
+            </td>
+            <td>{{ a.vacuna_nombre }}</td>
+            <td>{{ a.centro_nombre }}</td>
+            <td class="fs-sm text-muted">{{ a.alerta_inv_timestamp|format_datetime }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted" style="padding:40px">
+            <i class="fa-solid fa-circle-check" style="color:var(--success);font-size:24px"></i>
+            <p class="mt-8">No alertas de inventario</p>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-alertas-dosis">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-bell" style="color:var(--danger)"></i> Alertas de dosis por paciente</span>
+    </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Estado</th><th>Paciente</th><th>Vacuna</th><th>Tipo dosis</th><th>Fecha alerta</th></tr></thead>
+        <tbody>
+          {% for a in alertas_dosis %}
+          <tr>
+            <td>
+              {% set badge_map = {
+                'aplicable': 'applicable',
+                'atrasada': 'overdue',
+                'cerca_del_limite': 'near',
+                'proxima': 'upcoming'
+              } %}
+              <span class="badge badge-{{ badge_map.get(a.alerta_dosis_pac_tipo, 'gray') }}">
+                {{ a.alerta_dosis_pac_tipo|replace('_',' ')|title }}
+              </span>
+            </td>
+            <td class="fw-600">{{ a.paciente }}</td>
+            <td>{{ a.vacuna_nombre }}</td>
+            <td>{{ a.dosis_tipo }}</td>
+            <td class="fs-sm text-muted">{{ a.alerta_dosis_pac_timestamp|format_datetime }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-center text-muted" style="padding:40px">
+            <i class="fa-solid fa-circle-check" style="color:var(--success);font-size:24px"></i>
+            <p class="mt-8">No alertas de dosis</p>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#inv-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#inv-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+});
+</script>
+{% endblock %}

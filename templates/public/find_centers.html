@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block title %}Buscar Centros — VacunaTrack{% endblock %}
+{% block page_title %}Buscar Centros de Salud{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-title">Centros de Salud con Disponibilidad</div>
+    <div class="page-subtitle">Localiza dónde aplicar la vacuna que tu hijo necesita</div>
+  </div>
+</div>
+
+<div class="card mb-20">
+  <div class="card-body" style="padding:18px 22px">
+    <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+      <div class="form-group mb-0" style="flex:1;min-width:200px">
+        <label class="form-label">Vacuna a buscar</label>
+        <select id="vacuna-filter" class="form-select" onchange="searchCentros(this.value)">
+          <option value="">— Selecciona una vacuna —</option>
+          {% for v in vacunas %}
+          <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if hijos %}
+      <div class="form-group mb-0" style="flex:1;min-width:200px">
+        <label class="form-label">Filtrar por hijo (opcional)</label>
+        <select id="hijo-filter" class="form-select">
+          <option value="">Todos mis hijos</option>
+          {% for hijo in hijos %}
+          <option value="{{ hijo.paciente_id }}">{{ hijo.paciente_prim_nombre|cap }} {{ hijo.paciente_apellido_pat|cap }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <button class="btn btn-primary" onclick="searchCentros(document.getElementById('vacuna-filter').value)">
+        <i class="fa-solid fa-magnifying-glass"></i> Buscar
+      </button>
+    </div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+
+  
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-map" style="color:var(--secondary)"></i> Mapa de centros</span>
+      <span class="text-muted fs-sm"><i class="fa-solid fa-location-dot" style="color:var(--danger)"></i> Tu ubicación</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div id="map"></div>
+    </div>
+  </div>
+
+  
+  <div>
+    <div id="centers-list">
+      <div class="card">
+        <div class="card-body text-center" style="padding:40px 20px">
+          <div style="font-size:48px;margin-bottom:12px">🗺️</div>
+          <p style="font-weight:600;margin-bottom:6px">Selecciona una vacuna</p>
+          <p class="text-muted fs-sm">Verás los centros con stock disponible en el mapa y aquí.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="card mt-20">
+  <div class="card-header"><span class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> ¿Cómo llegar?</span></div>
+  <div class="card-body" style="font-size:0.875rem;color:var(--text-secondary)">
+    <p>Haz clic en cualquier marcador del mapa para ver el nombre y stock del centro. Una vez seleccionado, recuerda llevar la cartilla de vacunación y llegar durante el horario indicado. Al acercarte al centro, recibirás una notificación automática por Bluetooth (Beacon).</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  initMap(25.6866, -100.3161, 12);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Esquemas — VacunaTrack{% endblock %}
+{% block page_title %}Esquemas de Vacunación{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i> Nuevo Esquema</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.esquemas') }}">
+        <div class="form-group"><label class="form-label">Nombre del esquema <span class="required">*</span></label>
+          <input type="text" name="nombre" class="form-control" placeholder="Ej: Esquema Nacional 2024" required></div>
+        <div class="form-group"><label class="form-label">Fecha de vigencia <span class="required">*</span></label>
+          <input type="date" name="fecha_vigencia" class="form-control" required></div>
+
+        <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
+          <div class="form-label mb-8">Dosis incluidas en el esquema</div>
+          <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px">
+            {% for d in dosis_list %}
+            <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:0.85rem;border-bottom:1px solid var(--border-light)">
+              <input type="checkbox" name="dosis_ids" value="{{ d.dosis_id }}">
+              <span class="badge badge-primary">{{ d.dosis_tipo }}</span>
+              <span>{{ d.vacuna_nombre }}</span>
+              <span class="text-muted fs-sm" style="margin-left:auto">{{ days_to_human(d.dosis_edad_oportuna_dias) }}</span>
+            </label>
+            {% else %}
+            <p class="text-muted fs-sm">No dosis. Registra vacunas primero.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full mt-16">
+          <i class="fa-solid fa-plus"></i> Crear Esquema
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i> Esquemas ({{ esquemas|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar…" data-search-table="tabla-esquemas">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-esquemas">
+        <thead><tr><th>Nombre</th><th>Vigencia</th><th>Dosis</th><th>Acciones</th></tr></thead>
+        <tbody>
+          {% for e in esquemas %}
+          <tr>
+            <td class="fw-600">{{ e.esquema_nombre }}</td>
+            <td class="fs-sm">{{ e.esquema_fecha_vigencia|format_date }}</td>
+            <td><span class="badge badge-primary">{{ e.total_dosis }}</span></td>
+            <td>
+              <form method="POST" action="{{ url_for('admin.eliminar_esquema', eid=e.esquema_id) }}" style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm" data-confirm="¿Eliminar esquema {{ e.esquema_nombre }}?">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="text-center text-muted" style="padding:40px">No esquemas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

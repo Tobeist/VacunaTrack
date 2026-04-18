@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Padecimientos — VacunaTrack{% endblock %}
+{% block page_title %}Padecimientos{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-virus" style="color:var(--danger)"></i> Nuevo Padecimiento</span></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.padecimientos') }}">
+        <div class="form-group"><label class="form-label">Nombre <span class="required">*</span></label>
+          <input type="text" name="nombre" class="form-control" required></div>
+        <div class="form-group"><label class="form-label">Descripción</label>
+          <textarea name="descripcion" class="form-textarea" placeholder="Descripción breve del padecimiento…"></textarea></div>
+
+        <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+          <div class="form-label mb-8">Vacunas relacionadas</div>
+          <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px">
+            {% for v in vacunas %}
+            <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-size:0.85rem">
+              <input type="checkbox" name="vacuna_ids" value="{{ v.vacuna_id }}">
+              {{ v.vacuna_nombre }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full mt-14">
+          <i class="fa-solid fa-plus"></i> Registrar Padecimiento
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-virus" style="color:var(--danger)"></i> Padecimientos ({{ padecimientos|length }})</span>
+    </div>
+    <div class="card-body" style="padding:16px 22px 12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar…" data-search-table="tabla-pad">
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="tabla-pad">
+        <thead><tr><th>Padecimiento</th><th>Descripción</th><th>Vacunas</th></tr></thead>
+        <tbody>
+          {% for p in padecimientos %}
+          <tr>
+            <td class="fw-600">{{ p.padecimiento_nombre }}</td>
+            <td class="fs-sm text-muted">{{ p.padecimiento_descripcion or '—' }}</td>
+            <td class="fs-sm">{{ p.vacunas or '—' }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No padecimientos registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
