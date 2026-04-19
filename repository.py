@@ -1,13 +1,9 @@
 from __future__ import annotations
 # repository.py — Capa de acceso a datos de VacunaTrack (esquema v3)
 #
-# Cada función tiene dos ramas:
-#   • db.using_postgres() → True  → consulta PostgreSQL (esquema v3)
-#   • db.using_postgres() → False → listas en memoria de data.py
-#
-# Tabla usuarios unificada reemplaza administradores/responsables/tutores.
-# aplicaciones guarda usuario_id + centro_id + lote_id (no inventario_id).
-# inventario_activo_desde IS NOT NULL reemplaza inventario_activo = true.
+# Todas las consultas SELECT usan SPs de lectura (REFCURSOR) o VIEWs.
+# Las operaciones de escritura usan SPs con parámetros OUT (p_ok/p_msg/p_id).
+# NINGUNA consulta SQL está embebida directamente en este archivo.
 
 import data
 import db
@@ -23,24 +19,7 @@ _ROLE_PRIORITY = {'admin': 0, 'responsable': 1, 'tutor': 2}
 def buscar_usuario_por_email(email: str) -> dict | None:
     email = email.lower()
     if db.using_postgres():
-        return db.query_one("""
-            SELECT u.usuario_id AS id,
-                   l.login_correo AS email,
-                   l.login_contrasena AS password,
-                   u.usuario_prim_nombre AS first_name,
-                   u.usuario_apellido_pat AS last_name,
-                   r.rol_nombre AS role
-            FROM login l
-            JOIN usuarios u ON u.usuario_id = l.usuario_id
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id
-            WHERE l.login_correo = %s
-            ORDER BY CASE r.rol_nombre
-                WHEN 'admin' THEN 0
-                WHEN 'responsable' THEN 1
-                ELSE 2 END
-            LIMIT 1
-        """, (email,))
+        return db.call_read_sp_one('sp_buscar_usuario_por_email', [email])
     for lg in data.LOGIN:
         if lg['login_correo'] == email:
             u = data.get_by_id(data.USUARIOS, 'usuario_id', lg['usuario_id'])
@@ -66,8 +45,7 @@ def verificar_password(usuario: dict, password: str) -> bool:
 
 def cambiar_password(role: str, user_id: int, nuevo_hash: str) -> None:
     if db.using_postgres():
-        db.execute('UPDATE login SET login_contrasena = %s WHERE usuario_id = %s',
-                   (nuevo_hash, user_id))
+        _sp('sp_cambiar_password', [user_id, nuevo_hash], out_count=2)
         return
     for lg in data.LOGIN:
         if lg['usuario_id'] == user_id:
@@ -89,40 +67,15 @@ def _roles_de_usuario_mem(usuario_id: int) -> list[str]:
 
 
 # ─────────────────────────────────────────────
-# HELPER interno: INSERT usuarios + login + usuarios_roles
+# HELPER interno: llamada a stored procedures de escritura
 # ─────────────────────────────────────────────
 
-def _crear_usuario_pg(datos: dict, rol_nombre: str) -> int:
-    """Inserta en usuarios, login y usuarios_roles. Devuelve usuario_id."""
-    u = db.execute_returning("""
-        INSERT INTO usuarios
-            (usuario_prim_nombre, usuario_seg_nombre, usuario_apellido_pat,
-             usuario_apellido_mat, usuario_telefono, usuario_curp, usuario_rfc, centro_id)
-        VALUES
-            (%(usuario_prim_nombre)s, %(usuario_seg_nombre)s, %(usuario_apellido_pat)s,
-             %(usuario_apellido_mat)s, %(usuario_telefono)s, %(usuario_curp)s,
-             %(usuario_rfc)s, %(centro_id)s)
-        RETURNING usuario_id
-    """, {
-        'usuario_prim_nombre':  datos.get('usuario_prim_nombre'),
-        'usuario_seg_nombre':   datos.get('usuario_seg_nombre'),
-        'usuario_apellido_pat': datos.get('usuario_apellido_pat'),
-        'usuario_apellido_mat': datos.get('usuario_apellido_mat'),
-        'usuario_telefono':     datos.get('usuario_telefono'),
-        'usuario_curp':         datos.get('usuario_curp'),
-        'usuario_rfc':          datos.get('usuario_rfc'),
-        'centro_id':            datos.get('centro_id'),
-    })
-    uid = u['usuario_id']
-    db.execute(
-        'INSERT INTO login (usuario_id, login_correo, login_contrasena) VALUES (%s, %s, %s)',
-        (uid, datos['login_correo'], datos['login_contrasena']))
-    rol = db.query_one('SELECT rol_id FROM roles WHERE rol_nombre = %s', (rol_nombre,))
-    if rol:
-        db.execute(
-            'INSERT INTO usuarios_roles (usuario_id, rol_id) VALUES (%s, %s) ON CONFLICT DO NOTHING',
-            (uid, rol['rol_id']))
-    return uid
+def _sp(name: str, params: list, out_count: int = 3) -> dict:
+    """Llama al SP indicado y lanza ValueError si p_ok == 0."""
+    result = db.call_write_sp(name, params, out_count)
+    if not result.get('p_ok'):
+        raise ValueError(result.get('p_msg', 'Error desconocido'))
+    return result
 
 
 def _crear_usuario_mem(datos: dict, rol_nombre: str) -> dict:
@@ -163,48 +116,14 @@ def _crear_usuario_mem(datos: dict, rol_nombre: str) -> dict:
 
 def listar_administradores() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT u.usuario_id AS admin_id,
-                   u.usuario_prim_nombre AS admin_prim_nombre,
-                   u.usuario_seg_nombre  AS admin_seg_nombre,
-                   u.usuario_apellido_pat AS admin_apellido_pat,
-                   u.usuario_apellido_mat AS admin_apellido_mat,
-                   u.usuario_telefono AS admin_telefono,
-                   u.usuario_curp AS admin_curp,
-                   u.usuario_rfc  AS admin_rfc,
-                   u.usuario_activo AS admin_activo,
-                   u.usuario_imagen AS admin_imagen,
-                   l.login_correo AS admin_email
-            FROM usuarios u
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'admin'
-            JOIN login l ON l.usuario_id = u.usuario_id
-            ORDER BY u.usuario_apellido_pat, u.usuario_prim_nombre
-        """)
+        return db.call_read_sp('sp_listar_administradores')
     return [data._usuario_como_rol(u, 'admin') for u in data.USUARIOS
             if 'admin' in _roles_de_usuario_mem(u['usuario_id'])]
 
 
 def obtener_administrador(admin_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT u.usuario_id AS admin_id,
-                   u.usuario_prim_nombre AS admin_prim_nombre,
-                   u.usuario_seg_nombre  AS admin_seg_nombre,
-                   u.usuario_apellido_pat AS admin_apellido_pat,
-                   u.usuario_apellido_mat AS admin_apellido_mat,
-                   u.usuario_telefono AS admin_telefono,
-                   u.usuario_curp AS admin_curp,
-                   u.usuario_rfc  AS admin_rfc,
-                   u.usuario_activo AS admin_activo,
-                   u.usuario_imagen AS admin_imagen,
-                   l.login_correo AS admin_email
-            FROM usuarios u
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'admin'
-            JOIN login l ON l.usuario_id = u.usuario_id
-            WHERE u.usuario_id = %s
-        """, (admin_id,))
+        return db.call_read_sp_one('sp_obtener_administrador', [admin_id])
     u = data.get_by_id(data.USUARIOS, 'usuario_id', admin_id)
     return data._usuario_como_rol(u, 'admin') if u else None
 
@@ -212,19 +131,14 @@ def obtener_administrador(admin_id: int) -> dict | None:
 def crear_admin(datos: dict) -> dict:
     """datos usa claves admin_* (formulario) + admin_contrasena."""
     if db.using_postgres():
-        uid = _crear_usuario_pg({
-            'usuario_prim_nombre':  datos.get('admin_prim_nombre'),
-            'usuario_seg_nombre':   datos.get('admin_seg_nombre'),
-            'usuario_apellido_pat': datos.get('admin_apellido_pat'),
-            'usuario_apellido_mat': datos.get('admin_apellido_mat'),
-            'usuario_telefono':     datos.get('admin_telefono'),
-            'usuario_curp':         datos.get('admin_curp'),
-            'usuario_rfc':          datos.get('admin_rfc'),
-            'centro_id':            None,
-            'login_correo':         datos.get('admin_email'),
-            'login_contrasena':     datos.get('admin_contrasena'),
-        }, 'admin')
-        return obtener_administrador(uid) or {}
+        r = _sp('sp_crear_admin', [
+            datos.get('admin_prim_nombre'), datos.get('admin_seg_nombre'),
+            datos.get('admin_apellido_pat'), datos.get('admin_apellido_mat'),
+            datos.get('admin_telefono'), datos.get('admin_curp'),
+            datos.get('admin_rfc'), datos.get('admin_email'),
+            datos.get('admin_contrasena'),
+        ])
+        return obtener_administrador(r['p_id']) or {}
     u = _crear_usuario_mem({
         'usuario_prim_nombre':  datos.get('admin_prim_nombre', ''),
         'usuario_seg_nombre':   datos.get('admin_seg_nombre'),
@@ -240,9 +154,9 @@ def crear_admin(datos: dict) -> dict:
     return data._usuario_como_rol(u, 'admin')
 
 
-def eliminar_admin(admin_id: int) -> None:
+def eliminar_admin(admin_id: int, session_id: int = 0) -> None:
     if db.using_postgres():
-        db.execute('DELETE FROM usuarios WHERE usuario_id = %s', (admin_id,))
+        _sp('sp_eliminar_admin', [admin_id, session_id], out_count=2)
         return
     data.USUARIOS[:] = [u for u in data.USUARIOS if u['usuario_id'] != admin_id]
     data.LOGIN[:] = [lg for lg in data.LOGIN if lg['usuario_id'] != admin_id]
@@ -255,90 +169,59 @@ def eliminar_admin(admin_id: int) -> None:
 
 def listar_pacientes() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT p.*, e.esquema_nombre
-            FROM pacientes p
-            JOIN esquemas e ON e.esquema_id = p.esquema_id
-            ORDER BY p.paciente_apellido_pat, p.paciente_prim_nombre
-        """)
+        return db.call_read_sp('sp_listar_pacientes')
     return list(data.PACIENTES)
 
 
 def obtener_paciente(paciente_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT p.*, e.esquema_nombre
-            FROM pacientes p
-            JOIN esquemas e ON e.esquema_id = p.esquema_id
-            WHERE p.paciente_id = %s
-        """, (paciente_id,))
+        return db.call_read_sp_one('sp_obtener_paciente', [paciente_id])
     return data.get_by_id(data.PACIENTES, 'paciente_id', paciente_id)
 
 
 def obtener_paciente_por_nfc(nfc_uid: str) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT p.*, e.esquema_nombre
-            FROM pacientes p
-            JOIN esquemas e ON e.esquema_id = p.esquema_id
-            WHERE p.paciente_nfc = %s
-        """, (nfc_uid,))
+        return db.call_read_sp_one('sp_obtener_paciente_por_nfc', [nfc_uid])
     return next((p for p in data.PACIENTES if p.get('paciente_nfc') == nfc_uid), None)
 
 
 def obtener_paciente_por_curp(curp: str) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT p.*, e.esquema_nombre
-            FROM pacientes p
-            JOIN esquemas e ON e.esquema_id = p.esquema_id
-            WHERE p.paciente_curp = %s
-        """, (curp.upper(),))
+        return db.call_read_sp_one('sp_obtener_paciente_por_curp', [curp.upper()])
     return next((p for p in data.PACIENTES if p.get('paciente_curp') == curp.upper()), None)
 
 
 def obtener_paciente_por_cert_nac(cert_nac: str) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT p.*, e.esquema_nombre
-            FROM pacientes p
-            JOIN esquemas e ON e.esquema_id = p.esquema_id
-            WHERE p.paciente_num_cert_nac = %s
-        """, (cert_nac.strip(),))
+        return db.call_read_sp_one('sp_obtener_paciente_por_cert_nac', [cert_nac.strip()])
     return next((p for p in data.PACIENTES if p.get('paciente_num_cert_nac') == cert_nac.strip()), None)
 
 
 def crear_paciente(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO pacientes
-                (paciente_prim_nombre, paciente_seg_nombre, paciente_apellido_pat,
-                 paciente_apellido_mat, paciente_curp, paciente_num_cert_nac,
-                 paciente_fecha_nac, paciente_sexo, paciente_nfc, esquema_id)
-            VALUES
-                (%(paciente_prim_nombre)s, %(paciente_seg_nombre)s, %(paciente_apellido_pat)s,
-                 %(paciente_apellido_mat)s, %(paciente_curp)s, %(paciente_num_cert_nac)s,
-                 %(paciente_fecha_nac)s, %(paciente_sexo)s, %(paciente_nfc)s, %(esquema_id)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_crear_paciente', [
+            datos.get('paciente_prim_nombre'), datos.get('paciente_seg_nombre'),
+            datos.get('paciente_apellido_pat'), datos.get('paciente_apellido_mat'),
+            datos.get('paciente_curp'), datos.get('paciente_num_cert_nac'),
+            datos.get('paciente_fecha_nac'), datos.get('paciente_sexo'),
+            datos.get('paciente_nfc'), datos.get('esquema_id'),
+        ])
+        return obtener_paciente(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['paciente_id'] = data.next_id(data.PACIENTES, 'paciente_id')
     data.PACIENTES.append(nuevo)
     return nuevo
 
 
-def eliminar_paciente(paciente_id: int) -> bool:
+def eliminar_paciente(paciente_id: int) -> None:
     if db.using_postgres():
-        if db.query_one('SELECT 1 FROM aplicaciones WHERE paciente_id = %s', (paciente_id,)):
-            return False
-        db.execute('DELETE FROM pacientes WHERE paciente_id = %s', (paciente_id,))
-        return True
+        _sp('sp_eliminar_paciente', [paciente_id], out_count=2)
+        return
     if any(a['paciente_id'] == paciente_id for a in data.APLICACIONES):
-        return False
+        raise ValueError('No se puede eliminar: el paciente tiene aplicaciones registradas')
     data.PACIENTES[:] = [p for p in data.PACIENTES if p['paciente_id'] != paciente_id]
     data.PACIENTES_TUTORES[:] = [pt for pt in data.PACIENTES_TUTORES
                                   if pt['paciente_id'] != paciente_id]
-    return True
 
 
 # ─────────────────────────────────────────────
@@ -347,46 +230,14 @@ def eliminar_paciente(paciente_id: int) -> bool:
 
 def listar_tutores() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT u.usuario_id AS tutor_id,
-                   u.usuario_prim_nombre AS tutor_prim_nombre,
-                   u.usuario_seg_nombre  AS tutor_seg_nombre,
-                   u.usuario_apellido_pat AS tutor_apellido_pat,
-                   u.usuario_apellido_mat AS tutor_apellido_mat,
-                   u.usuario_telefono AS tutor_telefono,
-                   u.usuario_curp AS tutor_curp,
-                   u.usuario_activo AS tutor_activo,
-                   u.usuario_imagen AS tutor_imagen,
-                   l.login_correo AS tutor_email
-            FROM usuarios u
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'tutor'
-            JOIN login l ON l.usuario_id = u.usuario_id
-            ORDER BY u.usuario_apellido_pat, u.usuario_prim_nombre
-        """)
+        return db.call_read_sp('sp_listar_tutores')
     return [data._usuario_como_rol(u, 'tutor') for u in data.USUARIOS
             if 'tutor' in _roles_de_usuario_mem(u['usuario_id'])]
 
 
 def obtener_tutor(tutor_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT u.usuario_id AS tutor_id,
-                   u.usuario_prim_nombre AS tutor_prim_nombre,
-                   u.usuario_seg_nombre  AS tutor_seg_nombre,
-                   u.usuario_apellido_pat AS tutor_apellido_pat,
-                   u.usuario_apellido_mat AS tutor_apellido_mat,
-                   u.usuario_telefono AS tutor_telefono,
-                   u.usuario_curp AS tutor_curp,
-                   u.usuario_activo AS tutor_activo,
-                   u.usuario_imagen AS tutor_imagen,
-                   l.login_correo AS tutor_email
-            FROM usuarios u
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'tutor'
-            JOIN login l ON l.usuario_id = u.usuario_id
-            WHERE u.usuario_id = %s
-        """, (tutor_id,))
+        return db.call_read_sp_one('sp_obtener_tutor', [tutor_id])
     u = data.get_by_id(data.USUARIOS, 'usuario_id', tutor_id)
     return data._usuario_como_rol(u, 'tutor') if u else None
 
@@ -394,19 +245,13 @@ def obtener_tutor(tutor_id: int) -> dict | None:
 def crear_tutor(datos: dict) -> dict:
     """datos usa claves tutor_* (formulario) + tutor_contrasena."""
     if db.using_postgres():
-        uid = _crear_usuario_pg({
-            'usuario_prim_nombre':  datos.get('tutor_prim_nombre'),
-            'usuario_seg_nombre':   datos.get('tutor_seg_nombre'),
-            'usuario_apellido_pat': datos.get('tutor_apellido_pat'),
-            'usuario_apellido_mat': datos.get('tutor_apellido_mat'),
-            'usuario_telefono':     datos.get('tutor_telefono'),
-            'usuario_curp':         datos.get('tutor_curp'),
-            'usuario_rfc':          None,
-            'centro_id':            None,
-            'login_correo':         datos.get('tutor_email'),
-            'login_contrasena':     datos.get('tutor_contrasena'),
-        }, 'tutor')
-        return obtener_tutor(uid) or {}
+        r = _sp('sp_crear_tutor', [
+            datos.get('tutor_prim_nombre'), datos.get('tutor_seg_nombre'),
+            datos.get('tutor_apellido_pat'), datos.get('tutor_apellido_mat'),
+            datos.get('tutor_telefono'), datos.get('tutor_curp'),
+            datos.get('tutor_email'), datos.get('tutor_contrasena'),
+        ])
+        return obtener_tutor(r['p_id']) or {}
     u = _crear_usuario_mem({
         'usuario_prim_nombre':  datos.get('tutor_prim_nombre', ''),
         'usuario_seg_nombre':   datos.get('tutor_seg_nombre'),
@@ -422,45 +267,36 @@ def crear_tutor(datos: dict) -> dict:
     return data._usuario_como_rol(u, 'tutor')
 
 
-def actualizar_tutor(tutor_id: int, campos: dict) -> bool:
-    """campos usa claves usuario_* (internas)."""
+def actualizar_tutor(tutor_id: int, campos: dict) -> None:
+    """campos usa claves tutor_* (del formulario)."""
     if db.using_postgres():
-        if not campos:
-            return False
-        set_parts = [f'{k} = %s' for k in campos]
-        values = list(campos.values()) + [tutor_id]
-        db.execute(f"UPDATE usuarios SET {', '.join(set_parts)} WHERE usuario_id = %s", values)
-        return True
+        _sp('sp_actualizar_tutor', [
+            tutor_id,
+            campos.get('tutor_prim_nombre'), campos.get('tutor_seg_nombre'),
+            campos.get('tutor_apellido_pat'), campos.get('tutor_apellido_mat'),
+            campos.get('tutor_telefono'), campos.get('tutor_curp'),
+            campos.get('tutor_email'),
+        ], out_count=2)
+        return
     u = data.get_by_id(data.USUARIOS, 'usuario_id', tutor_id)
-    if not u:
-        return False
-    u.update(campos)
-    return True
+    if u:
+        u.update(campos)
 
 
-def eliminar_tutor(tutor_id: int) -> bool:
+def eliminar_tutor(tutor_id: int) -> None:
     if db.using_postgres():
-        if db.query_one('SELECT 1 FROM pacientes_tutores WHERE tutor_id = %s', (tutor_id,)):
-            return False
-        db.execute('DELETE FROM usuarios WHERE usuario_id = %s', (tutor_id,))
-        return True
+        _sp('sp_eliminar_tutor', [tutor_id], out_count=2)
+        return
     if any(pt['tutor_id'] == tutor_id for pt in data.PACIENTES_TUTORES):
-        return False
+        raise ValueError('No se puede eliminar: este tutor tiene pacientes vinculados')
     data.USUARIOS[:] = [u for u in data.USUARIOS if u['usuario_id'] != tutor_id]
     data.LOGIN[:] = [lg for lg in data.LOGIN if lg['usuario_id'] != tutor_id]
     data.USUARIOS_ROLES[:] = [ur for ur in data.USUARIOS_ROLES if ur['usuario_id'] != tutor_id]
-    return True
 
 
 def pacientes_de_tutor(tutor_id: int) -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT p.*, e.esquema_nombre
-            FROM pacientes p
-            JOIN pacientes_tutores pt ON pt.paciente_id = p.paciente_id
-            JOIN esquemas e ON e.esquema_id = p.esquema_id
-            WHERE pt.tutor_id = %s
-        """, (tutor_id,))
+        return db.call_read_sp('sp_pacientes_de_tutor', [tutor_id])
     ids = [pt['paciente_id'] for pt in data.PACIENTES_TUTORES if pt['tutor_id'] == tutor_id]
     return [p for p in data.PACIENTES if p['paciente_id'] in ids]
 
@@ -471,27 +307,7 @@ def pacientes_de_tutor(tutor_id: int) -> list[dict]:
 
 def listar_responsables() -> list[dict]:
     if db.using_postgres():
-        rows = db.query("""
-            SELECT u.usuario_id AS responsable_id,
-                   u.usuario_prim_nombre AS responsable_prim_nombre,
-                   u.usuario_seg_nombre  AS responsable_seg_nombre,
-                   u.usuario_apellido_pat AS responsable_apellido_pat,
-                   u.usuario_apellido_mat AS responsable_apellido_mat,
-                   u.usuario_telefono AS responsable_telefono,
-                   u.usuario_curp AS responsable_curp,
-                   u.usuario_rfc  AS responsable_rfc,
-                   u.usuario_activo AS responsable_activo,
-                   u.usuario_imagen AS responsable_imagen,
-                   u.centro_id,
-                   cs.centro_nombre,
-                   l.login_correo AS responsable_email
-            FROM usuarios u
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'responsable'
-            JOIN login l ON l.usuario_id = u.usuario_id
-            LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id
-            ORDER BY u.usuario_apellido_pat, u.usuario_prim_nombre
-        """)
+        rows = db.call_read_sp('sp_listar_responsables')
         for row in rows:
             row['cedulas'] = cedulas_de_responsable(row['responsable_id'])
         return rows
@@ -507,27 +323,7 @@ def listar_responsables() -> list[dict]:
 
 def obtener_responsable(responsable_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT u.usuario_id AS responsable_id,
-                   u.usuario_prim_nombre AS responsable_prim_nombre,
-                   u.usuario_seg_nombre  AS responsable_seg_nombre,
-                   u.usuario_apellido_pat AS responsable_apellido_pat,
-                   u.usuario_apellido_mat AS responsable_apellido_mat,
-                   u.usuario_telefono AS responsable_telefono,
-                   u.usuario_curp AS responsable_curp,
-                   u.usuario_rfc  AS responsable_rfc,
-                   u.usuario_activo AS responsable_activo,
-                   u.usuario_imagen AS responsable_imagen,
-                   u.centro_id,
-                   cs.centro_nombre,
-                   l.login_correo AS responsable_email
-            FROM usuarios u
-            JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-            JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'responsable'
-            JOIN login l ON l.usuario_id = u.usuario_id
-            LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id
-            WHERE u.usuario_id = %s
-        """, (responsable_id,))
+        return db.call_read_sp_one('sp_obtener_responsable', [responsable_id])
     u = data.get_by_id(data.USUARIOS, 'usuario_id', responsable_id)
     return data._usuario_como_rol(u, 'responsable') if u else None
 
@@ -535,19 +331,14 @@ def obtener_responsable(responsable_id: int) -> dict | None:
 def crear_responsable(datos: dict) -> dict:
     """datos usa claves responsable_* (formulario) + responsable_contrasena."""
     if db.using_postgres():
-        uid = _crear_usuario_pg({
-            'usuario_prim_nombre':  datos.get('responsable_prim_nombre'),
-            'usuario_seg_nombre':   datos.get('responsable_seg_nombre'),
-            'usuario_apellido_pat': datos.get('responsable_apellido_pat'),
-            'usuario_apellido_mat': datos.get('responsable_apellido_mat'),
-            'usuario_telefono':     datos.get('responsable_telefono'),
-            'usuario_curp':         datos.get('responsable_curp'),
-            'usuario_rfc':          datos.get('responsable_rfc'),
-            'centro_id':            datos.get('centro_id'),
-            'login_correo':         datos.get('responsable_email'),
-            'login_contrasena':     datos.get('responsable_contrasena'),
-        }, 'responsable')
-        return obtener_responsable(uid) or {}
+        r = _sp('sp_crear_responsable', [
+            datos.get('responsable_prim_nombre'), datos.get('responsable_seg_nombre'),
+            datos.get('responsable_apellido_pat'), datos.get('responsable_apellido_mat'),
+            datos.get('responsable_telefono'), datos.get('responsable_curp'),
+            datos.get('responsable_rfc'), datos.get('responsable_email'),
+            datos.get('responsable_contrasena'), datos.get('centro_id'),
+        ])
+        return obtener_responsable(r['p_id']) or {}
     u = _crear_usuario_mem({
         'usuario_prim_nombre':  datos.get('responsable_prim_nombre', ''),
         'usuario_seg_nombre':   datos.get('responsable_seg_nombre'),
@@ -563,39 +354,34 @@ def crear_responsable(datos: dict) -> dict:
     return data._usuario_como_rol(u, 'responsable')
 
 
-def eliminar_responsable(responsable_id: int) -> bool:
+def eliminar_responsable(responsable_id: int) -> None:
     if db.using_postgres():
-        if db.query_one('SELECT 1 FROM aplicaciones WHERE usuario_id = %s', (responsable_id,)):
-            return False
-        db.execute('DELETE FROM usuarios WHERE usuario_id = %s', (responsable_id,))
-        return True
+        _sp('sp_eliminar_responsable', [responsable_id], out_count=2)
+        return
     if any(a.get('usuario_id') == responsable_id for a in data.APLICACIONES):
-        return False
+        raise ValueError('No se puede eliminar: este responsable tiene aplicaciones registradas')
     data.USUARIOS[:] = [u for u in data.USUARIOS if u['usuario_id'] != responsable_id]
     data.LOGIN[:] = [lg for lg in data.LOGIN if lg['usuario_id'] != responsable_id]
     data.CEDULAS[:] = [c for c in data.CEDULAS if c['usuario_id'] != responsable_id]
     data.USUARIOS_ROLES[:] = [ur for ur in data.USUARIOS_ROLES
                                if ur['usuario_id'] != responsable_id]
-    return True
 
 
 def cedulas_de_responsable(usuario_id: int) -> list[dict]:
     if db.using_postgres():
-        return db.query('SELECT * FROM cedulas WHERE usuario_id = %s', (usuario_id,))
+        return db.call_read_sp('sp_cedulas_de_responsable', [usuario_id])
     return [c for c in data.CEDULAS if c['usuario_id'] == usuario_id]
 
 
 def agregar_cedula(usuario_id: int, numero: str, especialidad: str | None) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO cedulas (cedula_numero, cedula_especialidad, usuario_id)
-            VALUES (%s, %s, %s) RETURNING *
-        """, (numero, especialidad, usuario_id))
+        r = _sp('sp_agregar_cedula', [usuario_id, numero, especialidad])
+        return db.call_read_sp_one('sp_obtener_cedula', [r['p_id']]) or {}
     nueva = {
-        'cedula_id':         data.next_id(data.CEDULAS, 'cedula_id'),
-        'cedula_numero':     numero,
+        'cedula_id':           data.next_id(data.CEDULAS, 'cedula_id'),
+        'cedula_numero':       numero,
         'cedula_especialidad': especialidad,
-        'usuario_id':        usuario_id,
+        'usuario_id':          usuario_id,
     }
     data.CEDULAS.append(nueva)
     return nueva
@@ -607,35 +393,24 @@ def agregar_cedula(usuario_id: int, numero: str, especialidad: str | None) -> di
 
 def listar_relaciones() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT pt.*,
-                INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
-                INITCAP(u.usuario_prim_nombre)  || ' ' || INITCAP(u.usuario_apellido_pat)  AS tutor
-            FROM pacientes_tutores pt
-            JOIN pacientes p ON p.paciente_id = pt.paciente_id
-            JOIN usuarios  u ON u.usuario_id  = pt.tutor_id
-            ORDER BY pt.pac_tut_id
-        """)
+        return db.call_read_sp('sp_listar_relaciones')
     return list(data.PACIENTES_TUTORES)
 
 
 def existe_relacion(paciente_id: int, tutor_id: int) -> bool:
     if db.using_postgres():
-        return bool(db.query_one(
-            'SELECT 1 FROM pacientes_tutores WHERE paciente_id = %s AND tutor_id = %s',
-            (paciente_id, tutor_id)))
+        row = db.call_read_sp_one('sp_existe_relacion', [paciente_id, tutor_id])
+        return bool(row['result']) if row else False
     return any(pt['paciente_id'] == paciente_id and pt['tutor_id'] == tutor_id
                for pt in data.PACIENTES_TUTORES)
 
 
 def crear_relacion(paciente_id: int, tutor_id: int, pac_nombre: str, tut_nombre: str) -> dict:
     if db.using_postgres():
-        row = db.execute_returning(
-            'INSERT INTO pacientes_tutores (paciente_id, tutor_id) VALUES (%s, %s) RETURNING *',
-            (paciente_id, tutor_id))
-        row['paciente'] = pac_nombre
-        row['tutor'] = tut_nombre
-        return row
+        r = _sp('sp_crear_relacion', [paciente_id, tutor_id])
+        row = db.call_read_sp_one('sp_obtener_relacion', [r['p_id']])
+        return row or {'pac_tut_id': r['p_id'], 'paciente_id': paciente_id,
+                       'tutor_id': tutor_id, 'paciente': pac_nombre, 'tutor': tut_nombre}
     nueva = {
         'pac_tut_id':  data.next_id(data.PACIENTES_TUTORES, 'pac_tut_id'),
         'paciente_id': paciente_id,
@@ -649,7 +424,7 @@ def crear_relacion(paciente_id: int, tutor_id: int, pac_nombre: str, tut_nombre:
 
 def eliminar_relacion(pac_tut_id: int) -> None:
     if db.using_postgres():
-        db.execute('DELETE FROM pacientes_tutores WHERE pac_tut_id = %s', (pac_tut_id,))
+        _sp('sp_eliminar_relacion', [pac_tut_id], out_count=2)
         return
     data.PACIENTES_TUTORES[:] = [pt for pt in data.PACIENTES_TUTORES
                                   if pt['pac_tut_id'] != pac_tut_id]
@@ -661,48 +436,20 @@ def eliminar_relacion(pac_tut_id: int) -> None:
 
 def listar_aplicaciones() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT a.*,
-                INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
-                INITCAP(u.usuario_prim_nombre)  || ' ' || INITCAP(u.usuario_apellido_pat)  AS responsable,
-                cs.centro_nombre,
-                v.vacuna_nombre,
-                d.dosis_tipo
-            FROM aplicaciones a
-            JOIN pacientes     p  ON p.paciente_id = a.paciente_id
-            JOIN usuarios      u  ON u.usuario_id  = a.usuario_id
-            JOIN centros_salud cs ON cs.centro_id  = a.centro_id
-            JOIN dosis         d  ON d.dosis_id    = a.dosis_id
-            JOIN vacunas       v  ON v.vacuna_id   = d.vacuna_id
-            ORDER BY a.aplicacion_timestamp DESC
-        """)
+        return db.call_read_sp('sp_listar_aplicaciones')
     return list(data.APLICACIONES)
 
 
 def aplicaciones_de_paciente(paciente_id: int) -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT a.*,
-                INITCAP(u.usuario_prim_nombre)  || ' ' || INITCAP(u.usuario_apellido_pat)  AS responsable,
-                cs.centro_nombre,
-                v.vacuna_nombre,
-                d.dosis_tipo
-            FROM aplicaciones a
-            JOIN usuarios      u  ON u.usuario_id  = a.usuario_id
-            JOIN centros_salud cs ON cs.centro_id  = a.centro_id
-            JOIN dosis         d  ON d.dosis_id    = a.dosis_id
-            JOIN vacunas       v  ON v.vacuna_id   = d.vacuna_id
-            WHERE a.paciente_id = %s
-            ORDER BY a.aplicacion_timestamp
-        """, (paciente_id,))
+        return db.call_read_sp('sp_aplicaciones_de_paciente', [paciente_id])
     return [a for a in data.APLICACIONES if a['paciente_id'] == paciente_id]
 
 
 def dosis_ya_aplicada(paciente_id: int, dosis_id: int) -> bool:
     if db.using_postgres():
-        return bool(db.query_one(
-            'SELECT 1 FROM aplicaciones WHERE paciente_id = %s AND dosis_id = %s',
-            (paciente_id, dosis_id)))
+        row = db.call_read_sp_one('sp_dosis_ya_aplicada', [paciente_id, dosis_id])
+        return bool(row['result']) if row else False
     return any(a['paciente_id'] == paciente_id and a['dosis_id'] == dosis_id
                for a in data.APLICACIONES)
 
@@ -711,18 +458,15 @@ def registrar_aplicacion(datos: dict) -> dict:
     """
     datos: paciente_id, usuario_id, centro_id, lote_id, dosis_id,
            aplicacion_timestamp, aplicacion_observaciones.
-    El trigger trg_descontar_inventario descuenta el stock automáticamente.
+    El SP valida stock y dosis; el trigger descuenta el inventario automáticamente.
     """
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO aplicaciones
-                (paciente_id, usuario_id, centro_id, lote_id, dosis_id,
-                 aplicacion_timestamp, aplicacion_observaciones)
-            VALUES
-                (%(paciente_id)s, %(usuario_id)s, %(centro_id)s, %(lote_id)s, %(dosis_id)s,
-                 %(aplicacion_timestamp)s, %(aplicacion_observaciones)s)
-            RETURNING *
-        """, datos) or {}
+        r = _sp('sp_registrar_aplicacion', [
+            datos['paciente_id'], datos['usuario_id'], datos['centro_id'],
+            datos['lote_id'], datos['dosis_id'],
+            datos['aplicacion_timestamp'], datos.get('aplicacion_observaciones'),
+        ])
+        return db.call_read_sp_one('sp_obtener_aplicacion', [r['p_id']]) or {}
     nueva = dict(datos)
     nueva['aplicacion_id'] = data.next_id(data.APLICACIONES, 'aplicacion_id')
     data.APLICACIONES.append(nueva)
@@ -735,26 +479,9 @@ def registrar_aplicacion(datos: dict) -> dict:
 
 
 def historial_vacunacion_paciente(paciente_id: int, esquema_id: int) -> list[dict]:
-    """Dosis del esquema del paciente con info de aplicación (LEFT JOIN)."""
+    """Dosis del esquema del paciente con info de aplicación (LEFT JOIN sobre vistas)."""
     if db.using_postgres():
-        return db.query("""
-            SELECT d.*,
-                v.vacuna_nombre,
-                a.aplicacion_timestamp,
-                a.aplicacion_observaciones,
-                CASE WHEN a.aplicacion_id IS NOT NULL
-                     THEN u.usuario_prim_nombre || ' ' || u.usuario_apellido_pat
-                     ELSE NULL END AS responsable,
-                cs.centro_nombre
-            FROM dosis d
-            JOIN dosis_esquemas de ON de.dosis_id  = d.dosis_id
-            JOIN vacunas         v  ON v.vacuna_id  = d.vacuna_id
-            LEFT JOIN aplicaciones   a  ON a.dosis_id = d.dosis_id AND a.paciente_id = %s
-            LEFT JOIN usuarios       u  ON u.usuario_id = a.usuario_id
-            LEFT JOIN centros_salud cs  ON cs.centro_id = a.centro_id
-            WHERE de.esquema_id = %s
-            ORDER BY d.vacuna_id, d.dosis_edad_oportuna_dias
-        """, (paciente_id, esquema_id))
+        return db.call_read_sp('sp_historial_vacunacion_paciente', [paciente_id, esquema_id])
     ids = {de['dosis_id'] for de in data.DOSIS_ESQUEMAS if de['esquema_id'] == esquema_id}
     rows = []
     for d in sorted([x for x in data.DOSIS if x['dosis_id'] in ids],
@@ -778,41 +505,13 @@ def historial_vacunacion_paciente(paciente_id: int, esquema_id: int) -> list[dic
 
 def listar_inventarios() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT i.*,
-                (i.inventario_activo_desde IS NOT NULL) AS inventario_activo,
-                cs.centro_nombre,
-                l.lote_codigo, l.lote_fecha_fabricacion, l.lote_fecha_caducidad,
-                v.vacuna_nombre, f.fabricante_nombre
-            FROM inventarios   i
-            JOIN centros_salud cs ON cs.centro_id    = i.centro_id
-            JOIN lotes         l  ON l.lote_id       = i.lote_id
-            JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id
-            JOIN fabricantes   f  ON f.fabricante_id = l.fabricante_id
-            ORDER BY i.inventario_id
-        """)
+        return db.call_read_sp('sp_listar_inventarios')
     return list(data.INVENTARIOS)
 
 
 def inventarios_activos_de_centro(centro_id: int) -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT i.*,
-                (i.inventario_activo_desde IS NOT NULL) AS inventario_activo,
-                cs.centro_nombre,
-                l.lote_codigo, l.lote_fecha_fabricacion, l.lote_fecha_caducidad,
-                l.lote_id, l.vacuna_id,
-                v.vacuna_nombre, f.fabricante_nombre
-            FROM inventarios   i
-            JOIN centros_salud cs ON cs.centro_id    = i.centro_id
-            JOIN lotes         l  ON l.lote_id       = i.lote_id
-            JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id
-            JOIN fabricantes   f  ON f.fabricante_id = l.fabricante_id
-            WHERE i.centro_id = %s
-              AND i.inventario_activo_desde IS NOT NULL
-              AND i.inventario_stock_actual > 0
-            ORDER BY v.vacuna_nombre
-        """, (centro_id,))
+        return db.call_read_sp('sp_inventarios_activos_de_centro', [centro_id])
     return [i for i in data.INVENTARIOS
             if i['centro_id'] == centro_id
             and i.get('inventario_activo_desde') is not None
@@ -821,37 +520,22 @@ def inventarios_activos_de_centro(centro_id: int) -> list[dict]:
 
 def obtener_inventario(inventario_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT i.*,
-                (i.inventario_activo_desde IS NOT NULL) AS inventario_activo,
-                cs.centro_nombre,
-                l.lote_codigo, l.lote_id, l.vacuna_id,
-                v.vacuna_nombre, f.fabricante_nombre
-            FROM inventarios   i
-            JOIN centros_salud cs ON cs.centro_id    = i.centro_id
-            JOIN lotes         l  ON l.lote_id       = i.lote_id
-            JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id
-            JOIN fabricantes   f  ON f.fabricante_id = l.fabricante_id
-            WHERE i.inventario_id = %s
-        """, (inventario_id,))
+        return db.call_read_sp_one('sp_obtener_inventario', [inventario_id])
     return data.get_by_id(data.INVENTARIOS, 'inventario_id', inventario_id)
 
 
 def asignar_inventario(datos: dict) -> dict:
     """
     datos: centro_id, lote_id, inventario_stock_inicial, inventario_stock_actual,
-    inventario_activo_desde (None = pendiente de activación por responsable).
+    inventario_activo_desde.
     """
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO inventarios
-                (centro_id, lote_id, inventario_stock_inicial, inventario_stock_actual,
-                 inventario_activo_desde)
-            VALUES
-                (%(centro_id)s, %(lote_id)s, %(inventario_stock_inicial)s,
-                 %(inventario_stock_actual)s, %(inventario_activo_desde)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_asignar_inventario', [
+            datos['centro_id'], datos['lote_id'],
+            datos['inventario_stock_inicial'], datos['inventario_stock_actual'],
+            datos.get('inventario_activo_desde'),
+        ])
+        return obtener_inventario(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['inventario_id'] = data.next_id(data.INVENTARIOS, 'inventario_id')
     nuevo.setdefault('inventario_activo_desde', None)
@@ -861,19 +545,7 @@ def asignar_inventario(datos: dict) -> dict:
 
 def centros_con_vacuna_disponible(vacuna_id: int) -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT cs.*, ci.ciudad_nombre,
-                SUM(i.inventario_stock_actual) AS stock_total
-            FROM centros_salud cs
-            JOIN inventarios i  ON i.centro_id  = cs.centro_id
-            JOIN lotes       l  ON l.lote_id    = i.lote_id
-            JOIN ciudades    ci ON ci.ciudad_id  = cs.ciudad_id
-            WHERE l.vacuna_id = %s
-              AND i.inventario_activo_desde IS NOT NULL
-              AND i.inventario_stock_actual > 0
-            GROUP BY cs.centro_id, ci.ciudad_nombre
-            ORDER BY cs.centro_nombre
-        """, (vacuna_id,))
+        return db.call_read_sp('sp_centros_con_vacuna_disponible', [vacuna_id])
     result = []
     for inv in data.INVENTARIOS:
         lote = data.get_by_id(data.LOTES, 'lote_id', inv['lote_id'])
@@ -892,45 +564,26 @@ def centros_con_vacuna_disponible(vacuna_id: int) -> list[dict]:
 
 def listar_lotes() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT l.*, v.vacuna_nombre, f.fabricante_nombre,
-                p.proveedor_prim_nombre || ' ' || p.proveedor_apellido_pat AS proveedor_nombre
-            FROM lotes       l
-            JOIN vacunas     v ON v.vacuna_id    = l.vacuna_id
-            JOIN fabricantes f ON f.fabricante_id = l.fabricante_id
-            JOIN proveedores p ON p.proveedor_id  = l.proveedor_id
-            ORDER BY l.lote_id
-        """)
+        return db.call_read_sp('sp_listar_lotes')
     return list(data.LOTES)
 
 
 def obtener_lote(lote_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT l.*, v.vacuna_nombre, f.fabricante_nombre,
-                p.proveedor_prim_nombre || ' ' || p.proveedor_apellido_pat AS proveedor_nombre
-            FROM lotes       l
-            JOIN vacunas     v ON v.vacuna_id    = l.vacuna_id
-            JOIN fabricantes f ON f.fabricante_id = l.fabricante_id
-            JOIN proveedores p ON p.proveedor_id  = l.proveedor_id
-            WHERE l.lote_id = %s
-        """, (lote_id,))
+        return db.call_read_sp_one('sp_obtener_lote', [lote_id])
     return data.get_by_id(data.LOTES, 'lote_id', lote_id)
 
 
 def crear_lote(datos: dict) -> dict:
     """datos: lote_codigo, lote_fecha_fabricacion, lote_fecha_caducidad,
-    fabricante_id, vacuna_id, lote_cant_inicial, proveedor_id."""
+    vacuna_id, fabricante_id, lote_cant_inicial, proveedor_id."""
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO lotes
-                (lote_codigo, lote_fecha_fabricacion, lote_fecha_caducidad,
-                 fabricante_id, vacuna_id, lote_cant_inicial, proveedor_id)
-            VALUES
-                (%(lote_codigo)s, %(lote_fecha_fabricacion)s, %(lote_fecha_caducidad)s,
-                 %(fabricante_id)s, %(vacuna_id)s, %(lote_cant_inicial)s, %(proveedor_id)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_crear_lote', [
+            datos['lote_codigo'], datos['lote_fecha_fabricacion'], datos['lote_fecha_caducidad'],
+            datos['lote_cant_inicial'], datos['vacuna_id'], datos['fabricante_id'],
+            datos['proveedor_id'],
+        ])
+        return obtener_lote(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['lote_id'] = data.next_id(data.LOTES, 'lote_id')
     data.LOTES.append(nuevo)
@@ -943,23 +596,13 @@ def crear_lote(datos: dict) -> dict:
 
 def listar_proveedores() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT p.*, f.fabricante_nombre
-            FROM proveedores p
-            JOIN fabricantes f ON f.fabricante_id = p.fabricante_id
-            ORDER BY p.proveedor_apellido_pat, p.proveedor_prim_nombre
-        """)
+        return db.call_read_sp('sp_listar_proveedores')
     return list(data.PROVEEDORES)
 
 
 def obtener_proveedor(proveedor_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT p.*, f.fabricante_nombre
-            FROM proveedores p
-            JOIN fabricantes f ON f.fabricante_id = p.fabricante_id
-            WHERE p.proveedor_id = %s
-        """, (proveedor_id,))
+        return db.call_read_sp_one('sp_obtener_proveedor', [proveedor_id])
     return data.get_by_id(data.PROVEEDORES, 'proveedor_id', proveedor_id)
 
 
@@ -967,17 +610,13 @@ def crear_proveedor(datos: dict) -> dict:
     """datos: proveedor_prim_nombre, proveedor_apellido_pat, proveedor_email,
     proveedor_telefono, proveedor_empresa, fabricante_id."""
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO proveedores
-                (proveedor_prim_nombre, proveedor_seg_nombre, proveedor_apellido_pat,
-                 proveedor_apellido_mat, proveedor_email, proveedor_telefono,
-                 proveedor_empresa, fabricante_id)
-            VALUES
-                (%(proveedor_prim_nombre)s, %(proveedor_seg_nombre)s, %(proveedor_apellido_pat)s,
-                 %(proveedor_apellido_mat)s, %(proveedor_email)s, %(proveedor_telefono)s,
-                 %(proveedor_empresa)s, %(fabricante_id)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_crear_proveedor', [
+            datos.get('proveedor_prim_nombre'), datos.get('proveedor_seg_nombre'),
+            datos.get('proveedor_apellido_pat'), datos.get('proveedor_apellido_mat'),
+            datos.get('proveedor_email'), datos.get('proveedor_telefono'),
+            datos.get('proveedor_empresa'), datos['fabricante_id'],
+        ])
+        return obtener_proveedor(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['proveedor_id'] = data.next_id(data.PROVEEDORES, 'proveedor_id')
     data.PROVEEDORES.append(nuevo)
@@ -990,20 +629,20 @@ def crear_proveedor(datos: dict) -> dict:
 
 def listar_vacunas() -> list[dict]:
     if db.using_postgres():
-        return db.query('SELECT * FROM vacunas ORDER BY vacuna_nombre')
+        return db.call_read_sp('sp_listar_vacunas')
     return list(data.VACUNAS)
 
 
 def obtener_vacuna(vacuna_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one('SELECT * FROM vacunas WHERE vacuna_id = %s', (vacuna_id,))
+        return db.call_read_sp_one('sp_obtener_vacuna', [vacuna_id])
     return data.get_by_id(data.VACUNAS, 'vacuna_id', vacuna_id)
 
 
 def crear_vacuna(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning(
-            'INSERT INTO vacunas (vacuna_nombre) VALUES (%(vacuna_nombre)s) RETURNING *', datos)
+        r = _sp('sp_crear_vacuna', [datos['vacuna_nombre']])
+        return obtener_vacuna(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['vacuna_id'] = data.next_id(data.VACUNAS, 'vacuna_id')
     nuevo.setdefault('vacuna_activa', True)
@@ -1014,17 +653,8 @@ def crear_vacuna(datos: dict) -> dict:
 def listar_dosis(vacuna_id: int | None = None) -> list[dict]:
     if db.using_postgres():
         if vacuna_id:
-            return db.query("""
-                SELECT d.*, v.vacuna_nombre FROM dosis d
-                JOIN vacunas v ON v.vacuna_id = d.vacuna_id
-                WHERE d.vacuna_id = %s
-                ORDER BY d.dosis_edad_oportuna_dias
-            """, (vacuna_id,))
-        return db.query("""
-            SELECT d.*, v.vacuna_nombre FROM dosis d
-            JOIN vacunas v ON v.vacuna_id = d.vacuna_id
-            ORDER BY d.vacuna_id, d.dosis_edad_oportuna_dias
-        """)
+            return db.call_read_sp('sp_listar_dosis_por_vacuna', [vacuna_id])
+        return db.call_read_sp('sp_listar_dosis')
     if vacuna_id:
         return [d for d in data.DOSIS if d['vacuna_id'] == vacuna_id]
     return list(data.DOSIS)
@@ -1032,22 +662,18 @@ def listar_dosis(vacuna_id: int | None = None) -> list[dict]:
 
 def obtener_dosis(dosis_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one('SELECT * FROM dosis WHERE dosis_id = %s', (dosis_id,))
+        return db.call_read_sp_one('sp_obtener_dosis', [dosis_id])
     return data.get_by_id(data.DOSIS, 'dosis_id', dosis_id)
 
 
 def crear_dosis(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO dosis
-                (vacuna_id, dosis_tipo, dosis_cant_ml, dosis_area_aplicacion,
-                 dosis_edad_oportuna_dias, dosis_intervalo_min_dias, dosis_limite_edad_dias)
-            VALUES
-                (%(vacuna_id)s, %(dosis_tipo)s, %(dosis_cant_ml)s, %(dosis_area_aplicacion)s,
-                 %(dosis_edad_oportuna_dias)s, %(dosis_intervalo_min_dias)s,
-                 %(dosis_limite_edad_dias)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_crear_dosis', [
+            datos['vacuna_id'], datos['dosis_tipo'], datos['dosis_cant_ml'],
+            datos.get('dosis_area_aplicacion'), datos.get('dosis_edad_oportuna_dias', 0),
+            datos.get('dosis_intervalo_min_dias', 0), datos.get('dosis_limite_edad_dias'),
+        ])
+        return obtener_dosis(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['dosis_id'] = data.next_id(data.DOSIS, 'dosis_id')
     data.DOSIS.append(nuevo)
@@ -1056,23 +682,23 @@ def crear_dosis(datos: dict) -> dict:
 
 def listar_esquemas() -> list[dict]:
     if db.using_postgres():
-        return db.query('SELECT * FROM esquemas ORDER BY esquema_nombre')
+        return db.call_read_sp('sp_listar_esquemas')
     return list(data.ESQUEMAS)
 
 
 def obtener_esquema(esquema_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one('SELECT * FROM esquemas WHERE esquema_id = %s', (esquema_id,))
+        return db.call_read_sp_one('sp_obtener_esquema', [esquema_id])
     return data.get_by_id(data.ESQUEMAS, 'esquema_id', esquema_id)
 
 
 def crear_esquema(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO esquemas (esquema_nombre, esquema_fecha_vigencia, esquema_vigente_desde)
-            VALUES (%(esquema_nombre)s, %(esquema_fecha_vigencia)s, %(esquema_vigente_desde)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_crear_esquema', [
+            datos['esquema_nombre'], datos['esquema_fecha_vigencia'],
+            datos.get('vigente_desde'),
+        ])
+        return obtener_esquema(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['esquema_id'] = data.next_id(data.ESQUEMAS, 'esquema_id')
     nuevo.setdefault('total_dosis', 0)
@@ -1080,45 +706,33 @@ def crear_esquema(datos: dict) -> dict:
     return nuevo
 
 
-def eliminar_esquema(esquema_id: int) -> bool:
+def eliminar_esquema(esquema_id: int) -> None:
     if db.using_postgres():
-        if db.query_one('SELECT 1 FROM pacientes WHERE esquema_id = %s', (esquema_id,)):
-            return False
-        db.execute('DELETE FROM esquemas WHERE esquema_id = %s', (esquema_id,))
-        return True
+        _sp('sp_eliminar_esquema', [esquema_id], out_count=2)
+        return
     if any(p['esquema_id'] == esquema_id for p in data.PACIENTES):
-        return False
+        raise ValueError('No se puede eliminar: hay pacientes asignados a este esquema')
     data.ESQUEMAS[:] = [e for e in data.ESQUEMAS if e['esquema_id'] != esquema_id]
     data.DOSIS_ESQUEMAS[:] = [de for de in data.DOSIS_ESQUEMAS if de['esquema_id'] != esquema_id]
-    return True
 
 
 def dosis_de_esquema(esquema_id: int) -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT d.*, v.vacuna_nombre
-            FROM dosis d
-            JOIN dosis_esquemas de ON de.dosis_id = d.dosis_id
-            JOIN vacunas        v  ON v.vacuna_id  = d.vacuna_id
-            WHERE de.esquema_id = %s
-            ORDER BY d.vacuna_id, d.dosis_edad_oportuna_dias
-        """, (esquema_id,))
+        return db.call_read_sp('sp_dosis_de_esquema', [esquema_id])
     ids = {de['dosis_id'] for de in data.DOSIS_ESQUEMAS if de['esquema_id'] == esquema_id}
     return [d for d in data.DOSIS if d['dosis_id'] in ids]
 
 
 def listar_dosis_esquemas() -> list[dict]:
     if db.using_postgres():
-        return db.query('SELECT * FROM dosis_esquemas ORDER BY esquema_id, dosis_id')
+        return db.call_read_sp('sp_listar_dosis_esquemas')
     return list(data.DOSIS_ESQUEMAS)
 
 
 def agregar_dosis_a_esquema(esquema_id: int, dosis_id: int) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO dosis_esquemas (esquema_id, dosis_id) VALUES (%s, %s)
-            ON CONFLICT DO NOTHING RETURNING *
-        """, (esquema_id, dosis_id)) or {}
+        r = _sp('sp_agregar_dosis_a_esquema', [esquema_id, dosis_id])
+        return {'dosis_esq_id': r.get('p_id'), 'esquema_id': esquema_id, 'dosis_id': dosis_id}
     nueva = {
         'dosis_esq_id': data.next_id(data.DOSIS_ESQUEMAS, 'dosis_esq_id'),
         'esquema_id':   esquema_id,
@@ -1134,24 +748,16 @@ def agregar_dosis_a_esquema(esquema_id: int, dosis_id: int) -> dict:
 
 def listar_padecimientos() -> list[dict]:
     if db.using_postgres():
-        rows = db.query('SELECT * FROM padecimientos ORDER BY padecimiento_nombre')
-        for r in rows:
-            vacs = db.query("""
-                SELECT v.vacuna_nombre FROM vacunas_padecimientos vp
-                JOIN vacunas v ON v.vacuna_id = vp.vacuna_id
-                WHERE vp.padecimiento_id = %s ORDER BY v.vacuna_nombre
-            """, (r['padecimiento_id'],))
-            r['vacunas'] = ', '.join(v['vacuna_nombre'] for v in vacs) if vacs else None
-        return rows
+        return db.call_read_sp('sp_listar_padecimientos')
     return list(data.PADECIMIENTOS)
 
 
 def crear_padecimiento(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO padecimientos (padecimiento_nombre, padecimiento_descripcion)
-            VALUES (%(padecimiento_nombre)s, %(padecimiento_descripcion)s) RETURNING *
-        """, datos)
+        r = _sp('sp_crear_padecimiento', [
+            datos['padecimiento_nombre'], datos.get('padecimiento_descripcion'),
+        ])
+        return db.call_read_sp_one('sp_obtener_padecimiento', [r['p_id']]) or {}
     nuevo = dict(datos)
     nuevo['padecimiento_id'] = data.next_id(data.PADECIMIENTOS, 'padecimiento_id')
     nuevo.setdefault('padecimiento_activo', True)
@@ -1165,30 +771,22 @@ def crear_padecimiento(datos: dict) -> dict:
 
 def listar_fabricantes() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT f.*, p.pais_nombre FROM fabricantes f
-            JOIN paises p ON p.pais_id = f.pais_id
-            ORDER BY f.fabricante_nombre
-        """)
+        return db.call_read_sp('sp_listar_fabricantes')
     return list(data.FABRICANTES)
 
 
 def obtener_fabricante(fabricante_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT f.*, p.pais_nombre FROM fabricantes f
-            JOIN paises p ON p.pais_id = f.pais_id
-            WHERE f.fabricante_id = %s
-        """, (fabricante_id,))
+        return db.call_read_sp_one('sp_obtener_fabricante', [fabricante_id])
     return data.get_by_id(data.FABRICANTES, 'fabricante_id', fabricante_id)
 
 
 def crear_fabricante(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO fabricantes (fabricante_nombre, pais_id, fabricante_telefono)
-            VALUES (%(fabricante_nombre)s, %(pais_id)s, %(fabricante_telefono)s) RETURNING *
-        """, datos)
+        r = _sp('sp_crear_fabricante', [
+            datos['fabricante_nombre'], datos['pais_id'], datos.get('fabricante_telefono'),
+        ])
+        return obtener_fabricante(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['fabricante_id'] = data.next_id(data.FABRICANTES, 'fabricante_id')
     data.FABRICANTES.append(nuevo)
@@ -1201,57 +799,69 @@ def crear_fabricante(datos: dict) -> dict:
 
 def listar_centros() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT cs.*, ci.ciudad_nombre
-            FROM centros_salud cs
-            JOIN ciudades ci ON ci.ciudad_id = cs.ciudad_id
-            ORDER BY cs.centro_nombre
-        """)
+        return db.call_read_sp('sp_listar_centros')
     return list(data.CENTROS)
 
 
 def obtener_centro(centro_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT cs.*, ci.ciudad_nombre
-            FROM centros_salud cs
-            JOIN ciudades ci ON ci.ciudad_id = cs.ciudad_id
-            WHERE cs.centro_id = %s
-        """, (centro_id,))
+        return db.call_read_sp_one('sp_obtener_centro', [centro_id])
     return data.get_by_id(data.CENTROS, 'centro_id', centro_id)
 
 
 def crear_centro(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning("""
-            INSERT INTO centros_salud
-                (centro_nombre, centro_calle, centro_numero, centro_codigo_postal,
-                 ciudad_id, centro_horario_inicio, centro_horario_fin,
-                 centro_latitud, centro_longitud, centro_telefono, centro_beacon)
-            VALUES
-                (%(centro_nombre)s, %(centro_calle)s, %(centro_numero)s, %(centro_codigo_postal)s,
-                 %(ciudad_id)s, %(centro_horario_inicio)s, %(centro_horario_fin)s,
-                 %(centro_latitud)s, %(centro_longitud)s, %(centro_telefono)s, %(centro_beacon)s)
-            RETURNING *
-        """, datos)
+        r = _sp('sp_crear_centro', [
+            datos['centro_nombre'], datos.get('centro_calle'), datos.get('centro_numero'),
+            datos.get('centro_codigo_postal'), datos['ciudad_id'],
+            datos.get('centro_horario_inicio'), datos.get('centro_horario_fin'),
+            datos.get('centro_latitud'), datos.get('centro_longitud'),
+            datos.get('centro_telefono'), datos.get('centro_beacon'),
+        ])
+        return obtener_centro(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['centro_id'] = data.next_id(data.CENTROS, 'centro_id')
     data.CENTROS.append(nuevo)
     return nuevo
 
 
-def eliminar_centro(centro_id: int) -> bool:
+def obtener_centro_por_beacon(beacon_id: str) -> dict | None:
     if db.using_postgres():
-        if (db.query_one('SELECT 1 FROM usuarios WHERE centro_id = %s', (centro_id,)) or
-                db.query_one('SELECT 1 FROM inventarios WHERE centro_id = %s', (centro_id,))):
-            return False
-        db.execute('DELETE FROM centros_salud WHERE centro_id = %s', (centro_id,))
-        return True
+        return db.call_read_sp_one('sp_obtener_centro_por_beacon', [beacon_id])
+    return next((c for c in data.CENTROS if c.get('centro_beacon') == beacon_id), None)
+
+
+def vacunas_en_centro(centro_id: int) -> list[dict]:
+    if db.using_postgres():
+        rows = db.call_read_sp('sp_vacunas_en_centro', [centro_id])
+        for r in rows:
+            if r.get('stock_total') is not None:
+                r['stock_total'] = int(r['stock_total'])
+        return rows
+    return []
+
+
+def registrar_lectura_beacon(centro_id: int, tutor_id: int) -> None:
+    if not db.using_postgres():
+        return
+    _sp('sp_registrar_lectura_beacon', [centro_id, tutor_id], out_count=2)
+
+
+def personas_esperando_en_centro(centro_id: int) -> int:
+    if db.using_postgres():
+        row = db.call_read_sp_one('sp_personas_esperando_en_centro', [centro_id])
+        return int(row['total']) if row else 0
+    return 0
+
+
+def eliminar_centro(centro_id: int) -> None:
+    if db.using_postgres():
+        _sp('sp_eliminar_centro', [centro_id], out_count=2)
+        return
     if (any(u.get('centro_id') == centro_id for u in data.USUARIOS) or
             any(i['centro_id'] == centro_id for i in data.INVENTARIOS)):
-        return False
+        raise ValueError('No se puede eliminar: el centro tiene responsables o inventario asignado')
     data.CENTROS[:] = [c for c in data.CENTROS if c['centro_id'] != centro_id]
-    return True
 
 
 # ─────────────────────────────────────────────
@@ -1260,20 +870,20 @@ def eliminar_centro(centro_id: int) -> bool:
 
 def listar_paises() -> list[dict]:
     if db.using_postgres():
-        return db.query('SELECT * FROM paises ORDER BY pais_nombre')
+        return db.call_read_sp('sp_listar_paises')
     return list(data.PAISES)
 
 
 def obtener_pais(pais_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one('SELECT * FROM paises WHERE pais_id = %s', (pais_id,))
+        return db.call_read_sp_one('sp_obtener_pais', [pais_id])
     return data.get_by_id(data.PAISES, 'pais_id', pais_id)
 
 
 def crear_pais(nombre: str) -> dict:
     if db.using_postgres():
-        return db.execute_returning(
-            'INSERT INTO paises (pais_nombre) VALUES (%s) RETURNING *', (nombre,))
+        r = _sp('sp_crear_pais', [nombre])
+        return obtener_pais(r['p_id']) or {}
     nueva = {'pais_id': data.next_id(data.PAISES, 'pais_id'), 'pais_nombre': nombre}
     data.PAISES.append(nueva)
     return nueva
@@ -1282,16 +892,8 @@ def crear_pais(nombre: str) -> dict:
 def listar_estados(pais_id: int | None = None) -> list[dict]:
     if db.using_postgres():
         if pais_id:
-            return db.query("""
-                SELECT e.*, p.pais_nombre FROM estados e
-                JOIN paises p ON p.pais_id = e.pais_id
-                WHERE e.pais_id = %s ORDER BY e.estado_nombre
-            """, (pais_id,))
-        return db.query("""
-            SELECT e.*, p.pais_nombre FROM estados e
-            JOIN paises p ON p.pais_id = e.pais_id
-            ORDER BY e.estado_nombre
-        """)
+            return db.call_read_sp('sp_listar_estados_por_pais', [pais_id])
+        return db.call_read_sp('sp_listar_estados')
     if pais_id:
         return [e for e in data.ESTADOS if e['pais_id'] == pais_id]
     return list(data.ESTADOS)
@@ -1299,19 +901,14 @@ def listar_estados(pais_id: int | None = None) -> list[dict]:
 
 def obtener_estado(estado_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT e.*, p.pais_nombre FROM estados e
-            JOIN paises p ON p.pais_id = e.pais_id
-            WHERE e.estado_id = %s
-        """, (estado_id,))
+        return db.call_read_sp_one('sp_obtener_estado', [estado_id])
     return data.get_by_id(data.ESTADOS, 'estado_id', estado_id)
 
 
 def crear_estado(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning(
-            'INSERT INTO estados (estado_nombre, pais_id) '
-            'VALUES (%(estado_nombre)s, %(pais_id)s) RETURNING *', datos)
+        r = _sp('sp_crear_estado', [datos['estado_nombre'], datos['pais_id']])
+        return obtener_estado(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['estado_id'] = data.next_id(data.ESTADOS, 'estado_id')
     data.ESTADOS.append(nuevo)
@@ -1321,16 +918,8 @@ def crear_estado(datos: dict) -> dict:
 def listar_ciudades(estado_id: int | None = None) -> list[dict]:
     if db.using_postgres():
         if estado_id:
-            return db.query("""
-                SELECT c.*, e.estado_nombre FROM ciudades c
-                JOIN estados e ON e.estado_id = c.estado_id
-                WHERE c.estado_id = %s ORDER BY c.ciudad_nombre
-            """, (estado_id,))
-        return db.query("""
-            SELECT c.*, e.estado_nombre FROM ciudades c
-            JOIN estados e ON e.estado_id = c.estado_id
-            ORDER BY c.ciudad_nombre
-        """)
+            return db.call_read_sp('sp_listar_ciudades_por_estado', [estado_id])
+        return db.call_read_sp('sp_listar_ciudades')
     if estado_id:
         return [c for c in data.CIUDADES if c['estado_id'] == estado_id]
     return list(data.CIUDADES)
@@ -1338,19 +927,14 @@ def listar_ciudades(estado_id: int | None = None) -> list[dict]:
 
 def obtener_ciudad(ciudad_id: int) -> dict | None:
     if db.using_postgres():
-        return db.query_one("""
-            SELECT c.*, e.estado_nombre FROM ciudades c
-            JOIN estados e ON e.estado_id = c.estado_id
-            WHERE c.ciudad_id = %s
-        """, (ciudad_id,))
+        return db.call_read_sp_one('sp_obtener_ciudad', [ciudad_id])
     return data.get_by_id(data.CIUDADES, 'ciudad_id', ciudad_id)
 
 
 def crear_ciudad(datos: dict) -> dict:
     if db.using_postgres():
-        return db.execute_returning(
-            'INSERT INTO ciudades (ciudad_nombre, estado_id) '
-            'VALUES (%(ciudad_nombre)s, %(estado_id)s) RETURNING *', datos)
+        r = _sp('sp_crear_ciudad', [datos['ciudad_nombre'], datos['estado_id']])
+        return obtener_ciudad(r['p_id']) or {}
     nuevo = dict(datos)
     nuevo['ciudad_id'] = data.next_id(data.CIUDADES, 'ciudad_id')
     data.CIUDADES.append(nuevo)
@@ -1363,33 +947,13 @@ def crear_ciudad(datos: dict) -> dict:
 
 def listar_alertas_inventario() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT ai.*, i.inventario_stock_actual,
-                cs.centro_nombre, v.vacuna_nombre,
-                ai.alerta_inv_timestamp AS ts
-            FROM alertas_inventario ai
-            JOIN inventarios   i  ON i.inventario_id = ai.inventario_id
-            JOIN centros_salud cs ON cs.centro_id     = i.centro_id
-            JOIN lotes         l  ON l.lote_id        = i.lote_id
-            JOIN vacunas       v  ON v.vacuna_id      = l.vacuna_id
-            ORDER BY ai.alerta_inv_timestamp DESC
-        """)
+        return db.call_read_sp('sp_listar_alertas_inventario')
     return list(data.ALERTAS_INVENTARIO)
 
 
 def listar_alertas_dosis() -> list[dict]:
     if db.using_postgres():
-        return db.query("""
-            SELECT ad.*,
-                INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
-                v.vacuna_nombre,
-                d.dosis_tipo
-            FROM alertas_dosis_pacientes ad
-            JOIN pacientes p ON p.paciente_id = ad.paciente_id
-            JOIN dosis d ON d.dosis_id = ad.dosis_id
-            JOIN vacunas v ON v.vacuna_id = d.vacuna_id
-            ORDER BY ad.alerta_dosis_pac_timestamp DESC
-        """)
+        return db.call_read_sp('sp_listar_alertas_dosis')
     return list(data.ALERTAS_DOSIS)
 
 
@@ -1399,22 +963,7 @@ def listar_alertas_dosis() -> list[dict]:
 
 def stats_dashboard() -> dict:
     if db.using_postgres():
-        row = db.query_one("""
-            SELECT
-                (SELECT COUNT(*) FROM pacientes) AS pacientes,
-                (SELECT COUNT(DISTINCT u.usuario_id) FROM usuarios u
-                 JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-                 JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'tutor') AS tutores,
-                (SELECT COUNT(DISTINCT u.usuario_id) FROM usuarios u
-                 JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-                 JOIN roles r ON r.rol_id = ur.rol_id AND r.rol_nombre = 'responsable') AS responsables,
-                (SELECT COUNT(*) FROM centros_salud) AS centros,
-                (SELECT COUNT(*) FROM aplicaciones
-                 WHERE DATE(aplicacion_timestamp) = CURRENT_DATE) AS aplicaciones_hoy,
-                (SELECT COUNT(*) FROM alertas_inventario)      AS alertas_inv,
-                (SELECT COUNT(*) FROM alertas_dosis_pacientes) AS alertas_dosis
-        """)
-        return row or {}
+        return db.call_read_sp_one('sp_stats_dashboard') or {}
     from datetime import date
     return {
         'pacientes':        len(data.PACIENTES),
@@ -1435,19 +984,9 @@ def stats_dashboard() -> dict:
 # ─────────────────────────────────────────────
 
 def chart_aplicaciones_por_mes(meses: int = 12) -> list[dict]:
-    """Últimos N meses, agrupados, para la gráfica del dashboard."""
     if db.using_postgres():
-        return db.query("""
-            SELECT TO_CHAR(DATE_TRUNC('month', aplicacion_timestamp), 'Mon YYYY') AS mes,
-                   DATE_TRUNC('month', aplicacion_timestamp) AS mes_orden,
-                   COUNT(*) AS total
-            FROM aplicaciones
-            WHERE aplicacion_timestamp >= DATE_TRUNC('month', NOW() - (%(m)s || ' months')::interval)
-            GROUP BY DATE_TRUNC('month', aplicacion_timestamp)
-            ORDER BY DATE_TRUNC('month', aplicacion_timestamp)
-        """, {'m': meses - 1})
+        return db.call_read_sp('sp_chart_aplicaciones_por_mes', [meses])
     from collections import defaultdict
-    from datetime import date
     por_mes = defaultdict(int)
     for a in data.APLICACIONES:
         ts = a['aplicacion_timestamp']
@@ -1459,26 +998,8 @@ def chart_aplicaciones_por_mes(meses: int = 12) -> list[dict]:
 def chart_por_mes(desde: str, hasta: str,
                   centro_id: int | None = None,
                   vacuna_id: int | None = None) -> list[dict]:
-    """Aplicaciones agrupadas por mes con filtros opcionales."""
     if db.using_postgres():
-        sql = """
-            SELECT TO_CHAR(DATE_TRUNC('month', a.aplicacion_timestamp), 'Mon YYYY') AS mes,
-                   DATE_TRUNC('month', a.aplicacion_timestamp) AS mes_orden,
-                   COUNT(*) AS total
-            FROM aplicaciones a
-            JOIN dosis  d ON d.dosis_id  = a.dosis_id
-            JOIN vacunas v ON v.vacuna_id = d.vacuna_id
-            WHERE a.aplicacion_timestamp BETWEEN %(desde)s AND %(hasta)s
-        """
-        params: dict = {'desde': desde, 'hasta': hasta + ' 23:59:59'}
-        if centro_id:
-            sql += ' AND a.centro_id = %(centro_id)s'
-            params['centro_id'] = centro_id
-        if vacuna_id:
-            sql += ' AND d.vacuna_id = %(vacuna_id)s'
-            params['vacuna_id'] = vacuna_id
-        sql += ' GROUP BY DATE_TRUNC(\'month\', a.aplicacion_timestamp) ORDER BY mes_orden'
-        return db.query(sql, params)
+        return db.call_read_sp('sp_chart_por_mes', [desde, hasta, centro_id, vacuna_id])
     from collections import defaultdict
     apps = data.APLICACIONES
     if centro_id:
@@ -1494,24 +1015,8 @@ def chart_por_mes(desde: str, hasta: str,
 def chart_top_vacunas(desde: str, hasta: str,
                       centro_id: int | None = None,
                       vacuna_id: int | None = None) -> list[dict]:
-    """Top vacunas más aplicadas en el periodo."""
     if db.using_postgres():
-        sql = """
-            SELECT v.vacuna_nombre, COUNT(*) AS total
-            FROM aplicaciones a
-            JOIN dosis   d ON d.dosis_id  = a.dosis_id
-            JOIN vacunas v ON v.vacuna_id = d.vacuna_id
-            WHERE a.aplicacion_timestamp BETWEEN %(desde)s AND %(hasta)s
-        """
-        params: dict = {'desde': desde, 'hasta': hasta + ' 23:59:59'}
-        if centro_id:
-            sql += ' AND a.centro_id = %(centro_id)s'
-            params['centro_id'] = centro_id
-        if vacuna_id:
-            sql += ' AND d.vacuna_id = %(vacuna_id)s'
-            params['vacuna_id'] = vacuna_id
-        sql += ' GROUP BY v.vacuna_nombre ORDER BY total DESC LIMIT 8'
-        return db.query(sql, params)
+        return db.call_read_sp('sp_chart_top_vacunas', [desde, hasta, centro_id, vacuna_id])
     from collections import defaultdict
     cnt: dict = defaultdict(int)
     for a in data.APLICACIONES:
@@ -1523,43 +1028,27 @@ def chart_top_vacunas(desde: str, hasta: str,
 def resumen_periodo(desde: str, hasta: str,
                     centro_id: int | None = None,
                     vacuna_id: int | None = None) -> dict:
-    """Total de aplicaciones en el periodo para el resumen."""
     if db.using_postgres():
-        sql = """
-            SELECT COUNT(*) AS total
-            FROM aplicaciones a
-            JOIN dosis d ON d.dosis_id = a.dosis_id
-            WHERE a.aplicacion_timestamp BETWEEN %(desde)s AND %(hasta)s
-        """
-        params: dict = {'desde': desde, 'hasta': hasta + ' 23:59:59'}
-        if centro_id:
-            sql += ' AND a.centro_id = %(centro_id)s'
-            params['centro_id'] = centro_id
-        if vacuna_id:
-            sql += ' AND d.vacuna_id = %(vacuna_id)s'
-            params['vacuna_id'] = vacuna_id
-        row = db.query_one(sql, params)
-        return {'total': row['total'] if row else 0}
+        row = db.call_read_sp_one('sp_resumen_periodo', [desde, hasta, centro_id, vacuna_id])
+        return {'total': int(row['total']) if row else 0}
     return {'total': len(data.APLICACIONES)}
 
 
 # ── Fotos de perfil ──────────────────────────────────────────────
 
-def actualizar_imagen_usuario(usuario_id: int, ruta: str):
+def actualizar_imagen_usuario(usuario_id: int, ruta: str) -> None:
     if db.using_postgres():
-        db.execute('UPDATE usuarios SET usuario_imagen = %s WHERE usuario_id = %s',
-                   (ruta, usuario_id))
-    else:
-        u = data.get_by_id(data.USUARIOS, 'usuario_id', usuario_id)
-        if u:
-            u['usuario_imagen'] = ruta
+        _sp('sp_actualizar_imagen_usuario', [usuario_id, ruta], out_count=2)
+        return
+    u = data.get_by_id(data.USUARIOS, 'usuario_id', usuario_id)
+    if u:
+        u['usuario_imagen'] = ruta
 
 
-def actualizar_imagen_paciente(paciente_id: int, ruta: str):
+def actualizar_imagen_paciente(paciente_id: int, ruta: str) -> None:
     if db.using_postgres():
-        db.execute('UPDATE pacientes SET paciente_imagen = %s WHERE paciente_id = %s',
-                   (ruta, paciente_id))
-    else:
-        p = data.get_by_id(data.PACIENTES, 'paciente_id', paciente_id)
-        if p:
-            p['paciente_imagen'] = ruta
+        _sp('sp_actualizar_imagen_paciente', [paciente_id, ruta], out_count=2)
+        return
+    p = data.get_by_id(data.PACIENTES, 'paciente_id', paciente_id)
+    if p:
+        p['paciente_imagen'] = ruta

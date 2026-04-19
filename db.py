@@ -71,6 +71,43 @@ def execute_returning(sql: str, params=None) -> dict | None:
         return dict(row) if row else None
 
 
+def call_read_sp(name: str, in_params: list | None = None) -> list[dict]:
+    """Llama a un stored procedure de lectura (REFCURSOR) y retorna los resultados."""
+    conn = get_db()
+    params = list(in_params or [])
+    placeholders = ', '.join(['%s'] * len(params) + ["'_cur'"])
+    call_sql = f"CALL {name}({placeholders})"
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(call_sql, params)
+        cur.execute("FETCH ALL FROM _cur")
+        rows = [dict(row) for row in cur.fetchall()]
+    conn.commit()
+    return rows
+
+
+def call_read_sp_one(name: str, in_params: list | None = None) -> dict | None:
+    """Llama a un SP de lectura (REFCURSOR) y retorna la primera fila o None."""
+    rows = call_read_sp(name, in_params)
+    return rows[0] if rows else None
+
+
+def call_write_sp(name: str, in_params: list, out_count: int = 3) -> dict:
+    """Llama a un stored procedure de escritura y retorna sus parámetros OUT.
+
+    Los SPs de escritura tienen la forma:
+      sp_xxx(IN ..., OUT p_ok SMALLINT, OUT p_msg VARCHAR, [OUT p_id INTEGER])
+    Retorna un dict con p_ok, p_msg y opcionalmente p_id.
+    """
+    conn = get_db()
+    placeholders = ['%s'] * len(in_params) + ['NULL'] * out_count
+    sql = f"CALL {name}({', '.join(placeholders)})"
+    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(sql, in_params)
+        row = cur.fetchone()
+        conn.commit()
+    return dict(row) if row else {'p_ok': 0, 'p_msg': 'Error interno del servidor'}
+
+
 def init_app(app):
     """Registra el cierre de conexión en el contexto de la app Flask."""
     app.teardown_appcontext(close_db)

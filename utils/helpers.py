@@ -160,15 +160,14 @@ def validar_aplicacion(paciente, dosis, aplicaciones_previas):
             f'para esta dosis es {edad_oportuna} días.'
         )
 
-    # 2. Verificar intervalo mínimo desde la dosis anterior de la misma vacuna
+    # 2. Verificar intervalo mínimo desde la dosis anterior de la misma vacuna.
+    # Las aplicaciones_previas vienen de vw_aplicaciones (PG) o de data.APLICACIONES (mock),
+    # que incluyen vacuna_id en ambos casos, así que filtramos directamente por vacuna_id.
     if intervalo_min > 0:
         vacuna_id = dosis.get('vacuna_id')
-        import data as _data
-        dosis_misma_vacuna = {d['dosis_id'] for d in _data.DOSIS if d['vacuna_id'] == vacuna_id}
         apps_misma_vacuna = [
             a for a in aplicaciones_previas
-            if a['paciente_id'] == paciente['paciente_id']
-            and a['dosis_id'] in dosis_misma_vacuna
+            if a.get('vacuna_id') == vacuna_id
         ]
         if apps_misma_vacuna:
             ultima = max(apps_misma_vacuna, key=lambda a: a['aplicacion_timestamp'])

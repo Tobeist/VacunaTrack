@@ -38,8 +38,15 @@
               <option value="F">Femenino</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">UID NFC (pulsera)<span class="required">*</span></label>
-            <input required type="text" name="nfc" class="form-control" placeholder="Ej: NFC-001"></div>
+          <div class="form-group"><label class="form-label">UID NFC (pulsera) <span class="required">*</span></label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <input required type="text" name="nfc" id="nfc-uid-admin" class="form-control" placeholder="Ej: 04:A3:2B:1C:5D:6E">
+              <button type="button" class="btn btn-outline" style="white-space:nowrap" onclick="scanNfcIntoField('nfc-uid-admin')">
+                <i class="fa-solid fa-wifi"></i> Escanear
+              </button>
+            </div>
+            <p class="text-muted fs-sm mt-4">En Android Chrome puedes escanear el tag directamente. En otros dispositivos, usa una app externa (como NFC Tools) para leer el UID y escríbelo aquí.</p>
+          </div>
         </div>
         <div class="form-group"><label class="form-label">Esquema de vacunación <span class="required">*</span></label>
           <select name="esquema_id" class="form-select" required>

@@ -139,7 +139,12 @@ function initPasswordStrength(inputId) {
   });
 }
 
-// simulador de scanner nfc
+// normaliza un UID NFC al formato de fábrica: xx:xx:xx:xx (minúsculas, con colons)
+function normalizeNfcUid(uid) {
+  const clean = uid.replace(/[:\-\s]/g, '').toLowerCase();
+  return clean.match(/.{1,2}/g)?.join(':') || clean;
+}
+
 const NFC = {
   scanning: false,
 
@@ -152,26 +157,33 @@ const NFC = {
     ring?.classList.add('scanning');
     if (statusEl) statusEl.textContent = 'Leyendo NFC…';
 
-    // usar lector nfc web si es posible
-    if ('NDEFReader' in window) {
-      try {
-        const reader = new NDEFReader();
-        await reader.scan();
-        reader.addEventListener('reading', ({ message }) => {
-          const uid = message.records[0]?.data ? new TextDecoder().decode(message.records[0].data) : 'UNKNOWN';
-          this._stopScan(ring, statusEl, 'Paciente encontrado');
-          onResult(uid);
-        });
-        return;
-      } catch (_) {  }
+    if (!('NDEFReader' in window)) {
+      this._stopScan(ring, statusEl, 'NFC no disponible');
+      onError('Web NFC no está disponible en este dispositivo o navegador.');
+      return;
     }
 
-    // fallback (2s delay)
-    const uid = document.getElementById('sim-nfc-uid')?.value || 'NFC-SIM-001';
-    setTimeout(() => {
-      this._stopScan(ring, statusEl, 'Paciente encontrado');
-      onResult(uid);
-    }, 2000);
+    try {
+      const reader = new NDEFReader();
+      await reader.scan();
+      reader.addEventListener('reading', ({ serialNumber, message }) => {
+        let uid = serialNumber;
+        if (!uid && message.records[0]?.data) {
+          uid = new TextDecoder().decode(message.records[0].data);
+        }
+        if (!uid) { onError('No se pudo leer el UID del tag'); return; }
+        uid = normalizeNfcUid(uid);
+        this._stopScan(ring, statusEl, 'Tag leído');
+        onResult(uid);
+      });
+      reader.addEventListener('readingerror', () => {
+        this._stopScan(ring, statusEl, 'Error de lectura');
+        onError('No se pudo leer el tag NFC');
+      });
+    } catch (e) {
+      this._stopScan(ring, statusEl, 'NFC no disponible');
+      onError(e.message || 'NFC no disponible en este dispositivo');
+    }
   },
 
   _stopScan(ring, statusEl, msg) {
@@ -243,6 +255,36 @@ function renderHistoryTable(historial, pacienteId) {
       </table>
     </div>
   `;
+}
+
+// escaneo NFC para llenar campo de formulario
+async function scanNfcIntoField(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+
+  if (!('NDEFReader' in window)) {
+    Toast.show('Web NFC no disponible en este dispositivo/navegador. Ingresa el UID manualmente.', 'info');
+    return;
+  }
+
+  Toast.show('Acerca el tag NFC…', 'info', 5000);
+  try {
+    const reader = new NDEFReader();
+    await reader.scan();
+    reader.addEventListener('reading', ({ serialNumber, message }) => {
+      let uid = serialNumber;
+      if (!uid && message.records[0]?.data) {
+        uid = new TextDecoder().decode(message.records[0].data);
+      }
+      if (uid) {
+        const uidNorm = normalizeNfcUid(uid);
+        input.value = uidNorm;
+        Toast.show('UID capturado: ' + uidNorm, 'success');
+      }
+    });
+  } catch (e) {
+    Toast.show('Error NFC: ' + (e.message || 'No disponible'), 'error');
+  }
 }
 
 // historial de paciente AJAX
@@ -331,26 +373,6 @@ function initMap(lat = 25.6866, lng = -100.3161, zoom = 12) {
       map.setView([pos.coords.latitude, pos.coords.longitude], 13);
     });
   }
-}
-
-// simulador beacon
-function simulateBeacon(centerName, vaccines, waitCount) {
-  const modal = document.getElementById('beacon-modal');
-  if (!modal) return;
-
-  document.getElementById('beacon-center-name').textContent = centerName;
-  document.getElementById('beacon-wait-count').textContent = waitCount;
-
-  const vaccineList = document.getElementById('beacon-vaccines');
-  if (vaccineList) {
-    vaccineList.innerHTML = vaccines.map(v =>
-      `<div class="d-flex align-center gap-10 mb-8">
-         <span class="badge badge-applicable">${v.nombre}</span>
-         <span class="fs-sm text-muted">Stock: ${v.stock} dosis</span>
-       </div>`
-    ).join('');
-  }
-  openModal('beacon-modal');
 }
 
 // gráficos de reportes

@@ -22,12 +22,13 @@
 
         
         <div class="form-group w-full mb-12">
-          <label class="form-label fs-sm">UID NFC (modo simulación)</label>
-          <input type="text" id="nfc-uid-input" class="form-control" placeholder="Ej: NFC-001">
+          <label class="form-label fs-sm">UID manual (sin NFC)</label>
+          <input type="text" id="nfc-uid-input" class="form-control" placeholder="Ej: e2:d9:50:3d">
+          <p class="text-muted fs-sm mt-4">Solo si Web NFC no está disponible en tu dispositivo.</p>
         </div>
 
         <button id="btn-scan-nfc" class="btn btn-primary btn-full">
-          <i class="fa-solid fa-wifi"></i> Escanear / Buscar
+          <i class="fa-solid fa-wifi"></i> Escanear NFC
         </button>
       </div>
     </div>

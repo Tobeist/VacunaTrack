@@ -82,8 +82,11 @@ def tutores():
             'tutor_telefono':     f.get('telefono') or None,
             'tutor_contrasena':   generate_password_hash(temp),
         }
-        repo.crear_tutor(datos)
-        flash(f'Tutor registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+        try:
+            repo.crear_tutor(datos)
+            flash(f'Tutor registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.tutores'))
     return render_template('admin/tutores.html', tutores=repo.listar_tutores())
 
@@ -103,9 +106,11 @@ def editar_tutor(tid):
         'tutor_telefono':     f.get('telefono') or None,
         'tutor_curp':         f.get('curp', '').upper() or None,
     }
-    campos = {k: v for k, v in campos.items() if v is not None}
-    repo.actualizar_tutor(tid, campos)
-    flash('Tutor actualizado.', 'success')
+    try:
+        repo.actualizar_tutor(tid, campos)
+        flash('Tutor actualizado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.tutores'))
 
 
@@ -114,10 +119,11 @@ def eliminar_tutor(tid):
     redir = _require_admin()
     if redir:
         return redir
-    if not repo.eliminar_tutor(tid):
-        flash('No se puede eliminar: este tutor tiene pacientes vinculados.', 'error')
-    else:
+    try:
+        repo.eliminar_tutor(tid)
         flash('Tutor eliminado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.tutores'))
 
 
@@ -143,13 +149,16 @@ def responsables():
             'responsable_contrasena':   generate_password_hash(temp),
             'centro_id':                int(f['centro_id']),
         }
-        nuevo = repo.crear_responsable(datos)
-        rid   = nuevo['responsable_id']
-        for num, spec in zip(request.form.getlist('cedula_numero'),
-                             request.form.getlist('cedula_especialidad')):
-            if num.strip():
-                repo.agregar_cedula(rid, num.strip(), spec.strip() or None)
-        flash(f'Responsable registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+        try:
+            nuevo = repo.crear_responsable(datos)
+            rid   = nuevo['responsable_id']
+            for num, spec in zip(request.form.getlist('cedula_numero'),
+                                 request.form.getlist('cedula_especialidad')):
+                if num.strip():
+                    repo.agregar_cedula(rid, num.strip(), spec.strip() or None)
+            flash(f'Responsable registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.responsables'))
     return render_template('admin/responsables.html',
                            responsables=repo.listar_responsables(),
@@ -161,10 +170,11 @@ def eliminar_responsable(rid):
     redir = _require_admin()
     if redir:
         return redir
-    if not repo.eliminar_responsable(rid):
-        flash('No se puede eliminar: este responsable tiene aplicaciones registradas.', 'error')
-    else:
+    try:
+        repo.eliminar_responsable(rid)
         flash('Responsable eliminado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.responsables'))
 
 
@@ -189,8 +199,11 @@ def administradores():
             'admin_telefono':     f.get('telefono') or None,
             'admin_contrasena':   generate_password_hash(temp),
         }
-        repo.crear_admin(datos)
-        flash(f'Administrador registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+        try:
+            repo.crear_admin(datos)
+            flash(f'Administrador registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.administradores'))
     return render_template('admin/administradores.html', admins=repo.listar_administradores())
 
@@ -200,11 +213,11 @@ def eliminar_admin(aid):
     redir = _require_admin()
     if redir:
         return redir
-    if aid == session['user_id']:
-        flash('No puedes eliminar tu propia cuenta.', 'error')
-    else:
-        repo.eliminar_admin(aid)
+    try:
+        repo.eliminar_admin(aid, session['user_id'])
         flash('Administrador eliminado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.administradores'))
 
 
@@ -224,7 +237,7 @@ def pacientes():
             return redirect(url_for('admin.pacientes'))
         datos = {
             'paciente_prim_nombre':  f['prim_nombre'],
-            'paciente_nombre':       f.get('seg_nombre') or None,
+            'paciente_seg_nombre':   f.get('seg_nombre') or None,
             'paciente_apellido_pat': f['apellido_pat'],
             'paciente_apellido_mat': f.get('apellido_mat') or None,
             'paciente_curp':         curp,
@@ -234,8 +247,11 @@ def pacientes():
             'paciente_nfc':          f.get('nfc') or None,
             'esquema_id':            int(f['esquema_id']),
         }
-        repo.crear_paciente(datos)
-        flash('Paciente registrado.', 'success')
+        try:
+            repo.crear_paciente(datos)
+            flash('Paciente registrado.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.pacientes'))
     return render_template('admin/pacientes.html',
                            pacientes=repo.listar_pacientes(),
@@ -247,10 +263,11 @@ def eliminar_paciente(pid):
     redir = _require_admin()
     if redir:
         return redir
-    if not repo.eliminar_paciente(pid):
-        flash('No se puede eliminar: este paciente tiene aplicaciones registradas.', 'error')
-    else:
+    try:
+        repo.eliminar_paciente(pid)
         flash('Paciente eliminado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.pacientes'))
 
 
@@ -265,15 +282,15 @@ def relaciones():
         f   = request.form
         pid = int(f['paciente_id'])
         tid = int(f['tutor_id'])
-        if repo.existe_relacion(pid, tid):
-            flash('Esta relación ya existe.', 'error')
-        else:
-            pac = repo.obtener_paciente(pid)
-            tut = repo.obtener_tutor(tid)
-            pac_nombre = f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}" if pac else '—'
-            tut_nombre = f"{tut['tutor_prim_nombre']} {tut['tutor_apellido_pat']}" if tut else '—'
+        pac = repo.obtener_paciente(pid)
+        tut = repo.obtener_tutor(tid)
+        pac_nombre = f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}" if pac else '—'
+        tut_nombre = f"{tut['tutor_prim_nombre']} {tut['tutor_apellido_pat']}" if tut else '—'
+        try:
             repo.crear_relacion(pid, tid, pac_nombre, tut_nombre)
             flash('Relación registrada.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.relaciones'))
     import json as _json
     pacientes = repo.listar_pacientes()
@@ -328,8 +345,11 @@ def centros():
             'centro_telefono':        f.get('telefono') or None,
             'centro_beacon':          f.get('beacon') or None,
         }
-        repo.crear_centro(datos)
-        flash('Centro de salud registrado.', 'success')
+        try:
+            repo.crear_centro(datos)
+            flash('Centro de salud registrado.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.centros'))
     return render_template('admin/centros.html',
                            centros=repo.listar_centros(),
@@ -341,10 +361,11 @@ def eliminar_centro(cid):
     redir = _require_admin()
     if redir:
         return redir
-    if not repo.eliminar_centro(cid):
-        flash('No se puede eliminar: este centro tiene responsables o inventario asignado.', 'error')
-    else:
+    try:
+        repo.eliminar_centro(cid)
         flash('Centro eliminado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.centros'))
 
 
@@ -362,8 +383,11 @@ def esquemas():
             'esquema_fecha_vigencia': date.fromisoformat(f['fecha_vigencia']),
             'vigente_desde':          date.today(),
         }
-        repo.crear_esquema(datos)
-        flash('Esquema registrado.', 'success')
+        try:
+            repo.crear_esquema(datos)
+            flash('Esquema registrado.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.esquemas'))
     esquemas = repo.listar_esquemas()
     for e in esquemas:
@@ -380,10 +404,11 @@ def eliminar_esquema(eid):
     redir = _require_admin()
     if redir:
         return redir
-    if not repo.eliminar_esquema(eid):
-        flash('No se puede eliminar: este esquema tiene pacientes asignados.', 'error')
-    else:
+    try:
+        repo.eliminar_esquema(eid)
         flash('Esquema eliminado.', 'success')
+    except ValueError as e:
+        flash(str(e), 'error')
     return redirect(url_for('admin.esquemas'))
 
 
@@ -396,26 +421,29 @@ def vacunas():
         return redir
     if request.method == 'POST':
         f   = request.form
-        vac = repo.crear_vacuna({'vacuna_nombre': f['nombre']})
-        vid = vac['vacuna_id']
-        tipos   = request.form.getlist('dosis_tipo')
-        mls     = request.form.getlist('dosis_ml')
-        areas   = request.form.getlist('dosis_area')
-        edades  = request.form.getlist('dosis_edad')
-        ints    = request.form.getlist('dosis_intervalo')
-        limites = request.form.getlist('dosis_limite')
-        for i in range(len(tipos)):
-            if tipos[i]:
-                repo.crear_dosis({
-                    'vacuna_id':                vid,
-                    'dosis_tipo':               tipos[i],
-                    'dosis_cant_ml':            float(mls[i] or 0.5),
-                    'dosis_area_aplicacion':    areas[i] or None,
-                    'dosis_edad_oportuna_dias': int(edades[i] or 0),
-                    'dosis_intervalo_min_dias': int(ints[i] or 0),
-                    'dosis_limite_edad_dias':   int(limites[i]) if limites[i] else None,
-                })
-        flash('Vacuna registrada.', 'success')
+        try:
+            vac = repo.crear_vacuna({'vacuna_nombre': f['nombre']})
+            vid = vac['vacuna_id']
+            tipos   = request.form.getlist('dosis_tipo')
+            mls     = request.form.getlist('dosis_ml')
+            areas   = request.form.getlist('dosis_area')
+            edades  = request.form.getlist('dosis_edad')
+            ints    = request.form.getlist('dosis_intervalo')
+            limites = request.form.getlist('dosis_limite')
+            for i in range(len(tipos)):
+                if tipos[i]:
+                    repo.crear_dosis({
+                        'vacuna_id':                vid,
+                        'dosis_tipo':               tipos[i],
+                        'dosis_cant_ml':            float(mls[i] or 0.5),
+                        'dosis_area_aplicacion':    areas[i] or None,
+                        'dosis_edad_oportuna_dias': int(edades[i] or 0),
+                        'dosis_intervalo_min_dias': int(ints[i] or 0),
+                        'dosis_limite_edad_dias':   int(limites[i]) if limites[i] else None,
+                    })
+            flash('Vacuna registrada.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.vacunas'))
 
     todas_dosis = repo.listar_dosis()
@@ -444,11 +472,14 @@ def padecimientos():
         return redir
     if request.method == 'POST':
         f = request.form
-        repo.crear_padecimiento({
-            'padecimiento_nombre':      f['nombre'],
-            'padecimiento_descripcion': f.get('descripcion') or None,
-        })
-        flash('Padecimiento registrado.', 'success')
+        try:
+            repo.crear_padecimiento({
+                'padecimiento_nombre':      f['nombre'],
+                'padecimiento_descripcion': f.get('descripcion') or None,
+            })
+            flash('Padecimiento registrado.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.padecimientos'))
     return render_template('admin/padecimientos.html',
                            padecimientos=repo.listar_padecimientos(),
@@ -464,12 +495,15 @@ def fabricantes():
         return redir
     if request.method == 'POST':
         f = request.form
-        repo.crear_fabricante({
-            'fabricante_nombre':   f['nombre'],
-            'pais_id':             int(f['pais_id']),
-            'fabricante_telefono': f.get('telefono') or None,
-        })
-        flash('Fabricante registrado.', 'success')
+        try:
+            repo.crear_fabricante({
+                'fabricante_nombre':   f['nombre'],
+                'pais_id':             int(f['pais_id']),
+                'fabricante_telefono': f.get('telefono') or None,
+            })
+            flash('Fabricante registrado.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.fabricantes'))
     return render_template('admin/fabricantes.html',
                            fabricantes=repo.listar_fabricantes(),
@@ -488,45 +522,33 @@ def lotes():
         f      = request.form
 
         if accion == 'nuevo_lote':
-            fecha_cad = f['fecha_cad']
-            if fecha_cad <= str(date.today()):
-                flash('La fecha de caducidad debe ser posterior a hoy.', 'error')
-                return redirect(url_for('admin.lotes'))
-            if f['fecha_fab'] >= fecha_cad:
-                flash('La fecha de fabricación debe ser anterior a la fecha de caducidad.', 'error')
-                return redirect(url_for('admin.lotes'))
-            repo.crear_lote({
-                'lote_codigo':            f['codigo'],
-                'lote_fecha_fabricacion': date.fromisoformat(f['fecha_fab']),
-                'lote_fecha_caducidad':   date.fromisoformat(fecha_cad),
-                'lote_cant_inicial':      int(f['cantidad']),
-                'vacuna_id':              int(f['vacuna_id']),
-                'fabricante_id':          int(f['fabricante_id']),
-                'proveedor_id':           int(f['proveedor_id']),
-            })
-            flash('Lote registrado.', 'success')
+            try:
+                repo.crear_lote({
+                    'lote_codigo':            f['codigo'],
+                    'lote_fecha_fabricacion': date.fromisoformat(f['fecha_fab']),
+                    'lote_fecha_caducidad':   date.fromisoformat(f['fecha_cad']),
+                    'lote_cant_inicial':      int(f['cantidad']),
+                    'vacuna_id':              int(f['vacuna_id']),
+                    'fabricante_id':          int(f['fabricante_id']),
+                    'proveedor_id':           int(f['proveedor_id']),
+                })
+                flash('Lote registrado.', 'success')
+            except ValueError as e:
+                flash(str(e), 'error')
 
         elif accion == 'asignar_inventario':
-            stock = int(f['stock'])
-            lote  = repo.obtener_lote(int(f['lote_id']))
-            if not lote:
-                flash('Lote no encontrado.', 'error')
-                return redirect(url_for('admin.lotes'))
-            if stock > lote['lote_cant_inicial']:
-                flash(f"El stock ({stock}) no puede exceder la cantidad inicial del lote ({lote['lote_cant_inicial']}).", 'error')
-                return redirect(url_for('admin.lotes'))
-            if stock <= 0:
-                flash('El stock debe ser mayor a 0.', 'error')
-                return redirect(url_for('admin.lotes'))
             from datetime import datetime as _dt
-            repo.asignar_inventario({
-                'centro_id':                  int(f['centro_id']),
-                'lote_id':                    int(f['lote_id']),
-                'inventario_stock_inicial':   stock,
-                'inventario_stock_actual':    stock,
-                'inventario_activo_desde':    _dt.now(),
-            })
-            flash('Lote asignado al inventario.', 'success')
+            try:
+                repo.asignar_inventario({
+                    'centro_id':                int(f['centro_id']),
+                    'lote_id':                  int(f['lote_id']),
+                    'inventario_stock_inicial': int(f['stock']),
+                    'inventario_stock_actual':  int(f['stock']),
+                    'inventario_activo_desde':  _dt.now(),
+                })
+                flash('Lote asignado al inventario.', 'success')
+            except ValueError as e:
+                flash(str(e), 'error')
 
         return redirect(url_for('admin.lotes'))
 
@@ -599,8 +621,11 @@ def aplicaciones():
             'aplicacion_timestamp':     datetime.now(),
             'aplicacion_observaciones': f.get('observaciones', ''),
         }
-        repo.registrar_aplicacion(datos)
-        flash('Aplicación registrada.', 'success')
+        try:
+            repo.registrar_aplicacion(datos)
+            flash('Aplicación registrada.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.aplicaciones'))
 
     todas_dosis = repo.listar_dosis()
@@ -631,15 +656,18 @@ def geografia():
     if request.method == 'POST':
         accion = request.form.get('accion')
         f      = request.form
-        if accion == 'pais':
-            repo.crear_pais(f['nombre'])
-            flash('País registrado.', 'success')
-        elif accion == 'estado':
-            repo.crear_estado({'estado_nombre': f['nombre'], 'pais_id': int(f['pais_id'])})
-            flash('Estado registrado.', 'success')
-        elif accion == 'ciudad':
-            repo.crear_ciudad({'ciudad_nombre': f['nombre'], 'estado_id': int(f['estado_id'])})
-            flash('Ciudad registrada.', 'success')
+        try:
+            if accion == 'pais':
+                repo.crear_pais(f['nombre'])
+                flash('País registrado.', 'success')
+            elif accion == 'estado':
+                repo.crear_estado({'estado_nombre': f['nombre'], 'pais_id': int(f['pais_id'])})
+                flash('Estado registrado.', 'success')
+            elif accion == 'ciudad':
+                repo.crear_ciudad({'ciudad_nombre': f['nombre'], 'estado_id': int(f['estado_id'])})
+                flash('Ciudad registrada.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('admin.geografia'))
     return render_template('admin/geografia.html',
                            paises=repo.listar_paises(),

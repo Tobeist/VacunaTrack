@@ -31,8 +31,12 @@ def lookup():
 
 @clinical_bp.route('/api/nfc', methods=['POST'])
 def api_scan_nfc():
-    uid      = request.json.get('uid', '').strip()
-    paciente = repo.obtener_paciente_por_nfc(uid)
+    import re
+    uid_raw  = request.json.get('uid', '').strip()
+    # normalizar al formato de fábrica: xx:xx:xx:xx (minúsculas, con colons)
+    clean    = re.sub(r'[:\-\s]', '', uid_raw).lower()
+    uid_norm = ':'.join(clean[i:i+2] for i in range(0, len(clean), 2)) if clean else uid_raw
+    paciente = repo.obtener_paciente_por_nfc(uid_norm) or repo.obtener_paciente_por_nfc(uid_raw)
     if not paciente:
         return jsonify({'error': 'Paciente no encontrado'}), 404
     return _patient_response(paciente)
@@ -134,8 +138,11 @@ def register_application():
             'aplicacion_timestamp':     datetime.now(),
             'aplicacion_observaciones': observaciones,
         }
-        repo.registrar_aplicacion(datos)
-        flash('Aplicación registrada correctamente.', 'success')
+        try:
+            repo.registrar_aplicacion(datos)
+            flash('Aplicación registrada correctamente.', 'success')
+        except ValueError as e:
+            flash(str(e), 'error')
         return redirect(url_for('clinical.lookup'))
 
     inventarios = repo.inventarios_activos_de_centro(centro_id) if centro_id else []

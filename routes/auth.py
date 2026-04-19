@@ -57,15 +57,17 @@ def change_password():
             flash('La contraseña debe tener al menos 8 caracteres.', 'error')
         else:
             hashed = generate_password_hash(new_pwd)
-            repo.cambiar_password(session['user_role'], session['user_id'], hashed)
-            flash('Contraseña actualizada correctamente.', 'success')
-
-            role = session['user_role']
-            if role == 'admin':
-                return redirect(url_for('admin.dashboard'))
-            elif role == 'responsable':
-                return redirect(url_for('clinical.lookup'))
-            else:
-                return redirect(url_for('public.tutor_dashboard'))
+            try:
+                repo.cambiar_password(session['user_role'], session['user_id'], hashed)
+                flash('Contraseña actualizada correctamente.', 'success')
+                role = session['user_role']
+                if role == 'admin':
+                    return redirect(url_for('admin.dashboard'))
+                elif role == 'responsable':
+                    return redirect(url_for('clinical.lookup'))
+                else:
+                    return redirect(url_for('public.tutor_dashboard'))
+            except ValueError as e:
+                flash(str(e), 'error')
 
     return render_template('auth/change_password.html')

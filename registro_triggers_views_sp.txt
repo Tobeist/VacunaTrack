@@ -120,12 +120,407 @@ Tabla: usuarios
 
 
 ================================================================================
-3. VIEWS (0 vistas)
+3. VIEWS (15 vistas — toda lectura de datos pasa por estas vistas)
 ================================================================================
 
-  Actualmente no hay vistas definidas en el esquema publico.
-  Todas las consultas de reportes se ejecutan directamente desde
-  el repositorio de datos (repository.py) usando JOINs.
+  Todas las consultas SELECT en repository.py usan estas vistas.
+  Las operaciones de escritura (INSERT/UPDATE/DELETE) acceden directamente
+  a las tablas base. Para aplicar seguridad a nivel de base de datos,
+  revocar SELECT en las tablas y concederlo solo en las vistas.
+
+-- =========================================
+-- vw_usuarios_auth
+-- Proposito: Autenticacion de usuarios. Expone solo los campos necesarios
+--            para el login, incluyendo el rol de mayor prioridad.
+-- =========================================
+CREATE OR REPLACE VIEW vw_usuarios_auth AS
+SELECT u.usuario_id,
+       l.login_correo      AS email,
+       l.login_contrasena  AS password,
+       u.usuario_prim_nombre  AS first_name,
+       u.usuario_apellido_pat AS last_name,
+       r.rol_nombre           AS role
+FROM login l
+JOIN usuarios      u  ON u.usuario_id  = l.usuario_id
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles         r  ON r.rol_id      = ur.rol_id;
+
+
+-- =========================================
+-- vw_administradores
+-- Proposito: Lista de usuarios con rol 'admin' con sus datos de contacto.
+-- =========================================
+CREATE OR REPLACE VIEW vw_administradores AS
+SELECT u.usuario_id        AS admin_id,
+       u.usuario_prim_nombre  AS admin_prim_nombre,
+       u.usuario_seg_nombre   AS admin_seg_nombre,
+       u.usuario_apellido_pat AS admin_apellido_pat,
+       u.usuario_apellido_mat AS admin_apellido_mat,
+       u.usuario_telefono  AS admin_telefono,
+       u.usuario_curp      AS admin_curp,
+       u.usuario_rfc       AS admin_rfc,
+       u.usuario_activo    AS admin_activo,
+       u.usuario_imagen    AS admin_imagen,
+       l.login_correo      AS admin_email
+FROM usuarios u
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'admin'
+JOIN login          l  ON l.usuario_id  = u.usuario_id;
+
+
+-- =========================================
+-- vw_tutores
+-- Proposito: Lista de usuarios con rol 'tutor' (padres/tutores de pacientes).
+-- =========================================
+CREATE OR REPLACE VIEW vw_tutores AS
+SELECT u.usuario_id        AS tutor_id,
+       u.usuario_prim_nombre  AS tutor_prim_nombre,
+       u.usuario_seg_nombre   AS tutor_seg_nombre,
+       u.usuario_apellido_pat AS tutor_apellido_pat,
+       u.usuario_apellido_mat AS tutor_apellido_mat,
+       u.usuario_telefono  AS tutor_telefono,
+       u.usuario_curp      AS tutor_curp,
+       u.usuario_activo    AS tutor_activo,
+       u.usuario_imagen    AS tutor_imagen,
+       l.login_correo      AS tutor_email
+FROM usuarios u
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'tutor'
+JOIN login          l  ON l.usuario_id  = u.usuario_id;
+
+
+-- =========================================
+-- vw_responsables
+-- Proposito: Lista de usuarios con rol 'responsable' (personal clinico)
+--            incluyendo el centro de salud al que pertenecen.
+-- =========================================
+CREATE OR REPLACE VIEW vw_responsables AS
+SELECT u.usuario_id        AS responsable_id,
+       u.usuario_prim_nombre  AS responsable_prim_nombre,
+       u.usuario_seg_nombre   AS responsable_seg_nombre,
+       u.usuario_apellido_pat AS responsable_apellido_pat,
+       u.usuario_apellido_mat AS responsable_apellido_mat,
+       u.usuario_telefono  AS responsable_telefono,
+       u.usuario_curp      AS responsable_curp,
+       u.usuario_rfc       AS responsable_rfc,
+       u.usuario_activo    AS responsable_activo,
+       u.usuario_imagen    AS responsable_imagen,
+       u.centro_id,
+       cs.centro_nombre,
+       l.login_correo      AS responsable_email
+FROM usuarios u
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'responsable'
+JOIN login          l  ON l.usuario_id  = u.usuario_id
+LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
+
+
+-- =========================================
+-- vw_cedulas
+-- Proposito: Cedulas profesionales de los responsables.
+-- =========================================
+CREATE OR REPLACE VIEW vw_cedulas AS
+SELECT * FROM cedulas;
+
+
+-- =========================================
+-- vw_pacientes
+-- Proposito: Pacientes con el nombre del esquema de vacunacion asignado.
+-- =========================================
+CREATE OR REPLACE VIEW vw_pacientes AS
+SELECT p.*, e.esquema_nombre
+FROM pacientes p
+JOIN esquemas e ON e.esquema_id = p.esquema_id;
+
+
+-- =========================================
+-- vw_relaciones
+-- Proposito: Relaciones paciente-tutor con nombres legibles de ambos.
+-- =========================================
+CREATE OR REPLACE VIEW vw_relaciones AS
+SELECT pt.*,
+    INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
+    INITCAP(u.usuario_prim_nombre)  || ' ' || INITCAP(u.usuario_apellido_pat)  AS tutor
+FROM pacientes_tutores pt
+JOIN pacientes p ON p.paciente_id = pt.paciente_id
+JOIN usuarios  u ON u.usuario_id  = pt.tutor_id;
+
+
+-- =========================================
+-- vw_aplicaciones
+-- Proposito: Registro completo de vacunas aplicadas con datos del paciente,
+--            responsable, centro, vacuna y tipo de dosis.
+--            Incluye vacuna_id para filtrado en reportes.
+-- =========================================
+CREATE OR REPLACE VIEW vw_aplicaciones AS
+SELECT a.*,
+    INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
+    INITCAP(u.usuario_prim_nombre)  || ' ' || INITCAP(u.usuario_apellido_pat)  AS responsable,
+    cs.centro_nombre,
+    d.vacuna_id,
+    v.vacuna_nombre,
+    d.dosis_tipo
+FROM aplicaciones  a
+JOIN pacientes     p  ON p.paciente_id = a.paciente_id
+JOIN usuarios      u  ON u.usuario_id  = a.usuario_id
+JOIN centros_salud cs ON cs.centro_id  = a.centro_id
+JOIN dosis         d  ON d.dosis_id    = a.dosis_id
+JOIN vacunas       v  ON v.vacuna_id   = d.vacuna_id;
+
+
+-- =========================================
+-- vw_dosis_esquemas_detalle
+-- Proposito: Dosis con su vacuna y el esquema al que pertenecen.
+--            Usada en historial_vacunacion_paciente como tabla izquierda
+--            del LEFT JOIN con vw_aplicaciones_responsable.
+-- =========================================
+CREATE OR REPLACE VIEW vw_dosis_esquemas_detalle AS
+SELECT d.dosis_id,
+       d.vacuna_id,
+       d.dosis_tipo,
+       d.dosis_cant_ml,
+       d.dosis_area_aplicacion,
+       d.dosis_edad_oportuna_dias,
+       d.dosis_intervalo_min_dias,
+       d.dosis_limite_edad_dias,
+       d.dosis_vigente_desde,
+       d.dosis_vigente_hasta,
+       v.vacuna_nombre,
+       de.esquema_id,
+       de.dosis_esq_id
+FROM dosis d
+JOIN dosis_esquemas de ON de.dosis_id  = d.dosis_id
+JOIN vacunas        v  ON v.vacuna_id  = d.vacuna_id;
+
+
+-- =========================================
+-- vw_aplicaciones_responsable
+-- Proposito: Aplicaciones con datos del responsable y centro.
+--            Usada como tabla derecha en el LEFT JOIN del historial
+--            de vacunacion (filtrando por paciente_id en la condicion JOIN).
+-- =========================================
+CREATE OR REPLACE VIEW vw_aplicaciones_responsable AS
+SELECT a.aplicacion_id,
+       a.paciente_id,
+       a.dosis_id,
+       a.aplicacion_timestamp,
+       a.aplicacion_observaciones,
+       u.usuario_prim_nombre || ' ' || u.usuario_apellido_pat AS responsable,
+       cs.centro_nombre
+FROM aplicaciones  a
+JOIN usuarios      u  ON u.usuario_id  = a.usuario_id
+JOIN centros_salud cs ON cs.centro_id  = a.centro_id;
+
+
+-- =========================================
+-- vw_dosis_esquemas
+-- Proposito: Tabla de relacion dosis-esquema (sin joins adicionales).
+--            Usada por listar_dosis_esquemas().
+-- =========================================
+CREATE OR REPLACE VIEW vw_dosis_esquemas AS
+SELECT * FROM dosis_esquemas;
+
+
+-- =========================================
+-- vw_inventarios
+-- Proposito: Inventarios con datos del centro, lote, vacuna y fabricante.
+--            La columna inventario_activo es un booleano calculado.
+-- =========================================
+CREATE OR REPLACE VIEW vw_inventarios AS
+SELECT i.inventario_id,
+       i.centro_id,
+       i.lote_id,
+       i.inventario_stock_inicial,
+       i.inventario_stock_actual,
+       i.inventario_activo_desde,
+       (i.inventario_activo_desde IS NOT NULL) AS inventario_activo,
+       cs.centro_nombre,
+       l.lote_codigo,
+       l.lote_fecha_fabricacion,
+       l.lote_fecha_caducidad,
+       l.vacuna_id,
+       v.vacuna_nombre,
+       f.fabricante_nombre
+FROM inventarios   i
+JOIN centros_salud cs ON cs.centro_id    = i.centro_id
+JOIN lotes         l  ON l.lote_id       = i.lote_id
+JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id
+JOIN fabricantes   f  ON f.fabricante_id = l.fabricante_id;
+
+
+-- =========================================
+-- vw_centros_stock_vacuna
+-- Proposito: Centros con stock activo agrupado por vacuna.
+--            Usada por centros_con_vacuna_disponible(vacuna_id).
+-- =========================================
+CREATE OR REPLACE VIEW vw_centros_stock_vacuna AS
+SELECT cs.centro_id,
+       cs.centro_nombre,
+       cs.centro_calle,
+       cs.centro_numero,
+       cs.centro_codigo_postal,
+       cs.ciudad_id,
+       cs.centro_horario_inicio,
+       cs.centro_horario_fin,
+       cs.centro_latitud,
+       cs.centro_longitud,
+       cs.centro_telefono,
+       cs.centro_beacon,
+       ci.ciudad_nombre,
+       l.vacuna_id,
+       SUM(i.inventario_stock_actual) AS stock_total
+FROM centros_salud cs
+JOIN inventarios i  ON i.centro_id  = cs.centro_id
+JOIN lotes       l  ON l.lote_id    = i.lote_id
+JOIN ciudades    ci ON ci.ciudad_id  = cs.ciudad_id
+WHERE i.inventario_activo_desde IS NOT NULL
+  AND i.inventario_stock_actual > 0
+GROUP BY cs.centro_id, ci.ciudad_nombre, l.vacuna_id;
+
+
+-- =========================================
+-- vw_lotes
+-- Proposito: Lotes con nombre de vacuna, fabricante y proveedor.
+-- =========================================
+CREATE OR REPLACE VIEW vw_lotes AS
+SELECT l.*,
+    v.vacuna_nombre,
+    f.fabricante_nombre,
+    p.proveedor_prim_nombre || ' ' || p.proveedor_apellido_pat AS proveedor_nombre
+FROM lotes       l
+JOIN vacunas     v ON v.vacuna_id     = l.vacuna_id
+JOIN fabricantes f ON f.fabricante_id = l.fabricante_id
+JOIN proveedores p ON p.proveedor_id  = l.proveedor_id;
+
+
+-- =========================================
+-- vw_proveedores
+-- Proposito: Proveedores con el nombre del fabricante asociado.
+-- =========================================
+CREATE OR REPLACE VIEW vw_proveedores AS
+SELECT p.*, f.fabricante_nombre
+FROM proveedores p
+JOIN fabricantes f ON f.fabricante_id = p.fabricante_id;
+
+
+-- =========================================
+-- vw_dosis
+-- Proposito: Dosis con el nombre de la vacuna correspondiente.
+-- =========================================
+CREATE OR REPLACE VIEW vw_dosis AS
+SELECT d.*, v.vacuna_nombre
+FROM dosis   d
+JOIN vacunas v ON v.vacuna_id = d.vacuna_id;
+
+
+-- =========================================
+-- vw_vacunas
+-- Proposito: Vista sobre la tabla de vacunas (acceso indirecto a la tabla base).
+-- =========================================
+CREATE OR REPLACE VIEW vw_vacunas AS
+SELECT * FROM vacunas;
+
+
+-- =========================================
+-- vw_esquemas
+-- Proposito: Vista sobre la tabla de esquemas de vacunacion.
+-- =========================================
+CREATE OR REPLACE VIEW vw_esquemas AS
+SELECT * FROM esquemas;
+
+
+-- =========================================
+-- vw_padecimientos
+-- Proposito: Padecimientos con los nombres de vacunas relacionadas
+--            concatenados en una sola cadena.
+-- =========================================
+CREATE OR REPLACE VIEW vw_padecimientos AS
+SELECT p.*,
+    STRING_AGG(v.vacuna_nombre, ', ' ORDER BY v.vacuna_nombre) AS vacunas
+FROM padecimientos p
+LEFT JOIN vacunas_padecimientos vp ON vp.padecimiento_id = p.padecimiento_id
+LEFT JOIN vacunas v ON v.vacuna_id = vp.vacuna_id
+GROUP BY p.padecimiento_id;
+
+
+-- =========================================
+-- vw_fabricantes
+-- Proposito: Fabricantes con el nombre del pais de origen.
+-- =========================================
+CREATE OR REPLACE VIEW vw_fabricantes AS
+SELECT f.*, p.pais_nombre
+FROM fabricantes f
+JOIN paises p ON p.pais_id = f.pais_id;
+
+
+-- =========================================
+-- vw_centros
+-- Proposito: Centros de salud con el nombre de la ciudad.
+-- =========================================
+CREATE OR REPLACE VIEW vw_centros AS
+SELECT cs.*, ci.ciudad_nombre
+FROM centros_salud cs
+JOIN ciudades ci ON ci.ciudad_id = cs.ciudad_id;
+
+
+-- =========================================
+-- vw_paises
+-- Proposito: Vista sobre la tabla de paises.
+-- =========================================
+CREATE OR REPLACE VIEW vw_paises AS
+SELECT * FROM paises;
+
+
+-- =========================================
+-- vw_estados
+-- Proposito: Estados con el nombre del pais al que pertenecen.
+-- =========================================
+CREATE OR REPLACE VIEW vw_estados AS
+SELECT e.*, p.pais_nombre
+FROM estados e
+JOIN paises p ON p.pais_id = e.pais_id;
+
+
+-- =========================================
+-- vw_ciudades
+-- Proposito: Ciudades con el nombre del estado al que pertenecen.
+-- =========================================
+CREATE OR REPLACE VIEW vw_ciudades AS
+SELECT c.*, e.estado_nombre
+FROM ciudades c
+JOIN estados e ON e.estado_id = c.estado_id;
+
+
+-- =========================================
+-- vw_alertas_inventario
+-- Proposito: Alertas de stock bajo con datos del centro y vacuna afectados.
+-- =========================================
+CREATE OR REPLACE VIEW vw_alertas_inventario AS
+SELECT ai.*,
+    i.inventario_stock_actual,
+    cs.centro_nombre,
+    v.vacuna_nombre,
+    ai.alerta_inv_timestamp AS ts
+FROM alertas_inventario ai
+JOIN inventarios   i  ON i.inventario_id = ai.inventario_id
+JOIN centros_salud cs ON cs.centro_id    = i.centro_id
+JOIN lotes         l  ON l.lote_id       = i.lote_id
+JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id;
+
+
+-- =========================================
+-- vw_alertas_dosis
+-- Proposito: Alertas de dosis atrasadas con datos del paciente y la dosis.
+-- =========================================
+CREATE OR REPLACE VIEW vw_alertas_dosis AS
+SELECT ad.*,
+    INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
+    v.vacuna_nombre,
+    d.dosis_tipo
+FROM alertas_dosis_pacientes ad
+JOIN pacientes p ON p.paciente_id = ad.paciente_id
+JOIN dosis     d ON d.dosis_id    = ad.dosis_id
+JOIN vacunas   v ON v.vacuna_id   = d.vacuna_id;
 
 
 ================================================================================

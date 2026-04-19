@@ -2,11 +2,186 @@
 {% block title %}Inicio — VacunaTrack{% endblock %}
 {% block page_title %}Mis Hijos{% endblock %}
 
+{% block extra_css %}
+<style>
+  #beacon-modal .modal-card { max-width: 480px; width: 95vw; }
+  .beacon-vacuna-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .beacon-vacuna-nombre { font-weight: 700; font-size: 1rem; margin-bottom: 8px; }
+  .beacon-hijo-row { display:flex; align-items:center; gap:8px; font-size:0.83rem; margin-top:4px; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const btn = document.getElementById('btn-detectar-beacon');
+  if (!btn) return;
+
+  btn.addEventListener('click', () => {
+    if (navigator.bluetooth) {
+      detectarConBluetooth();
+    } else {
+      detectarConGPS();
+    }
+  });
+
+  async function detectarConBluetooth() {
+    try {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando…';
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['battery_service'],
+      });
+      const beaconId = device.name || device.id;
+      await consultarBeacon({ beacon_id: beaconId });
+    } catch (e) {
+      if (e.name === 'NotFoundError') {
+        mostrarError('No se seleccionó ningún dispositivo.');
+      } else if (e.name === 'NotSupportedError' || e.name === 'SecurityError') {
+        detectarConGPS();
+        return;
+      } else {
+        mostrarError(e.message || 'Error al detectar beacon.');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-bluetooth"></i> Detectar centro';
+    }
+  }
+
+  function detectarConGPS() {
+    if (!navigator.geolocation) {
+      mostrarError('GPS no disponible en este dispositivo.');
+      return;
+    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Obteniendo ubicación…';
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await consultarBeacon({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-bluetooth"></i> Detectar centro';
+        }
+      },
+      (err) => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-bluetooth"></i> Detectar centro';
+        mostrarError('No se pudo obtener la ubicación: ' + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function consultarBeacon(params) {
+    const qs = new URLSearchParams(params).toString();
+    const res = await fetch(`/api/beacon/info?${qs}`);
+    const data = await res.json();
+    if (!res.ok) {
+      mostrarError(data.error || 'No se encontró un centro cercano.');
+      return;
+    }
+    mostrarModal(data);
+  }
+
+  function mostrarModal(data) {
+    const { centro, vacunas, total_esperando } = data;
+
+    document.getElementById('beacon-centro-nombre').textContent = centro.nombre || 'Centro detectado';
+    document.getElementById('beacon-centro-dir').textContent = centro.direccion || '';
+
+    const esperandoEl = document.getElementById('beacon-esperando');
+    if (total_esperando > 0) {
+      esperandoEl.style.display = '';
+      esperandoEl.textContent = `👥 ${total_esperando} persona${total_esperando !== 1 ? 's' : ''} esperando en este centro ahora.`;
+    } else {
+      esperandoEl.style.display = 'none';
+    }
+
+    const list = document.getElementById('beacon-vacunas-list');
+    const sinVacunas = document.getElementById('beacon-sin-vacunas');
+    list.innerHTML = '';
+
+    if (!vacunas || vacunas.length === 0) {
+      sinVacunas.style.display = '';
+    } else {
+      sinVacunas.style.display = 'none';
+      vacunas.forEach(v => {
+        const card = document.createElement('div');
+        card.className = 'beacon-vacuna-card';
+        const hijosHtml = v.hijos.map(h =>
+          `<div class="beacon-hijo-row">
+             <span class="badge badge-${h.status}">${h.status_label}</span>
+             <span>${h.nombre}</span>
+           </div>`
+        ).join('');
+        card.innerHTML = `
+          <div class="beacon-vacuna-nombre">💉 ${v.vacuna_nombre}</div>
+          <div class="fs-sm text-muted mb-4">Stock disponible: ${v.stock_total ?? '—'}</div>
+          ${hijosHtml}
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    if (typeof openModal === 'function') openModal('beacon-modal');
+    else document.getElementById('beacon-modal').classList.add('active');
+  }
+
+  function mostrarError(msg) {
+    const list = document.getElementById('beacon-vacunas-list');
+    const sinVacunas = document.getElementById('beacon-sin-vacunas');
+    document.getElementById('beacon-centro-nombre').textContent = 'Error';
+    document.getElementById('beacon-centro-dir').textContent = '';
+    document.getElementById('beacon-esperando').style.display = 'none';
+    list.innerHTML = '';
+    sinVacunas.style.display = 'none';
+    const errDiv = document.createElement('div');
+    errDiv.className = 'flash-msg error fs-sm';
+    errDiv.textContent = msg;
+    list.appendChild(errDiv);
+    if (typeof openModal === 'function') openModal('beacon-modal');
+    else document.getElementById('beacon-modal').classList.add('active');
+  }
+})();
+</script>
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
   <div>
     <div class="page-title">Bienvenido, {{ session.user_name.split()[0] }} 👋</div>
     <div class="page-subtitle">Seguimiento de vacunación de tus hijos registrados</div>
+  </div>
+  {% if hijos %}
+  <button class="btn btn-primary" id="btn-detectar-beacon">
+    <i class="fa-solid fa-bluetooth"></i> Detectar centro
+  </button>
+  {% endif %}
+</div>
+
+<!-- Modal beacon -->
+<div class="modal-overlay" id="beacon-modal">
+  <div class="modal-card">
+    <div class="modal-header">
+      <span class="modal-title" id="beacon-centro-nombre">Centro detectado</span>
+      <button class="modal-close" data-close-modal="beacon-modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted fs-sm mb-12" id="beacon-centro-dir"></p>
+      <div id="beacon-esperando" class="flash-msg info fs-sm mb-16" style="display:none"></div>
+      <div id="beacon-vacunas-list"></div>
+      <div id="beacon-sin-vacunas" style="display:none" class="text-center text-muted" style="padding:20px">
+        No hay vacunas pendientes aplicables en este centro para tus hijos.
+      </div>
+    </div>
   </div>
 </div>
 

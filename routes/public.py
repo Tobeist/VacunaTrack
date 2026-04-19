@@ -118,16 +118,109 @@ def find_centers():
 
 @public_bp.route('/api/centros-cercanos')
 def api_nearby_centers():
+    import math
     vacuna_id = request.args.get('vacuna_id', type=int)
     if not vacuna_id:
         return jsonify([])
+
+    user_lat = request.args.get('lat', type=float)
+    user_lng = request.args.get('lng', type=float)
+
     centros = repo.centros_con_vacuna_disponible(vacuna_id)
-    # convertir Decimal a float para JSON
+
     for c in centros:
         for key in ('centro_latitud', 'centro_longitud', 'stock_total'):
             if c.get(key) is not None:
                 c[key] = float(c[key])
+
+        for key in ('centro_horario_inicio', 'centro_horario_fin'):
+            if c.get(key) is not None:
+                c[key] = str(c[key])
+
+        if user_lat is not None and user_lng is not None:
+            lat1, lon1 = math.radians(user_lat), math.radians(user_lng)
+            lat2 = math.radians(c['centro_latitud'] or 0)
+            lon2 = math.radians(c['centro_longitud'] or 0)
+            dlat, dlon = lat2 - lat1, lon2 - lon1
+            a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
+            c['distancia_km'] = round(6371 * 2 * math.asin(math.sqrt(a)), 1)
+        else:
+            c['distancia_km'] = None
+
+    if user_lat is not None:
+        centros.sort(key=lambda x: x['distancia_km'] if x['distancia_km'] is not None else 9999)
+
     return jsonify(centros)
+
+
+@public_bp.route('/api/beacon/info')
+def api_beacon_info():
+    import math
+    if session.get('user_role') != 'tutor':
+        return jsonify({'error': 'No autorizado'}), 401
+
+    beacon_id = request.args.get('beacon_id')
+    lat       = request.args.get('lat', type=float)
+    lng       = request.args.get('lng', type=float)
+
+    centro = None
+    if beacon_id:
+        centro = repo.obtener_centro_por_beacon(beacon_id)
+    elif lat is not None and lng is not None:
+        for c in repo.listar_centros():
+            clat = float(c.get('centro_latitud') or 0)
+            clng = float(c.get('centro_longitud') or 0)
+            if not clat or not clng:
+                continue
+            dlat = math.radians(lat - clat)
+            dlng = math.radians(lng - clng)
+            a    = math.sin(dlat/2)**2 + math.cos(math.radians(clat)) * math.cos(math.radians(lat)) * math.sin(dlng/2)**2
+            if 6371000 * 2 * math.asin(math.sqrt(a)) <= 100:
+                centro = c
+                break
+
+    if not centro:
+        return jsonify({'error': 'No se encontró ningún centro cercano'}), 404
+
+    centro_id = centro['centro_id']
+    tutor_id  = session['user_id']
+
+    repo.registrar_lectura_beacon(centro_id, tutor_id)
+
+    vacunas_centro = {v['vacuna_id']: v for v in repo.vacunas_en_centro(centro_id)}
+    hijos          = repo.pacientes_de_tutor(tutor_id)
+    vacunas_result = {}
+
+    for hijo in hijos:
+        birth_date = hijo['paciente_fecha_nac']
+        rows       = repo.historial_vacunacion_paciente(hijo['paciente_id'], hijo['esquema_id'])
+        historial  = enrich_history(rows, birth_date)
+        nombre_hijo = f"{hijo['paciente_prim_nombre']} {hijo['paciente_apellido_pat']}"
+
+        for dosis in historial:
+            vid = dosis.get('vacuna_id')
+            if dosis['status'] in ('aplicable', 'cerca_limite') and vid in vacunas_centro:
+                if vid not in vacunas_result:
+                    vacunas_result[vid] = {
+                        'vacuna_nombre': dosis['vacuna_nombre'],
+                        'stock_total':   vacunas_centro[vid]['stock_total'],
+                        'hijos':         [],
+                    }
+                vacunas_result[vid]['hijos'].append({
+                    'nombre':       nombre_hijo,
+                    'status':       dosis['status'],
+                    'status_label': dosis['status_label'],
+                })
+
+    return jsonify({
+        'centro': {
+            'id':        centro_id,
+            'nombre':    centro.get('centro_nombre'),
+            'direccion': f"{centro.get('centro_calle','') or ''} {centro.get('centro_numero','') or ''}".strip(),
+        },
+        'vacunas':         list(vacunas_result.values()),
+        'total_esperando': repo.personas_esperando_en_centro(centro_id),
+    })
 
 
 @public_bp.route('/tutor/perfil')

@@ -3,7 +3,109 @@
 {% block page_title %}Buscar Centros de Salud{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  #carousel-wrapper {
+    position: relative;
+  }
+  #carousel {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  #carousel::-webkit-scrollbar { display: none; }
+
+  .centro-card {
+    scroll-snap-align: start;
+    flex: 0 0 300px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .centro-card.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(37,99,235,0.15);
+  }
+  .centro-nombre {
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+  .centro-meta {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-stock {
+    display: inline-block;
+    background: #dcfce7;
+    color: #15803d;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .badge-distancia {
+    display: inline-block;
+    background: #dbeafe;
+    color: #1d4ed8;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .carousel-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .carousel-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+  .carousel-btn:hover { background: var(--hover); }
+  .carousel-btn:disabled { opacity: 0.35; cursor: default; }
+  #carousel-counter {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    min-width: 60px;
+    text-align: center;
+  }
+  #gps-status {
+    font-size: 0.82rem;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    display: none;
+  }
+  #gps-status.info  { background:#dbeafe; color:#1d4ed8; display:block; }
+  #gps-status.warn  { background:#fef9c3; color:#92400e; display:block; }
+  #gps-status.error { background:#fee2e2; color:#991b1b; display:block; }
+
+  @media (max-width: 640px) {
+    .centro-card { flex: 0 0 85vw; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -19,7 +121,7 @@
     <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
       <div class="form-group mb-0" style="flex:1;min-width:200px">
         <label class="form-label">Vacuna a buscar</label>
-        <select id="vacuna-filter" class="form-select" onchange="searchCentros(this.value)">
+        <select id="vacuna-filter" class="form-select">
           <option value="">— Selecciona una vacuna —</option>
           {% for v in vacunas %}
           <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
@@ -37,54 +139,207 @@
         </select>
       </div>
       {% endif %}
-      <button class="btn btn-primary" onclick="searchCentros(document.getElementById('vacuna-filter').value)">
-        <i class="fa-solid fa-magnifying-glass"></i> Buscar
+      <button class="btn btn-primary" onclick="buscarCentros()">
+        <i class="fa-solid fa-location-dot"></i> Buscar cerca de mí
       </button>
     </div>
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+<div id="gps-status"></div>
 
-  
+<div id="results-section" style="display:none">
   <div class="card">
     <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-map" style="color:var(--secondary)"></i> Mapa de centros</span>
-      <span class="text-muted fs-sm"><i class="fa-solid fa-location-dot" style="color:var(--danger)"></i> Tu ubicación</span>
+      <span class="card-title" id="results-title">
+        <i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Centros disponibles
+      </span>
+      <span id="results-count" class="text-muted fs-sm"></span>
     </div>
-    <div class="card-body" style="padding:0">
-      <div id="map"></div>
-    </div>
-  </div>
-
-  
-  <div>
-    <div id="centers-list">
-      <div class="card">
-        <div class="card-body text-center" style="padding:40px 20px">
-          <div style="font-size:48px;margin-bottom:12px">🗺️</div>
-          <p style="font-weight:600;margin-bottom:6px">Selecciona una vacuna</p>
-          <p class="text-muted fs-sm">Verás los centros con stock disponible en el mapa y aquí.</p>
+    <div class="card-body">
+      <div id="carousel-wrapper">
+        <div id="carousel"></div>
+        <div class="carousel-nav">
+          <button class="carousel-btn" id="btn-prev" onclick="scrollCarousel(-1)">&#8592;</button>
+          <span id="carousel-counter"></span>
+          <button class="carousel-btn" id="btn-next" onclick="scrollCarousel(1)">&#8594;</button>
         </div>
       </div>
     </div>
   </div>
+</div>
 
+<div id="empty-section" style="display:none">
+  <div class="card">
+    <div class="card-body text-center" style="padding:40px 20px">
+      <div style="font-size:48px;margin-bottom:12px">😔</div>
+      <p style="font-weight:600;margin-bottom:6px">Sin resultados</p>
+      <p class="text-muted fs-sm">No hay centros con stock disponible para esta vacuna.</p>
+    </div>
+  </div>
+</div>
+
+<div id="placeholder-section">
+  <div class="card">
+    <div class="card-body text-center" style="padding:40px 20px">
+      <div style="font-size:48px;margin-bottom:12px">🗺️</div>
+      <p style="font-weight:600;margin-bottom:6px">Selecciona una vacuna</p>
+      <p class="text-muted fs-sm">Verás los centros con stock disponible ordenados por distancia.</p>
+    </div>
+  </div>
 </div>
 
 <div class="card mt-20">
   <div class="card-header"><span class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> ¿Cómo llegar?</span></div>
   <div class="card-body" style="font-size:0.875rem;color:var(--text-secondary)">
-    <p>Haz clic en cualquier marcador del mapa para ver el nombre y stock del centro. Una vez seleccionado, recuerda llevar la cartilla de vacunación y llegar durante el horario indicado. Al acercarte al centro, recibirás una notificación automática por Bluetooth (Beacon).</p>
+    <p>Los centros se ordenan automáticamente del más cercano al más lejano usando tu ubicación GPS. Haz clic en <strong>Cómo llegar</strong> para abrir Google Maps. Al acercarte al centro, recibirás una notificación automática por Bluetooth (Beacon).</p>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+let centrosData = [];
+let currentIndex = 0;
+
+function setGpsStatus(msg, type) {
+  const el = document.getElementById('gps-status');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function buscarCentros() {
+  const vacunaId = document.getElementById('vacuna-filter').value;
+  if (!vacunaId) {
+    setGpsStatus('Selecciona una vacuna primero.', 'warn');
+    return;
+  }
+
+  if (!navigator.geolocation) {
+    fetchCentros(vacunaId, null, null, 'Tu navegador no soporta geolocalización. Mostrando centros sin ordenar por distancia.');
+    return;
+  }
+
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+    setGpsStatus('⚠️ Sitio en HTTP: el navegador puede bloquear el GPS. Si no funciona, activa la excepción en chrome://flags/#unsafely-treat-insecure-origin-as-secure', 'warn');
+  } else {
+    setGpsStatus('Obteniendo tu ubicación…', 'info');
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setGpsStatus('Ubicación obtenida. Buscando centros cercanos…', 'info');
+      fetchCentros(vacunaId, pos.coords.latitude, pos.coords.longitude, null);
+    },
+    (err) => {
+      let msg = 'No se pudo obtener tu ubicación';
+      if (err.code === 1) msg = 'Permiso de ubicación denegado. Mostrando centros sin ordenar por distancia.';
+      else if (err.code === 2) msg = 'Ubicación no disponible. Mostrando centros sin ordenar por distancia.';
+      else if (err.code === 3) msg = 'Tiempo de espera agotado. Mostrando centros sin ordenar por distancia.';
+      fetchCentros(vacunaId, null, null, msg);
+    },
+    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+  );
+}
+
+function fetchCentros(vacunaId, lat, lng, warnMsg) {
+  let url = `/api/centros-cercanos?vacuna_id=${vacunaId}`;
+  if (lat !== null && lng !== null) url += `&lat=${lat}&lng=${lng}`;
+
+  fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      if (warnMsg) setGpsStatus(warnMsg, 'warn');
+      else document.getElementById('gps-status').className = '';
+
+      centrosData = data;
+      currentIndex = 0;
+      renderCarousel(lat !== null);
+    })
+    .catch(err => setGpsStatus(`Error al consultar los centros (${err.message}). Verifica que el servidor esté corriendo.`, 'error'));
+}
+
+function renderCarousel(tieneDistancia) {
+  document.getElementById('placeholder-section').style.display = 'none';
+  document.getElementById('empty-section').style.display = 'none';
+  document.getElementById('results-section').style.display = 'none';
+
+  if (centrosData.length === 0) {
+    document.getElementById('empty-section').style.display = 'block';
+    return;
+  }
+
+  const carousel = document.getElementById('carousel');
+  carousel.innerHTML = '';
+
+  centrosData.forEach((c, i) => {
+    const dir = [c.centro_calle, c.centro_numero, c.ciudad_nombre].filter(Boolean).join(', ');
+    const distBadge = c.distancia_km !== null
+      ? `<span class="badge-distancia"><i class="fa-solid fa-location-dot"></i> ${c.distancia_km} km</span>`
+      : '';
+    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${c.centro_latitud},${c.centro_longitud}`;
+
+    const card = document.createElement('div');
+    card.className = 'centro-card' + (i === 0 ? ' active' : '');
+    card.id = `card-${i}`;
+    card.innerHTML = `
+      <div class="centro-nombre">${c.centro_nombre}</div>
+      <div class="centro-meta"><i class="fa-solid fa-map-pin"></i> ${dir || 'Dirección no disponible'}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge-stock"><i class="fa-solid fa-syringe"></i> ${c.stock_total} dosis</span>
+        ${distBadge}
+      </div>
+      ${c.centro_telefono ? `<div class="centro-meta"><i class="fa-solid fa-phone"></i> ${c.centro_telefono}</div>` : ''}
+      ${c.centro_horario_inicio ? `<div class="centro-meta"><i class="fa-solid fa-clock"></i> ${c.centro_horario_inicio} – ${c.centro_horario_fin}</div>` : ''}
+      <a href="${mapsUrl}" target="_blank" class="btn btn-outline btn-sm" style="margin-top:4px">
+        <i class="fa-solid fa-diamond-turn-right"></i> Cómo llegar
+      </a>
+    `;
+    carousel.appendChild(card);
+  });
+
+  document.getElementById('results-count').textContent = `${centrosData.length} centro${centrosData.length !== 1 ? 's' : ''}`;
+  document.getElementById('results-title').innerHTML =
+    `<i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> ` +
+    (tieneDistancia ? 'Centros más cercanos' : 'Centros disponibles');
+  document.getElementById('results-section').style.display = 'block';
+
+  updateCarouselNav();
+}
+
+function scrollCarousel(dir) {
+  const total = centrosData.length;
+  currentIndex = Math.max(0, Math.min(total - 1, currentIndex + dir));
+
+  document.querySelectorAll('.centro-card').forEach((c, i) => {
+    c.classList.toggle('active', i === currentIndex);
+  });
+
+  const card = document.getElementById(`card-${currentIndex}`);
+  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+
+  updateCarouselNav();
+}
+
+function updateCarouselNav() {
+  const total = centrosData.length;
+  document.getElementById('carousel-counter').textContent = total ? `${currentIndex + 1} / ${total}` : '';
+  document.getElementById('btn-prev').disabled = currentIndex === 0;
+  document.getElementById('btn-next').disabled = currentIndex === total - 1;
+}
+
+// Soporte swipe para móvil
 document.addEventListener('DOMContentLoaded', () => {
-  initMap(25.6866, -100.3161, 12);
+  const carousel = document.getElementById('carousel');
+  let startX = 0;
+  carousel.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+  carousel.addEventListener('touchend', e => {
+    const diff = startX - e.changedTouches[0].clientX;
+    if (Math.abs(diff) > 40) scrollCarousel(diff > 0 ? 1 : -1);
+  }, { passive: true });
 });
 </script>
 {% endblock %}
