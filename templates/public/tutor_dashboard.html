@@ -133,7 +133,6 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Buscando…';
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ namePrefix: 'FSC-' }],
-        optionalServices: ['battery_service'],
       });
       const beaconId = device.name || device.id;
       await consultarBeacon({ beacon_id: beaconId });
