@@ -175,6 +175,33 @@ def api_dosis_por_inventario(inventario_id):
     return jsonify(dosis)
 
 
+@clinical_bp.route('/inventario/confirmar', methods=['GET', 'POST'])
+def confirmar_inventario():
+    redir = _require_responsable()
+    if redir:
+        return redir
+    responsable_id = session['user_id']
+    responsable    = repo.obtener_responsable(responsable_id)
+    centro_id      = responsable['centro_id'] if responsable else None
+
+    if request.method == 'POST':
+        lote_codigo = request.form.get('lote_codigo', '').strip()
+        if not lote_codigo:
+            flash('Ingresa el código de lote.', 'error')
+        else:
+            r = repo.confirmar_recepcion_inventario(lote_codigo, responsable_id)
+            if r.get('p_ok') == 1:
+                flash(r.get('p_msg', 'Inventario activado correctamente.'), 'success')
+            else:
+                flash(r.get('p_msg', 'No se pudo activar el inventario.'), 'error')
+        return redirect(url_for('clinical.confirmar_inventario'))
+
+    pendientes = repo.inventarios_pendientes_de_centro(centro_id) if centro_id else []
+    return render_template('clinical/confirmar_inventario.html',
+                           pendientes=pendientes,
+                           responsable=responsable)
+
+
 @clinical_bp.route('/perfil')
 def profile():
     redir = _require_responsable()

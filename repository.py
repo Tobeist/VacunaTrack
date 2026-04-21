@@ -524,6 +524,20 @@ def obtener_inventario(inventario_id: int) -> dict | None:
     return data.get_by_id(data.INVENTARIOS, 'inventario_id', inventario_id)
 
 
+def inventarios_pendientes_de_centro(centro_id: int) -> list[dict]:
+    if db.using_postgres():
+        return db.call_read_sp('sp_inventarios_pendientes_de_centro', [centro_id])
+    return [i for i in data.INVENTARIOS
+            if i['centro_id'] == centro_id
+            and i.get('inventario_activo_desde') is None]
+
+
+def confirmar_recepcion_inventario(lote_codigo: str, responsable_id: int) -> dict:
+    if db.using_postgres():
+        return _sp('sp_confirmar_recepcion_inventario', [lote_codigo, responsable_id], out_count=2)
+    return {'p_ok': 0, 'p_msg': 'Función solo disponible con PostgreSQL.'}
+
+
 def asignar_inventario(datos: dict) -> dict:
     """
     datos: centro_id, lote_id, inventario_stock_inicial, inventario_stock_actual,

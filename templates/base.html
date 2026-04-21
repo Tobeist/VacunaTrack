@@ -91,6 +91,9 @@
       <a href="{{ url_for('clinical.register_application') }}" class="sidebar-item {% if request.endpoint == 'clinical.register_application' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-syringe"></i></span> Registrar Aplicación
       </a>
+      <a href="{{ url_for('clinical.confirmar_inventario') }}" class="sidebar-item {% if request.endpoint == 'clinical.confirmar_inventario' %}active{% endif %}">
+        <span class="si-icon"><i class="fa-solid fa-box-open"></i></span> Confirmar Inventario
+      </a>
 
       <div class="sidebar-section-label">Cuenta</div>
       <a href="{{ url_for('clinical.profile') }}" class="sidebar-item {% if request.endpoint == 'clinical.profile' %}active{% endif %}">

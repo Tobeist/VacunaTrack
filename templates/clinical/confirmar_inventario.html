@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+{% block title %}Confirmar Recepción de Inventario — VacunaTrack{% endblock %}
+{% block page_title %}Confirmar Recepción de Inventario{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start">
+
+  <!-- Formulario de confirmación -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <i class="fa-solid fa-box-open" style="color:var(--primary)"></i> Confirmar llegada
+        </span>
+      </div>
+      <div class="card-body">
+
+        {% with msgs = get_flashed_messages(with_categories=true) %}
+          {% for cat, msg in msgs %}
+          <div class="flash-msg {{ cat }}" style="margin-bottom:16px">{{ msg }}</div>
+          {% endfor %}
+        {% endwith %}
+
+        <p class="text-muted fs-sm" style="margin-bottom:20px">
+          Ingresa el código del lote que llegó físicamente a tu centro de salud.
+          El sistema verificará que corresponda a un inventario asignado pendiente de activación.
+        </p>
+
+        <form method="POST" action="{{ url_for('clinical.confirmar_inventario') }}">
+          <div class="form-group">
+            <label class="form-label">Código de lote <span class="required">*</span></label>
+            <input type="text" name="lote_codigo" class="form-control"
+                   placeholder="Ej: LOT-2024-001"
+                   autocomplete="off"
+                   style="text-transform:uppercase;letter-spacing:1px"
+                   required>
+            <div class="form-hint">El código está impreso en el empaque del lote recibido.</div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full">
+            <i class="fa-solid fa-circle-check"></i> Confirmar recepción
+          </button>
+        </form>
+
+      </div>
+    </div>
+
+    {% if responsable and responsable.centro_nombre %}
+    <div class="card" style="margin-top:16px">
+      <div class="card-body" style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+        <i class="fa-solid fa-hospital" style="color:var(--secondary);font-size:1.2rem"></i>
+        <div>
+          <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1px">Tu centro de salud</div>
+          <div style="font-weight:600;font-size:0.9rem">{{ responsable.centro_nombre }}</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Lista de inventarios pendientes -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">
+          <i class="fa-solid fa-clock" style="color:var(--warning)"></i> Inventarios pendientes de activación
+        </span>
+        {% if pendientes %}
+        <span class="badge badge-warning" style="margin-left:auto">{{ pendientes|length }}</span>
+        {% endif %}
+      </div>
+
+      {% if pendientes %}
+      <div style="overflow-x:auto">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Vacuna</th>
+              <th>Código de lote</th>
+              <th>Fabricante</th>
+              <th>Caducidad</th>
+              <th style="text-align:right">Dosis</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for inv in pendientes %}
+            <tr>
+              <td style="font-weight:600">{{ inv.vacuna_nombre }}</td>
+              <td>
+                <code style="background:var(--bg-hover);padding:2px 7px;border-radius:4px;font-size:0.85rem">
+                  {{ inv.lote_codigo }}
+                </code>
+              </td>
+              <td class="text-muted fs-sm">{{ inv.fabricante_nombre }}</td>
+              <td class="fs-sm">
+                {% set hoy = namespace() %}
+                {{ inv.lote_fecha_caducidad|format_date if inv.lote_fecha_caducidad else '—' }}
+              </td>
+              <td style="text-align:right;font-weight:600">{{ inv.inventario_stock_inicial }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% else %}
+      <div class="card-body text-center" style="padding:48px 20px">
+        <div style="font-size:2.5rem;margin-bottom:12px">✅</div>
+        <div style="font-weight:600;margin-bottom:6px">Sin inventarios pendientes</div>
+        <p class="text-muted fs-sm">
+          Todos los inventarios asignados a tu centro ya fueron confirmados,
+          o aún no se te ha asignado ninguno.
+        </p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
