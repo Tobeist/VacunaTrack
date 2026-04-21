@@ -3,50 +3,135 @@
 {% block page_title %}Esquemas de Vacunación{% endblock %}
 
 {% block content %}
+
+<div class="tabs" id="esq-tabs">
+  <button class="tab-btn active" data-tab="tab-esquemas">
+    <i class="fa-solid fa-calendar-check"></i> Esquemas ({{ esquemas|length }})
+  </button>
+  <button class="tab-btn" data-tab="tab-conflictos" id="btn-tab-conflictos">
+    <i class="fa-solid fa-triangle-exclamation"></i> Conflictos
+    {% if conflictos %}<span class="badge badge-danger" style="margin-left:6px">{{ conflictos|length }}</span>{% endif %}
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB: ESQUEMAS                                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-esquemas">
 <div class="crud-layout">
 
+  <!-- ── Formulario publicar ──────────────────────────── -->
   <div class="card">
-    <div class="card-header"><span class="card-title"><i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i> Nuevo Esquema</span></div>
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i>
+        {% if esquema_actual %}Publicar Nuevo Esquema{% else %}Crear Primer Esquema{% endif %}
+      </span>
+    </div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.esquemas') }}">
-        <div class="form-group"><label class="form-label">Nombre del esquema <span class="required">*</span></label>
-          <input type="text" name="nombre" class="form-control" placeholder="Ej: Esquema Nacional 2024" required></div>
-        <div class="form-group"><label class="form-label">Fecha de vigencia <span class="required">*</span></label>
-          <input type="date" name="fecha_vigencia" class="form-control" required></div>
 
+      {% if esquema_actual %}
+      <div class="flash-msg info" style="margin-bottom:16px;font-size:0.85rem">
+        <i class="fa-solid fa-circle-info"></i>
+        Al publicar, el esquema <strong>{{ esquema_actual.esquema_nombre }}</strong> quedará archivado.
+        Los pacientes sin conflictos de dosis se actualizarán automáticamente.
+      </div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('admin.esquemas') }}" id="form-publicar">
+        {% if esquema_actual %}
+        <input type="hidden" name="esquema_anterior_id" value="{{ esquema_actual.esquema_id }}">
+        {% endif %}
+
+        <div class="form-group">
+          <label class="form-label">Nombre del nuevo esquema <span class="required">*</span></label>
+          <input type="text" name="nombre" class="form-control"
+                 placeholder="Ej: Esquema Nacional 2025" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de vigencia <span class="required">*</span></label>
+          <input type="date" name="fecha_vigencia" class="form-control" required>
+        </div>
+
+        <!-- ── Dosis existentes ─────────────────────── -->
         <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
-          <div class="form-label mb-8">Dosis incluidas en el esquema</div>
-          <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px">
+          <div class="form-label mb-8">Dosis existentes a incluir</div>
+          <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border);
+                      border-radius:var(--radius-sm);padding:10px">
             {% for d in dosis_list %}
-            <label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:0.85rem;border-bottom:1px solid var(--border-light)">
-              <input type="checkbox" name="dosis_ids" value="{{ d.dosis_id }}">
-              <span class="badge badge-primary">{{ d.dosis_tipo }}</span>
-              <span>{{ d.vacuna_nombre }}</span>
-              <span class="text-muted fs-sm" style="margin-left:auto">{{ days_to_human(d.dosis_edad_oportuna_dias) }}</span>
+            <label style="display:flex;align-items:flex-start;gap:8px;padding:8px 4px;
+                          cursor:pointer;border-bottom:1px solid var(--border-light)">
+              <input type="checkbox" name="dosis_ids" value="{{ d.dosis_id }}"
+                     style="margin-top:3px;flex-shrink:0"
+                     {% if d.dosis_id in dosis_esquema_actual_ids %}checked{% endif %}>
+              <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <span class="badge badge-primary">{{ d.dosis_tipo }}</span>
+                  <span class="fw-600 fs-sm">{{ d.vacuna_nombre }}</span>
+                </div>
+                <div class="text-muted" style="font-size:0.78rem;margin-top:2px">
+                  Edad oportuna: {{ days_to_human(d.dosis_edad_oportuna_dias) }}
+                  {% if d.dosis_limite_edad_dias %}
+                    · Límite: {{ days_to_human(d.dosis_limite_edad_dias) }}
+                  {% endif %}
+                  · {{ d.dosis_cant_ml }} ml · {{ d.dosis_area_aplicacion }}
+                  {% if d.dosis_intervalo_min_dias > 0 %}
+                    · Intervalo mín: {{ days_to_human(d.dosis_intervalo_min_dias) }}
+                  {% endif %}
+                </div>
+              </div>
             </label>
             {% else %}
-            <p class="text-muted fs-sm">No dosis. Registra vacunas primero.</p>
+            <p class="text-muted fs-sm" style="padding:8px">No hay dosis activas registradas.</p>
             {% endfor %}
+          </div>
+          <div class="form-hint">Las dosis del esquema anterior que no selecciones quedarán desactivadas.</div>
+        </div>
+
+        <!-- ── Nuevas dosis inline ──────────────────── -->
+        <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <span class="form-label mb-0">Nuevas dosis</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-dosis">
+              <i class="fa-solid fa-plus"></i> Agregar dosis
+            </button>
+          </div>
+          <div id="nuevas-dosis-container">
+            <!-- Las filas se agregan aquí por JS -->
           </div>
         </div>
 
         <button type="submit" class="btn btn-primary btn-full mt-16">
-          <i class="fa-solid fa-plus"></i> Crear Esquema
+          <i class="fa-solid fa-upload"></i>
+          {% if esquema_actual %}Publicar como nuevo esquema{% else %}Crear esquema{% endif %}
         </button>
       </form>
     </div>
   </div>
 
+  <!-- ── Tabla de esquemas ────────────────────────────── -->
   <div class="card">
     <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i> Esquemas ({{ esquemas|length }})</span>
+      <span class="card-title">
+        <i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i>
+        Historial de esquemas
+      </span>
     </div>
     <div class="card-body" style="padding:16px 22px 12px">
-      <input type="text" class="form-control" placeholder="🔍 Buscar…" data-search-table="tabla-esquemas">
+      <input type="text" class="form-control" placeholder="🔍 Buscar…"
+             data-search-table="tabla-esquemas">
     </div>
     <div class="table-wrapper">
       <table class="table" id="tabla-esquemas">
-        <thead><tr><th>Nombre</th><th>Vigencia</th><th>Dosis</th><th>Acciones</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Vigencia</th>
+            <th>Dosis</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
         <tbody>
           {% for e in esquemas %}
           <tr>
@@ -54,13 +139,35 @@
             <td class="fs-sm">{{ e.esquema_fecha_vigencia|format_date }}</td>
             <td><span class="badge badge-primary">{{ e.total_dosis }}</span></td>
             <td>
-              <form method="POST" action="{{ url_for('admin.eliminar_esquema', eid=e.esquema_id) }}" style="display:inline">
-                <button type="submit" class="btn btn-danger btn-sm" data-confirm="¿Eliminar esquema {{ e.esquema_nombre }}?">🗑</button>
+              {% if not e.esquema_vigente_hasta %}
+                <span class="badge badge-success">Activo</span>
+              {% else %}
+                <span class="badge" style="background:var(--bg-secondary);color:var(--text-secondary)">
+                  Archivado {{ e.esquema_vigente_hasta|format_date }}
+                </span>
+              {% endif %}
+            </td>
+            <td>
+              {% if e.esquema_vigente_hasta %}
+              <form method="POST"
+                    action="{{ url_for('admin.eliminar_esquema', eid=e.esquema_id) }}"
+                    style="display:inline">
+                <button type="submit" class="btn btn-danger btn-sm"
+                        data-confirm="¿Eliminar esquema {{ e.esquema_nombre }}?">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
               </form>
+              {% else %}
+              <span class="text-muted fs-sm">—</span>
+              {% endif %}
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="4" class="text-center text-muted" style="padding:40px">No esquemas.</td></tr>
+          <tr>
+            <td colspan="5" class="text-center text-muted" style="padding:40px">
+              Sin esquemas registrados.
+            </td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -68,4 +175,190 @@
   </div>
 
 </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TAB: CONFLICTOS                                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-conflictos">
+
+  {% if not conflictos %}
+  <div class="card" style="max-width:520px;margin:40px auto">
+    <div class="card-body" style="text-align:center;padding:48px 32px">
+      <div style="font-size:2.5rem;margin-bottom:12px">✅</div>
+      <div class="fw-600" style="margin-bottom:6px">Sin conflictos pendientes</div>
+      <div class="text-muted fs-sm">
+        Todos los pacientes están en el esquema activo o ya tienen una decisión registrada.
+      </div>
+    </div>
+  </div>
+
+  {% else %}
+  <div style="margin-bottom:16px;color:var(--text-secondary);font-size:0.87rem">
+    <i class="fa-solid fa-circle-info"></i>
+    Estos pacientes tienen dosis del esquema anterior que no forman parte del nuevo y aún pueden recibirlas.
+    Decide si actualizar su esquema o conservar el actual.
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">
+    {% for c in conflictos %}
+    <div class="card" style="border-left:4px solid var(--warning)">
+      <div class="card-body" style="padding:16px">
+
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--warning);
+                      color:#fff;display:flex;align-items:center;justify-content:center;
+                      font-weight:700;flex-shrink:0">
+            {{ c.nombre_display[0]|upper }}
+          </div>
+          <div>
+            <div class="fw-600">{{ c.nombre_display }}</div>
+            <div class="text-muted fs-sm">
+              Esquema actual: <em>{{ c.esquema_actual_nombre }}</em>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div class="fs-sm fw-600" style="margin-bottom:6px;color:var(--text-secondary)">
+            Dosis en conflicto:
+          </div>
+          {% for dosis in c.dosis %}
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;
+                      background:var(--bg);border-radius:var(--radius-sm);margin-bottom:4px">
+            <span class="badge badge-warning" style="font-size:0.7rem">{{ dosis.dosis_tipo }}</span>
+            <span class="fs-sm">{{ dosis.vacuna_nombre }}</span>
+            <span class="text-muted fs-sm" style="margin-left:auto">
+              {% if dosis.limite_dias %}
+                límite {{ days_to_human(dosis.limite_dias) }}
+              {% else %}
+                sin límite de edad
+              {% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px">
+          Nuevo esquema: <strong>{{ c.esquema_nuevo_nombre }}</strong>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <form method="POST" action="{{ url_for('admin.resolver_conflicto_esquema') }}"
+                style="flex:1">
+            <input type="hidden" name="paciente_id"      value="{{ c.paciente_id }}">
+            <input type="hidden" name="esquema_nuevo_id" value="{{ c.esquema_nuevo_id }}">
+            <input type="hidden" name="accion"           value="actualizar">
+            <button type="submit" class="btn btn-primary btn-full btn-sm"
+                    data-confirm="¿Actualizar esquema de {{ c.nombre_display }} al nuevo?">
+              <i class="fa-solid fa-arrow-up-right-dots"></i> Actualizar
+            </button>
+          </form>
+          <form method="POST" action="{{ url_for('admin.resolver_conflicto_esquema') }}"
+                style="flex:1">
+            <input type="hidden" name="paciente_id"      value="{{ c.paciente_id }}">
+            <input type="hidden" name="esquema_nuevo_id" value="{{ c.esquema_nuevo_id }}">
+            <input type="hidden" name="accion"           value="mantener">
+            <button type="submit" class="btn btn-secondary btn-full btn-sm">
+              <i class="fa-solid fa-lock"></i> Mantener actual
+            </button>
+          </form>
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Plantilla oculta para filas de nueva dosis -->
+<template id="tpl-nueva-dosis">
+  <div class="nueva-dosis-fila" style="border:1px solid var(--border);border-radius:var(--radius-sm);
+       padding:14px;margin-bottom:10px;background:var(--bg)">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+      <button type="button" class="btn btn-danger btn-sm btn-rm-dosis">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="form-group" style="margin:0">
+        <label class="form-label fs-sm">Vacuna <span class="required">*</span></label>
+        <select name="nueva_vacuna_id" class="form-select" required>
+          <option value="">— Vacuna —</option>
+          {%- for vac in vacunas %}
+          <option value="{{ vac.vacuna_id }}">{{ vac.vacuna_nombre }}</option>
+          {%- endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label fs-sm">Tipo <span class="required">*</span></label>
+        <select name="nueva_tipo" class="form-select" required>
+          {%- for t in DOSIS_TIPOS %}
+          <option value="{{ t }}">{{ t }}</option>
+          {%- endfor %}
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label fs-sm">Edad oportuna (días) <span class="required">*</span></label>
+        <input type="number" name="nueva_edad_dias" class="form-control"
+               min="0" placeholder="Ej: 60" required>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label fs-sm">Límite de edad (días)</label>
+        <input type="number" name="nueva_limite_dias" class="form-control"
+               min="0" placeholder="Vacío = sin límite">
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label fs-sm">Intervalo mínimo (días) <span class="required">*</span></label>
+        <input type="number" name="nueva_intervalo_dias" class="form-control"
+               min="0" value="0" required>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label class="form-label fs-sm">Cantidad (ml) <span class="required">*</span></label>
+        <input type="number" name="nueva_cant_ml" class="form-control"
+               min="0.01" step="0.01" placeholder="Ej: 0.5" required>
+      </div>
+      <div class="form-group" style="margin:0;grid-column:1/-1">
+        <label class="form-label fs-sm">Área de aplicación <span class="required">*</span></label>
+        <input type="text" name="nueva_area" class="form-control"
+               placeholder="Ej: Muslo anterolateral derecho" required>
+      </div>
+    </div>
+  </div>
+</template>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Tabs ────────────────────────────────────────────────
+document.querySelectorAll('#esq-tabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#esq-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
+// Activar pestaña conflictos si la URL tiene el hash
+if (window.location.hash === '#tab-conflictos') {
+  document.querySelector('[data-tab="tab-conflictos"]').click();
+}
+
+// ── Inline nuevas dosis ─────────────────────────────────
+const tpl       = document.getElementById('tpl-nueva-dosis');
+const container = document.getElementById('nuevas-dosis-container');
+
+document.getElementById('btn-add-dosis').addEventListener('click', () => {
+  const fila = tpl.content.cloneNode(true);
+  fila.querySelector('.btn-rm-dosis').addEventListener('click', function () {
+    this.closest('.nueva-dosis-fila').remove();
+  });
+  container.appendChild(fila);
+  container.lastElementChild.querySelector('select').focus();
+});
+</script>
 {% endblock %}

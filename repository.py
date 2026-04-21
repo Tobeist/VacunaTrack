@@ -757,6 +757,41 @@ def listar_dosis_esquemas() -> list[dict]:
     return list(data.DOSIS_ESQUEMAS)
 
 
+def listar_dosis_activas() -> list[dict]:
+    if db.using_postgres():
+        return db.call_read_sp('sp_listar_dosis_activas')
+    return [d for d in data.DOSIS if not d.get('dosis_vigente_hasta')]
+
+
+def cerrar_esquema(esquema_id: int) -> None:
+    if db.using_postgres():
+        _sp('sp_cerrar_esquema', [esquema_id], out_count=2)
+
+
+def desactivar_dosis(dosis_id: int) -> None:
+    if db.using_postgres():
+        _sp('sp_desactivar_dosis', [dosis_id], out_count=2)
+
+
+def asignar_esquema_auto(viejo_id: int, nuevo_id: int) -> dict:
+    if db.using_postgres():
+        return _sp('sp_asignar_esquema_auto', [viejo_id, nuevo_id])
+    return {'p_ok': 1, 'p_msg': 'N/A en modo local', 'p_actualizados': 0}
+
+
+def resolver_conflicto_esquema(paciente_id: int, esquema_nuevo_id: int, accion: str) -> dict:
+    if db.using_postgres():
+        return db.call_write_sp('sp_resolver_conflicto',
+                                [paciente_id, esquema_nuevo_id, accion], out_count=2)
+    return {'p_ok': 1, 'p_msg': 'N/A en modo local'}
+
+
+def listar_conflictos_esquema() -> list[dict]:
+    if db.using_postgres():
+        return db.call_read_sp('sp_listar_conflictos_esquema')
+    return []
+
+
 def agregar_dosis_a_esquema(esquema_id: int, dosis_id: int) -> dict:
     if db.using_postgres():
         r = _sp('sp_agregar_dosis_a_esquema', [esquema_id, dosis_id])

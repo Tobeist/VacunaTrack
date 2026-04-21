@@ -376,27 +376,109 @@ def esquemas():
     redir = _require_admin()
     if redir:
         return redir
+
     if request.method == 'POST':
         f = request.form
-        datos = {
-            'esquema_nombre':         f['nombre'],
-            'esquema_fecha_vigencia': date.fromisoformat(f['fecha_vigencia']),
-            'vigente_desde':          date.today(),
-        }
+        nombre             = f.get('nombre', '').strip()
+        fecha_vigencia     = date.fromisoformat(f['fecha_vigencia'])
+        esquema_anterior_id = f.get('esquema_anterior_id', type=int)
+        dosis_seleccionadas = set(f.getlist('dosis_ids', type=int))
+
+        nuevas_vacunas    = f.getlist('nueva_vacuna_id',     type=int)
+        nuevas_tipos      = f.getlist('nueva_tipo')
+        nuevas_ml         = f.getlist('nueva_cant_ml')
+        nuevas_areas      = f.getlist('nueva_area')
+        nuevas_edades     = f.getlist('nueva_edad_dias',     type=int)
+        nuevas_intervalos = f.getlist('nueva_intervalo_dias', type=int)
+        nuevas_limites    = f.getlist('nueva_limite_dias')
+
         try:
-            repo.crear_esquema(datos)
-            flash('Esquema registrado.', 'success')
+            nuevo   = repo.crear_esquema({'esquema_nombre': nombre,
+                                          'esquema_fecha_vigencia': fecha_vigencia,
+                                          'vigente_desde': date.today()})
+            nuevo_id = nuevo['esquema_id']
+
+            for i, vacuna_id in enumerate(nuevas_vacunas):
+                if not vacuna_id:
+                    continue
+                limite_raw = nuevas_limites[i] if i < len(nuevas_limites) else ''
+                d = repo.crear_dosis({
+                    'vacuna_id':               vacuna_id,
+                    'dosis_tipo':              nuevas_tipos[i] if i < len(nuevas_tipos) else 'UNICA',
+                    'dosis_cant_ml':           float(nuevas_ml[i]) if i < len(nuevas_ml) and nuevas_ml[i] else 0.5,
+                    'dosis_area_aplicacion':   nuevas_areas[i] if i < len(nuevas_areas) else '',
+                    'dosis_edad_oportuna_dias': nuevas_edades[i] if i < len(nuevas_edades) else 0,
+                    'dosis_intervalo_min_dias': nuevas_intervalos[i] if i < len(nuevas_intervalos) else 0,
+                    'dosis_limite_edad_dias':  int(limite_raw) if limite_raw else None,
+                })
+                repo.agregar_dosis_a_esquema(nuevo_id, d['dosis_id'])
+
+            for dosis_id in dosis_seleccionadas:
+                repo.agregar_dosis_a_esquema(nuevo_id, dosis_id)
+
+            if esquema_anterior_id:
+                dosis_antiguas = repo.dosis_de_esquema(esquema_anterior_id)
+                for d in dosis_antiguas:
+                    if d['dosis_id'] not in dosis_seleccionadas:
+                        repo.desactivar_dosis(d['dosis_id'])
+                repo.cerrar_esquema(esquema_anterior_id)
+                r = repo.asignar_esquema_auto(esquema_anterior_id, nuevo_id)
+                flash(f'Esquema publicado. {r.get("p_msg", "")}', 'success')
+            else:
+                flash('Esquema creado correctamente.', 'success')
+
         except ValueError as e:
             flash(str(e), 'error')
+
         return redirect(url_for('admin.esquemas'))
-    esquemas = repo.listar_esquemas()
-    for e in esquemas:
+
+    esquemas_list = repo.listar_esquemas()
+    for e in esquemas_list:
         e['total_dosis'] = len(repo.dosis_de_esquema(e['esquema_id']))
+
+    esquema_actual = next(
+        (e for e in esquemas_list if not e.get('esquema_vigente_hasta')), None
+    )
+    dosis_esquema_actual_ids = set()
+    if esquema_actual:
+        dosis_esquema_actual_ids = {
+            d['dosis_id'] for d in repo.dosis_de_esquema(esquema_actual['esquema_id'])
+        }
+
+    conflictos_raw = repo.listar_conflictos_esquema()
+    conflictos = {}
+    for c in conflictos_raw:
+        pid = c['paciente_id']
+        if pid not in conflictos:
+            conflictos[pid] = {
+                'paciente_id':         pid,
+                'nombre':              (f"{c['paciente_prim_nombre']} "
+                                        f"{c.get('paciente_seg_nombre') or ''} "
+                                        f"{c['paciente_apellido_pat']} "
+                                        f"{c.get('paciente_apellido_mat') or ''}").split(),
+                'nombre_display':      f"{c['paciente_prim_nombre']} {c['paciente_apellido_pat']}",
+                'esquema_nuevo_id':    c['esquema_nuevo_id'],
+                'esquema_nuevo_nombre': c['esquema_nuevo_nombre'],
+                'esquema_actual_nombre': c.get('esquema_actual_nombre', ''),
+                'dosis': [],
+            }
+        conflictos[pid]['dosis'].append({
+            'dosis_id':     c['dosis_conflicto_id'],
+            'vacuna_nombre': c['vacuna_nombre'],
+            'dosis_tipo':   c['dosis_tipo'],
+            'edad_dias':    c.get('dosis_edad_oportuna_dias'),
+            'limite_dias':  c.get('dosis_limite_edad_dias'),
+        })
+
     return render_template('admin/esquemas.html',
-                           esquemas=esquemas,
-                           dosis_list=repo.listar_dosis(),
+                           esquemas=esquemas_list,
+                           esquema_actual=esquema_actual,
+                           dosis_list=repo.listar_dosis_activas(),
+                           dosis_esquema_actual_ids=dosis_esquema_actual_ids,
                            vacunas=repo.listar_vacunas(),
-                           days_to_human=days_to_human)
+                           conflictos=list(conflictos.values()),
+                           days_to_human=days_to_human,
+                           DOSIS_TIPOS=DOSIS_TIPOS)
 
 
 @admin_bp.route('/esquemas/<int:eid>/eliminar', methods=['POST'])
@@ -410,6 +492,22 @@ def eliminar_esquema(eid):
     except ValueError as e:
         flash(str(e), 'error')
     return redirect(url_for('admin.esquemas'))
+
+
+@admin_bp.route('/esquemas/conflicto/resolver', methods=['POST'])
+def resolver_conflicto_esquema():
+    redir = _require_admin()
+    if redir:
+        return redir
+    paciente_id     = request.form.get('paciente_id', type=int)
+    esquema_nuevo_id = request.form.get('esquema_nuevo_id', type=int)
+    accion          = request.form.get('accion')
+    r = repo.resolver_conflicto_esquema(paciente_id, esquema_nuevo_id, accion)
+    if r.get('p_ok') == 1:
+        flash(r.get('p_msg', 'Resuelto.'), 'success')
+    else:
+        flash(r.get('p_msg', 'Error al resolver conflicto.'), 'error')
+    return redirect(url_for('admin.esquemas') + '#tab-conflictos')
 
 
 # ── Vacunas ───────────────────────────────────────────────────────
