@@ -26,6 +26,9 @@ def get_db():
                 'Crea un archivo .env o define la variable de entorno.'
             )
         g.db = psycopg2.connect(DATABASE_URL)
+        with g.db.cursor() as _tz:
+            _tz.execute("SET TIME ZONE 'America/Mexico_City'")
+        g.db.commit()
     return g.db
 
 

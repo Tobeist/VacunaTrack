@@ -4,47 +4,53 @@
 
 {% block extra_css %}
 <style>
-  #beacon-modal .modal-card {
-    max-width: 520px;
-    width: 95vw;
-    max-height: 90vh;
+  .beacon-result-card {
+    border: 2px solid var(--primary);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 24px;
+    animation: fadeInDown 0.3s ease;
+  }
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .beacon-result-header {
+    background: linear-gradient(135deg, var(--primary-bg), var(--secondary-bg));
+    border-bottom: 1px solid rgba(124,58,237,0.2);
+    padding: 16px 20px;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
-  #beacon-modal .modal-body {
-    overflow-y: auto;
-    flex: 1;
-    padding: 20px;
-  }
-  .beacon-centro-header {
+  .beacon-result-centro {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-bottom: 16px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid var(--border);
+    min-width: 0;
   }
-  .beacon-centro-icon {
-    width: 44px; height: 44px;
-    background: var(--primary-bg);
+  .beacon-result-icon {
+    width: 42px; height: 42px;
+    background: var(--primary);
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 20px;
+    font-size: 18px;
     flex-shrink: 0;
   }
-  .beacon-centro-info { flex: 1; min-width: 0; }
-  .beacon-centro-nombre {
+  .beacon-result-nombre {
     font-weight: 700;
     font-size: 1.05rem;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: var(--primary-dark);
   }
-  .beacon-centro-dir {
-    font-size: 0.82rem;
+  .beacon-result-dir {
+    font-size: 0.8rem;
     color: var(--text-secondary);
     margin-top: 2px;
+  }
+  .beacon-result-body {
+    padding: 20px;
+    background: var(--bg-card);
   }
   .beacon-esperando-badge {
     display: inline-flex;
@@ -53,17 +59,17 @@
     background: #eff6ff;
     border: 1px solid #bfdbfe;
     border-radius: 20px;
-    padding: 6px 12px;
+    padding: 5px 12px;
     font-size: 0.82rem;
     color: #1d4ed8;
+    font-weight: 600;
     margin-bottom: 16px;
-    font-weight: 500;
   }
   .beacon-section-label {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     color: var(--text-secondary);
     margin-bottom: 10px;
   }
@@ -94,17 +100,17 @@
     border: 1px solid rgba(124,58,237,0.25);
     color: var(--primary);
     border-radius: 20px;
-    padding: 2px 9px;
+    padding: 2px 10px;
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .beacon-hijos-list { padding: 8px 14px; }
+  .beacon-hijos-list { padding: 6px 14px; }
   .beacon-hijo-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     font-size: 0.875rem;
-    padding: 5px 0;
+    padding: 7px 0;
     border-bottom: 1px solid var(--border);
     color: var(--text-primary);
   }
@@ -125,6 +131,10 @@
     } else {
       detectarConGPS();
     }
+  });
+
+  document.getElementById('btn-cerrar-beacon')?.addEventListener('click', () => {
+    document.getElementById('beacon-result').style.display = 'none';
   });
 
   async function detectarConBluetooth() {
@@ -184,19 +194,20 @@
       mostrarError(data.error || 'No se encontró un centro cercano.');
       return;
     }
-    mostrarModal(data);
+    mostrarResultado(data);
   }
 
-  function mostrarModal(data) {
+  function mostrarResultado(data) {
     const { centro, vacunas, total_esperando } = data;
+    const panel = document.getElementById('beacon-result');
 
     document.getElementById('beacon-centro-nombre').textContent = centro.nombre || 'Centro detectado';
     document.getElementById('beacon-centro-dir').textContent = centro.direccion || '';
 
     const esperandoEl = document.getElementById('beacon-esperando');
     if (total_esperando > 0) {
-      esperandoEl.style.display = '';
-      esperandoEl.innerHTML = `<span>👥</span> <span>${total_esperando} persona${total_esperando !== 1 ? 's' : ''} esperando ahora</span>`;
+      esperandoEl.style.display = 'inline-flex';
+      esperandoEl.innerHTML = `<span>👥</span><span>${total_esperando} persona${total_esperando !== 1 ? 's' : ''} esperando ahora</span>`;
     } else {
       esperandoEl.style.display = 'none';
     }
@@ -209,12 +220,10 @@
       sinVacunas.style.display = '';
     } else {
       sinVacunas.style.display = 'none';
-      if (vacunas.length > 0) {
-        const label = document.createElement('div');
-        label.className = 'beacon-section-label';
-        label.textContent = `Vacunas disponibles (${vacunas.length})`;
-        list.appendChild(label);
-      }
+      const label = document.createElement('div');
+      label.className = 'beacon-section-label';
+      label.textContent = `Vacunas disponibles para tus hijos (${vacunas.length})`;
+      list.appendChild(label);
       vacunas.forEach(v => {
         const card = document.createElement('div');
         card.className = 'beacon-vacuna-card';
@@ -224,7 +233,7 @@
              <span class="beacon-hijo-nombre">${h.nombre}</span>
            </div>`
         ).join('');
-        const stockLabel = v.stock_total != null ? `${v.stock_total} dosis` : 'Stock —';
+        const stockLabel = v.stock_total != null ? `${v.stock_total} dosis` : '—';
         card.innerHTML = `
           <div class="beacon-vacuna-header">
             <span class="beacon-vacuna-nombre">💉 ${v.vacuna_nombre}</span>
@@ -236,24 +245,20 @@
       });
     }
 
-    if (typeof openModal === 'function') openModal('beacon-modal');
-    else document.getElementById('beacon-modal').classList.add('active');
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function mostrarError(msg) {
-    const list = document.getElementById('beacon-vacunas-list');
-    const sinVacunas = document.getElementById('beacon-sin-vacunas');
-    document.getElementById('beacon-centro-nombre').textContent = 'Error';
+    const panel = document.getElementById('beacon-result');
+    document.getElementById('beacon-centro-nombre').textContent = 'No se encontró centro';
     document.getElementById('beacon-centro-dir').textContent = '';
     document.getElementById('beacon-esperando').style.display = 'none';
-    list.innerHTML = '';
-    sinVacunas.style.display = 'none';
-    const errDiv = document.createElement('div');
-    errDiv.className = 'flash-msg error fs-sm';
-    errDiv.textContent = msg;
-    list.appendChild(errDiv);
-    if (typeof openModal === 'function') openModal('beacon-modal');
-    else document.getElementById('beacon-modal').classList.add('active');
+    const list = document.getElementById('beacon-vacunas-list');
+    list.innerHTML = `<div class="flash-msg error fs-sm">${msg}</div>`;
+    document.getElementById('beacon-sin-vacunas').style.display = 'none';
+    panel.style.display = '';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 })();
 </script>
@@ -272,24 +277,25 @@
   {% endif %}
 </div>
 
-<!-- Modal beacon -->
-<div class="modal-overlay" id="beacon-modal">
-  <div class="modal-card">
-    <div class="modal-header">
-      <span class="modal-title"><i class="fa-solid fa-location-dot" style="color:var(--primary);margin-right:6px"></i>Centro detectado</span>
-      <button class="modal-close" data-close-modal="beacon-modal">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="beacon-centro-header">
-        <div class="beacon-centro-icon">🏥</div>
-        <div class="beacon-centro-info">
-          <div class="beacon-centro-nombre" id="beacon-centro-nombre">—</div>
-          <div class="beacon-centro-dir" id="beacon-centro-dir"></div>
+<!-- Resultado beacon inline -->
+<div id="beacon-result" style="display:none">
+  <div class="beacon-result-card">
+    <div class="beacon-result-header">
+      <div class="beacon-result-centro">
+        <div class="beacon-result-icon">🏥</div>
+        <div>
+          <div class="beacon-result-nombre" id="beacon-centro-nombre">—</div>
+          <div class="beacon-result-dir" id="beacon-centro-dir"></div>
         </div>
       </div>
+      <button id="btn-cerrar-beacon" class="btn btn-outline-primary btn-sm" style="flex-shrink:0">
+        <i class="fa-solid fa-xmark"></i> Cerrar
+      </button>
+    </div>
+    <div class="beacon-result-body">
       <div id="beacon-esperando" class="beacon-esperando-badge" style="display:none"></div>
       <div id="beacon-vacunas-list"></div>
-      <div id="beacon-sin-vacunas" style="display:none;padding:24px 0;text-align:center" class="text-muted fs-sm">
+      <div id="beacon-sin-vacunas" style="display:none;padding:20px 0;text-align:center" class="text-muted fs-sm">
         <div style="font-size:2rem;margin-bottom:8px">✅</div>
         No hay vacunas pendientes aplicables en este centro para tus hijos.
       </div>
