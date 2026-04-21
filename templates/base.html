@@ -86,7 +86,7 @@
     {% elif session.user_role == 'responsable' %}
       <div class="sidebar-section-label">Clínica</div>
       <a href="{{ url_for('clinical.lookup') }}" class="sidebar-item {% if request.endpoint == 'clinical.lookup' %}active{% endif %}">
-        <span class="si-icon"><i class="fa-solid fa-nfc"></i></span> Buscar Paciente
+        <span class="si-icon"><i class="fa-solid fa-wifi"></i></span> Buscar Paciente
       </a>
       <a href="{{ url_for('clinical.register_application') }}" class="sidebar-item {% if request.endpoint == 'clinical.register_application' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-syringe"></i></span> Registrar Aplicación

@@ -212,7 +212,7 @@
             {{ c.nombre_display[0]|upper }}
           </div>
           <div>
-            <div class="fw-600">{{ c.nombre_display }}</div>
+            <div class="fw-600">{{ c.nombre_display|cap }}</div>
             <div class="text-muted fs-sm">
               Esquema actual: <em>{{ c.esquema_actual_nombre }}</em>
             </div>

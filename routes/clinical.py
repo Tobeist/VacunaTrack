@@ -71,12 +71,12 @@ def _patient_response(paciente):
     historial = enrich_history(rows, birth_date)
     for r in historial:
         r['edad_texto'] = days_to_human(r['dosis_edad_oportuna_dias'])
-    nombre = (
-        f"{paciente['paciente_prim_nombre']} "
-        f"{paciente.get('paciente_nombre') or ''} "
-        f"{paciente['paciente_apellido_pat']} "
-        f"{paciente.get('paciente_apellido_mat') or ''}"
-    ).strip()
+    nombre = ' '.join(filter(None, [
+        paciente.get('paciente_prim_nombre', '').title(),
+        (paciente.get('paciente_seg_nombre') or '').title() or None,
+        paciente.get('paciente_apellido_pat', '').title(),
+        (paciente.get('paciente_apellido_mat') or '').title() or None,
+    ]))
     return jsonify({
         'paciente': {
             'id':         paciente['paciente_id'],
