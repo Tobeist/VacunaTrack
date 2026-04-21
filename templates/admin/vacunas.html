@@ -6,25 +6,21 @@
 <div class="crud-layout">
 
   <div class="card">
-    <div class="card-header"><span class="card-title"><i class="fa-solid fa-syringe" style="color:var(--primary)"></i> Nueva Vacuna</span></div>
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-syringe" style="color:var(--primary)"></i> Nueva Vacuna</span>
+    </div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.vacunas') }}" id="form-vacuna">
-        <div class="form-group"><label class="form-label">Nombre de la vacuna <span class="required">*</span></label>
-          <input type="text" name="nombre" class="form-control" placeholder="Ej: BCG, Hepatitis B…" required></div>
-
-        <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-            <span class="form-label mb-0">Dosis de esta vacuna</span>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addDoseRow()">
-              <i class="fa-solid fa-plus"></i> Agregar dosis
-            </button>
-          </div>
-          <div id="dosis-rows">
-            
-          </div>
+      <form method="POST" action="{{ url_for('admin.vacunas') }}">
+        <div class="form-group">
+          <label class="form-label">Nombre de la vacuna <span class="required">*</span></label>
+          <input type="text" name="nombre" class="form-control"
+                 placeholder="Ej: BCG, Hepatitis B…" required>
         </div>
-
-        <button type="submit" class="btn btn-primary btn-full mt-12">
+        <div class="form-hint" style="margin-bottom:12px">
+          <i class="fa-solid fa-circle-info"></i>
+          Las dosis se asocian al registrar o actualizar un esquema de vacunación.
+        </div>
+        <button type="submit" class="btn btn-primary btn-full">
           <i class="fa-solid fa-plus"></i> Registrar Vacuna
         </button>
       </form>
@@ -33,10 +29,14 @@
 
   <div class="card">
     <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-syringe" style="color:var(--primary)"></i> Vacunas ({{ vacunas|length }})</span>
+      <span class="card-title">
+        <i class="fa-solid fa-syringe" style="color:var(--primary)"></i>
+        Vacunas ({{ vacunas|length }})
+      </span>
     </div>
     <div class="card-body" style="padding:16px 22px 12px">
-      <input type="text" class="form-control" placeholder="🔍 Buscar vacuna…" data-search-table="tabla-vacunas">
+      <input type="text" class="form-control" placeholder="🔍 Buscar vacuna…"
+             data-search-table="tabla-vacunas">
     </div>
     <div class="table-wrapper">
       <table class="table" id="tabla-vacunas">
@@ -70,41 +70,6 @@
 
 {% block extra_js %}
 <script>
-let doseCount = 0;
-
-function addDoseRow() {
-  doseCount++;
-  const container = document.getElementById('dosis-rows');
-  const row = document.createElement('div');
-  row.className = 'card mb-12';
-  row.style.border = '1px solid var(--border)';
-  row.innerHTML = `
-    <div class="card-body" style="padding:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <span style="font-size:0.8rem;font-weight:600;color:var(--primary)">Dosis #${doseCount}</span>
-        <button type="button" class="btn btn-danger btn-sm" onclick="this.closest('.card').remove()">✕ Quitar</button>
-      </div>
-      <div class="form-row form-row-2">
-        <div class="form-group mb-8"><label class="form-label fs-sm">Tipo de dosis</label>
-          <input type="text" name="dosis_tipo" class="form-control" placeholder="1ª dosis, Refuerzo…" required></div>
-        <div class="form-group mb-8"><label class="form-label fs-sm">Volumen (ml)</label>
-          <input type="number" name="dosis_ml" class="form-control" step="0.1" placeholder="0.5"></div>
-      </div>
-      <div class="form-group mb-8"><label class="form-label fs-sm">Área de aplicación</label>
-        <input type="text" name="dosis_area" class="form-control" placeholder="Ej: Muslo derecho, Deltoides…"></div>
-      <div class="form-row form-row-3">
-        <div class="form-group mb-0"><label class="form-label fs-sm">Edad oportuna (días)</label>
-          <input type="number" name="dosis_edad" class="form-control" placeholder="0"></div>
-        <div class="form-group mb-0"><label class="form-label fs-sm">Intervalo mínimo (días)</label>
-          <input type="number" name="dosis_intervalo" class="form-control" placeholder="30"></div>
-        <div class="form-group mb-0"><label class="form-label fs-sm">Límite de edad (días)</label>
-          <input type="number" name="dosis_limite" class="form-control" placeholder="3650"></div>
-      </div>
-    </div>
-  `;
-  container.appendChild(row);
-}
-
 async function loadDose(vacunaId, btn) {
   const detailRow = document.getElementById(`dosis-detail-${vacunaId}`);
   const content   = document.getElementById(`dosis-content-${vacunaId}`);
@@ -123,27 +88,25 @@ async function loadDose(vacunaId, btn) {
   const data = await res.json();
 
   if (!data.length) {
-    content.innerHTML = '<p class="text-muted fs-sm">No dosis registrados.</p>';
+    content.innerHTML = '<p class="text-muted fs-sm">Sin dosis registradas para esta vacuna.</p>';
     return;
   }
 
   const rows = data.map(d => `
     <tr>
       <td><span class="badge badge-primary">${d.dosis_tipo}</span></td>
-      <td>${d.edad_texto}</td>
+      <td>${d.edad_texto || '—'}</td>
       <td>${d.dosis_limite_edad_dias ? Math.floor(d.dosis_limite_edad_dias/365) + ' años' : '—'}</td>
       <td>${d.dosis_area_aplicacion || '—'}</td>
       <td>${d.dosis_cant_ml ? d.dosis_cant_ml + ' ml' : '—'}</td>
+      <td>${d.dosis_vigente_hasta ? '<span class="badge" style="background:var(--bg-secondary);color:var(--text-secondary)">Inactiva</span>' : '<span class="badge badge-success">Activa</span>'}</td>
     </tr>
   `).join('');
 
   content.innerHTML = `<table class="table" style="margin:0">
-    <thead><tr><th>Tipo</th><th>Edad recomendada</th><th>Límite</th><th>Área</th><th>Vol.</th></tr></thead>
+    <thead><tr><th>Tipo</th><th>Edad recomendada</th><th>Límite</th><th>Área</th><th>Vol.</th><th>Estado</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
-
-// Auto-add one dose row on load
-document.addEventListener('DOMContentLoaded', () => addDoseRow());
 </script>
 {% endblock %}

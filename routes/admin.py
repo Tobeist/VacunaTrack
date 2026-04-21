@@ -518,27 +518,8 @@ def vacunas():
     if redir:
         return redir
     if request.method == 'POST':
-        f   = request.form
         try:
-            vac = repo.crear_vacuna({'vacuna_nombre': f['nombre']})
-            vid = vac['vacuna_id']
-            tipos   = request.form.getlist('dosis_tipo')
-            mls     = request.form.getlist('dosis_ml')
-            areas   = request.form.getlist('dosis_area')
-            edades  = request.form.getlist('dosis_edad')
-            ints    = request.form.getlist('dosis_intervalo')
-            limites = request.form.getlist('dosis_limite')
-            for i in range(len(tipos)):
-                if tipos[i]:
-                    repo.crear_dosis({
-                        'vacuna_id':                vid,
-                        'dosis_tipo':               tipos[i],
-                        'dosis_cant_ml':            float(mls[i] or 0.5),
-                        'dosis_area_aplicacion':    areas[i] or None,
-                        'dosis_edad_oportuna_dias': int(edades[i] or 0),
-                        'dosis_intervalo_min_dias': int(ints[i] or 0),
-                        'dosis_limite_edad_dias':   int(limites[i]) if limites[i] else None,
-                    })
+            repo.crear_vacuna({'vacuna_nombre': request.form['nombre']})
             flash('Vacuna registrada.', 'success')
         except ValueError as e:
             flash(str(e), 'error')
