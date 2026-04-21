@@ -44,6 +44,7 @@
 
 <div class="tabs" id="inv-tabs">
   <button class="tab-btn active" data-tab="tab-inv">📦 Inventario</button>
+  <button class="tab-btn" data-tab="tab-transferencias">🔄 Transferencias ({{ transferencias|length }})</button>
   <button class="tab-btn" data-tab="tab-alertas-inv">⚠️ Alertas Inventario ({{ alertas_inv|length }})</button>
   <button class="tab-btn" data-tab="tab-alertas-dosis">💉 Alertas Dosis ({{ alertas_dosis|length }})</button>
 </div>
@@ -112,6 +113,102 @@
         </tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-transferencias">
+  <div style="display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start">
+
+    <!-- Formulario de transferencia -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-right-left" style="color:var(--primary)"></i> Nueva transferencia</span>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.inventario') }}" id="form-transferencia">
+          <div class="form-group">
+            <label class="form-label">Centro de origen <span class="required">*</span></label>
+            <select id="sel-centro-origen" class="form-select" required>
+              <option value="">— Selecciona centro —</option>
+              {% for c in centros %}
+              <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Inventario a transferir <span class="required">*</span></label>
+            <select id="sel-inv-origen" name="inv_origen_id" class="form-select" required disabled>
+              <option value="">— Primero selecciona un centro —</option>
+            </select>
+            <div id="inv-info" class="form-hint" style="display:none"></div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Centro de destino <span class="required">*</span></label>
+            <select name="centro_destino_id" id="sel-centro-destino" class="form-select" required>
+              <option value="">— Selecciona centro —</option>
+              {% for c in centros %}
+              <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Cantidad a transferir <span class="required">*</span></label>
+            <input type="number" name="cantidad" id="input-cantidad" class="form-control"
+                   min="1" placeholder="Ingresa la cantidad" required disabled>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full mt-8" id="btn-transferir" disabled>
+            <i class="fa-solid fa-right-left"></i> Registrar transferencia
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Trazabilidad -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-route" style="color:var(--secondary)"></i> Historial de transferencias</span>
+      </div>
+      {% if transferencias %}
+      <div style="overflow-x:auto">
+        <table class="table" id="tabla-transf">
+          <thead><tr>
+            <th>Fecha</th><th>Vacuna</th><th>Lote</th>
+            <th>Origen</th><th>Destino</th><th style="text-align:right">Cantidad</th><th>Estado destino</th>
+          </tr></thead>
+          <tbody>
+            {% for t in transferencias %}
+            <tr>
+              <td class="fs-sm text-muted">{{ t.transf_timestamp|format_datetime if t.transf_timestamp else '—' }}</td>
+              <td class="fw-600">{{ t.vacuna_nombre }}</td>
+              <td style="font-family:monospace;font-size:0.82rem">{{ t.lote_codigo }}</td>
+              <td>{{ t.origen_centro_nombre }}</td>
+              <td>{{ t.destino_centro_nombre }}</td>
+              <td style="text-align:right;font-weight:700">{{ t.cantidad_transferida }}</td>
+              <td>
+                {% if t.destino_confirmado %}
+                  <span class="badge badge-aplicada">Confirmado</span>
+                {% else %}
+                  <span class="badge badge-proxima">Pendiente</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="card-body text-center" style="padding:48px 20px">
+        <div style="font-size:2.5rem;margin-bottom:12px">🔄</div>
+        <div style="font-weight:600;margin-bottom:6px">Sin transferencias registradas</div>
+        <p class="text-muted fs-sm">Usa el formulario para mover stock entre centros.</p>
+      </div>
+      {% endif %}
+    </div>
+
   </div>
 </div>
 
@@ -191,6 +288,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  // Tabs
   document.querySelectorAll('#inv-tabs .tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#inv-tabs .tab-btn').forEach(b => b.classList.remove('active'));
@@ -199,6 +297,71 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(btn.dataset.tab).classList.add('active');
     });
   });
+
+  // Transferencia: carga dinámica de inventarios por centro origen
+  const selOrigen  = document.getElementById('sel-centro-origen');
+  const selInv     = document.getElementById('sel-inv-origen');
+  const selDestino = document.getElementById('sel-centro-destino');
+  const invInfo    = document.getElementById('inv-info');
+  const inputCant  = document.getElementById('input-cantidad');
+  const btnTransf  = document.getElementById('btn-transferir');
+
+  if (selOrigen) {
+    selOrigen.addEventListener('change', async () => {
+      const centroId = selOrigen.value;
+      selInv.innerHTML = '<option value="">Cargando…</option>';
+      selInv.disabled = true;
+      inputCant.disabled = true;
+      btnTransf.disabled = true;
+      invInfo.style.display = 'none';
+      if (!centroId) {
+        selInv.innerHTML = '<option value="">— Primero selecciona un centro —</option>';
+        return;
+      }
+      const res  = await fetch(`/admin/api/inventarios-activos-centro/${centroId}`);
+      const invs = await res.json();
+      selInv.innerHTML = '<option value="">— Selecciona inventario —</option>';
+      if (invs.length === 0) {
+        selInv.innerHTML = '<option value="">Sin inventarios activos en este centro</option>';
+        return;
+      }
+      invs.forEach(inv => {
+        const opt = document.createElement('option');
+        opt.value = inv.inventario_id;
+        opt.textContent = `${inv.vacuna_nombre} — Lote ${inv.lote_codigo} (${inv.inventario_stock_actual} dosis)`;
+        opt.dataset.stock = inv.inventario_stock_actual;
+        selInv.appendChild(opt);
+      });
+      selInv.disabled = false;
+    });
+
+    selInv.addEventListener('change', () => {
+      const opt = selInv.options[selInv.selectedIndex];
+      if (!opt.value) {
+        invInfo.style.display = 'none';
+        inputCant.disabled = true;
+        btnTransf.disabled = true;
+        return;
+      }
+      const stock = parseInt(opt.dataset.stock);
+      inputCant.max = stock;
+      inputCant.value = '';
+      inputCant.placeholder = `1 – ${stock}`;
+      inputCant.disabled = false;
+      invInfo.textContent = `Stock disponible en origen: ${stock} dosis`;
+      invInfo.style.display = '';
+      actualizarBoton();
+    });
+
+    inputCant.addEventListener('input', actualizarBoton);
+    selDestino.addEventListener('change', actualizarBoton);
+
+    function actualizarBoton() {
+      const ok = selInv.value && selDestino.value && inputCant.value > 0
+                 && selOrigen.value !== selDestino.value;
+      btnTransf.disabled = !ok;
+    }
+  }
 });
 </script>
 {% endblock %}

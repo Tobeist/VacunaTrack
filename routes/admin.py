@@ -577,17 +577,51 @@ def lotes():
 
 # ── Inventario y alertas ──────────────────────────────────────────
 
-@admin_bp.route('/inventario')
+@admin_bp.route('/inventario', methods=['GET', 'POST'])
 def inventario():
     redir = _require_admin()
     if redir:
         return redir
     from datetime import date
+    if request.method == 'POST':
+        f = request.form
+        try:
+            r = repo.transferir_inventario(
+                int(f['inv_origen_id']),
+                int(f['centro_destino_id']),
+                int(f['cantidad']),
+            )
+            if r.get('p_ok') == 1:
+                flash(r.get('p_msg'), 'success')
+            else:
+                flash(r.get('p_msg', 'Error al transferir.'), 'error')
+        except (ValueError, KeyError) as e:
+            flash(str(e), 'error')
+        return redirect(url_for('admin.inventario'))
     return render_template('admin/inventario.html',
                            inventarios=repo.listar_inventarios(),
+                           transferencias=repo.listar_transferencias(),
+                           centros=repo.listar_centros(),
                            alertas_inv=repo.listar_alertas_inventario(),
                            alertas_dosis=repo.listar_alertas_dosis(),
                            today=date.today())
+
+
+@admin_bp.route('/api/inventarios-activos-centro/<int:centro_id>')
+def api_inventarios_activos_centro(centro_id):
+    redir = _require_admin()
+    if redir:
+        return jsonify([]), 401
+    invs = repo.inventarios_activos_de_centro(centro_id)
+    for inv in invs:
+        for k in ('inventario_activo_desde', 'lote_fecha_fabricacion', 'lote_fecha_caducidad'):
+            if inv.get(k) is not None:
+                inv[k] = str(inv[k])
+        for k in ('inventario_id', 'inventario_stock_inicial', 'inventario_stock_actual',
+                  'lote_id', 'vacuna_id', 'centro_id'):
+            if inv.get(k) is not None:
+                inv[k] = int(inv[k])
+    return jsonify(invs)
 
 
 # ── Aplicaciones ──────────────────────────────────────────────────

@@ -538,6 +538,20 @@ def confirmar_recepcion_inventario(lote_codigo: str, responsable_id: int) -> dic
     return {'p_ok': 0, 'p_msg': 'Función solo disponible con PostgreSQL.'}
 
 
+def transferir_inventario(inv_origen_id: int, centro_destino_id: int, cantidad: int) -> dict:
+    if db.using_postgres():
+        return db.call_write_sp('sp_transferir_inventario',
+                                [inv_origen_id, centro_destino_id, cantidad],
+                                out_count=3)
+    return {'p_ok': 0, 'p_msg': 'Función solo disponible con PostgreSQL.'}
+
+
+def listar_transferencias() -> list[dict]:
+    if db.using_postgres():
+        return db.call_read_sp('sp_listar_transferencias')
+    return []
+
+
 def asignar_inventario(datos: dict) -> dict:
     """
     datos: centro_id, lote_id, inventario_stock_inicial, inventario_stock_actual,
