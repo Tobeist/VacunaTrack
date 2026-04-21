@@ -73,7 +73,7 @@
           <td class="fs-sm">{{ d.edad_texto }}</td>
           <td><span class="badge badge-{{ d.status }}">{{ d.status_label }}</span></td>
           <td class="fs-sm">{{ d.aplicacion_timestamp|format_datetime if d.aplicacion_timestamp else '—' }}</td>
-          <td class="fs-sm">{{ d.responsable or '—' }}</td>
+          <td class="fs-sm">{{ d.responsable|cap if d.responsable else '—' }}</td>
           <td class="fs-sm">{{ d.centro_nombre or '—' }}</td>
         </tr>
         {% else %}

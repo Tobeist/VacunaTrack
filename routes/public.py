@@ -94,13 +94,14 @@ def api_child_history(paciente_id):
     if not paciente:
         return jsonify([])
     birth_date = paciente['paciente_fecha_nac']
-    rows       = repo.historial_vacunacion_paciente(paciente_id, paciente['esquema_id'])
-    for r in rows:
-        if r.get('aplicacion_timestamp'):
-            r['aplicacion_timestamp'] = str(r['aplicacion_timestamp'])
+    rows     = repo.historial_vacunacion_paciente(paciente_id, paciente['esquema_id'])
     enriched = enrich_history(rows, birth_date)
     for r in enriched:
         r['edad_texto'] = days_to_human(r['dosis_edad_oportuna_dias'])
+        if r.get('aplicacion_timestamp'):
+            r['aplicacion_timestamp'] = str(r['aplicacion_timestamp'])
+        if r.get('responsable'):
+            r['responsable'] = r['responsable'].title()
     return jsonify(enriched)
 
 

@@ -63,14 +63,14 @@ def api_search_cert_nac():
 def _patient_response(paciente):
     birth_date = paciente['paciente_fecha_nac']
     age_days   = (date.today() - birth_date).days
-    rows       = repo.historial_vacunacion_paciente(paciente['paciente_id'], paciente['esquema_id'])
-    # stringify timestamps para JSON
-    for r in rows:
-        if r.get('aplicacion_timestamp'):
-            r['aplicacion_timestamp'] = str(r['aplicacion_timestamp'])
+    rows      = repo.historial_vacunacion_paciente(paciente['paciente_id'], paciente['esquema_id'])
     historial = enrich_history(rows, birth_date)
     for r in historial:
         r['edad_texto'] = days_to_human(r['dosis_edad_oportuna_dias'])
+        if r.get('aplicacion_timestamp'):
+            r['aplicacion_timestamp'] = str(r['aplicacion_timestamp'])
+        if r.get('responsable'):
+            r['responsable'] = r['responsable'].title()
     nombre = ' '.join(filter(None, [
         paciente.get('paciente_prim_nombre', '').title(),
         (paciente.get('paciente_seg_nombre') or '').title() or None,
