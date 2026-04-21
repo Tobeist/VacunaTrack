@@ -192,9 +192,9 @@ def api_beacon_info():
     vacunas_result = {}
 
     for hijo in hijos:
-        birth_date = hijo['paciente_fecha_nac']
-        rows       = repo.historial_vacunacion_paciente(hijo['paciente_id'], hijo['esquema_id'])
-        historial  = enrich_history(rows, birth_date)
+        birth_date  = hijo['paciente_fecha_nac']
+        rows        = repo.historial_vacunacion_paciente(hijo['paciente_id'], hijo['esquema_id'])
+        historial   = enrich_history(rows, birth_date)
         nombre_hijo = f"{hijo['paciente_prim_nombre']} {hijo['paciente_apellido_pat']}"
 
         for dosis in historial:
@@ -202,9 +202,10 @@ def api_beacon_info():
             if dosis['status'] in ('aplicable', 'cerca_limite', 'atrasada') and vid in vacunas_centro:
                 if vid not in vacunas_result:
                     vacunas_result[vid] = {
-                        'vacuna_nombre': dosis['vacuna_nombre'],
-                        'stock_total':   vacunas_centro[vid]['stock_total'],
-                        'hijos':         [],
+                        'vacuna_nombre':     dosis['vacuna_nombre'],
+                        'stock_total':       vacunas_centro[vid]['stock_total'],
+                        'hijos':             [],
+                        'personas_esperando': 0,
                     }
                 vacunas_result[vid]['hijos'].append({
                     'nombre':       nombre_hijo,
@@ -212,14 +213,32 @@ def api_beacon_info():
                     'status_label': dosis['status_label'],
                 })
 
+    # Calcular cuántos tutores esperando en el centro necesitan cada vacuna
+    tutores_esperando = repo.tutores_esperando_en_centro(centro_id)
+    tutor_ids = {t['tutor_id'] for t in tutores_esperando}
+
+    vacunas_por_tutor = {vid: set() for vid in vacunas_result}
+    for t_id in tutor_ids:
+        t_hijos = repo.pacientes_de_tutor(t_id)
+        for hijo in t_hijos:
+            rows     = repo.historial_vacunacion_paciente(hijo['paciente_id'], hijo['esquema_id'])
+            hist     = enrich_history(rows, hijo['paciente_fecha_nac'])
+            for dosis in hist:
+                vid = dosis.get('vacuna_id')
+                if (dosis['status'] in ('aplicable', 'cerca_limite', 'atrasada')
+                        and vid in vacunas_por_tutor):
+                    vacunas_por_tutor[vid].add(t_id)
+
+    for vid in vacunas_result:
+        vacunas_result[vid]['personas_esperando'] = len(vacunas_por_tutor[vid])
+
     return jsonify({
         'centro': {
             'id':        centro_id,
             'nombre':    centro.get('centro_nombre'),
             'direccion': f"{centro.get('centro_calle','') or ''} {centro.get('centro_numero','') or ''}".strip(),
         },
-        'vacunas':         list(vacunas_result.values()),
-        'total_esperando': repo.personas_esperando_en_centro(centro_id),
+        'vacunas': list(vacunas_result.values()),
     })
 
 

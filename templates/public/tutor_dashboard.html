@@ -52,18 +52,13 @@
     padding: 20px;
     background: var(--bg-card);
   }
-  .beacon-esperando-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 0.82rem;
-    color: #1d4ed8;
+  .beacon-esperando-vacuna {
+    font-size: 0.78rem;
     font-weight: 600;
-    margin-bottom: 16px;
+    color: #1d4ed8;
+    background: #eff6ff;
+    border-bottom: 1px solid #bfdbfe;
+    padding: 5px 14px;
   }
   .beacon-section-label {
     font-size: 0.72rem;
@@ -198,19 +193,11 @@
   }
 
   function mostrarResultado(data) {
-    const { centro, vacunas, total_esperando } = data;
+    const { centro, vacunas } = data;
     const panel = document.getElementById('beacon-result');
 
     document.getElementById('beacon-centro-nombre').textContent = centro.nombre || 'Centro detectado';
     document.getElementById('beacon-centro-dir').textContent = centro.direccion || '';
-
-    const esperandoEl = document.getElementById('beacon-esperando');
-    if (total_esperando > 0) {
-      esperandoEl.style.display = 'inline-flex';
-      esperandoEl.innerHTML = `<span>👥</span><span>${total_esperando} persona${total_esperando !== 1 ? 's' : ''} esperando ahora</span>`;
-    } else {
-      esperandoEl.style.display = 'none';
-    }
 
     const list = document.getElementById('beacon-vacunas-list');
     const sinVacunas = document.getElementById('beacon-sin-vacunas');
@@ -234,11 +221,15 @@
            </div>`
         ).join('');
         const stockLabel = v.stock_total != null ? `${v.stock_total} dosis` : '—';
+        const esperandoHtml = v.personas_esperando > 0
+          ? `<div class="beacon-esperando-vacuna">👥 ${v.personas_esperando} persona${v.personas_esperando !== 1 ? 's' : ''} esperando esta vacuna</div>`
+          : '';
         card.innerHTML = `
           <div class="beacon-vacuna-header">
             <span class="beacon-vacuna-nombre">💉 ${v.vacuna_nombre}</span>
             <span class="beacon-stock-pill">📦 ${stockLabel}</span>
           </div>
+          ${esperandoHtml}
           <div class="beacon-hijos-list">${hijosHtml}</div>
         `;
         list.appendChild(card);
@@ -293,7 +284,6 @@
       </button>
     </div>
     <div class="beacon-result-body">
-      <div id="beacon-esperando" class="beacon-esperando-badge" style="display:none"></div>
       <div id="beacon-vacunas-list"></div>
       <div id="beacon-sin-vacunas" style="display:none;padding:20px 0;text-align:center" class="text-muted fs-sm">
         <div style="font-size:2rem;margin-bottom:8px">✅</div>

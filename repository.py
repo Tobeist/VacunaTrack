@@ -868,6 +868,12 @@ def personas_esperando_en_centro(centro_id: int) -> int:
     return 0
 
 
+def tutores_esperando_en_centro(centro_id: int) -> list[dict]:
+    if db.using_postgres():
+        return db.call_read_sp('sp_tutores_esperando_en_centro', [centro_id])
+    return []
+
+
 def eliminar_centro(centro_id: int) -> None:
     if db.using_postgres():
         _sp('sp_eliminar_centro', [centro_id], out_count=2)
