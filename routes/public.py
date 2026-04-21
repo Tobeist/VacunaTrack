@@ -199,7 +199,7 @@ def api_beacon_info():
 
         for dosis in historial:
             vid = dosis.get('vacuna_id')
-            if dosis['status'] in ('aplicable', 'cerca_limite') and vid in vacunas_centro:
+            if dosis['status'] in ('aplicable', 'cerca_limite', 'atrasada') and vid in vacunas_centro:
                 if vid not in vacunas_result:
                     vacunas_result[vid] = {
                         'vacuna_nombre': dosis['vacuna_nombre'],
