@@ -152,7 +152,7 @@
       }
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fa-solid fa-bluetooth"></i> Detectar centro';
+      btn.innerHTML = '<i class="fa-solid fa-tower-broadcast"></i> Detectar centro';
     }
   }
 
@@ -169,12 +169,12 @@
           await consultarBeacon({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         } finally {
           btn.disabled = false;
-          btn.innerHTML = '<i class="fa-solid fa-bluetooth"></i> Detectar centro';
+          btn.innerHTML = '<i class="fa-solid fa-tower-broadcast"></i> Detectar centro';
         }
       },
       (err) => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-bluetooth"></i> Detectar centro';
+        btn.innerHTML = '<i class="fa-solid fa-tower-broadcast"></i> Detectar centro';
         mostrarError('No se pudo obtener la ubicación: ' + err.message);
       },
       { enableHighAccuracy: true, timeout: 10000 }
@@ -263,7 +263,7 @@
   </div>
   {% if hijos %}
   <button class="btn btn-primary" id="btn-detectar-beacon">
-    <i class="fa-solid fa-bluetooth"></i> Detectar centro
+    <i class="fa-solid fa-tower-broadcast"></i> Detectar centro
   </button>
   {% endif %}
 </div>
