@@ -1,57 +1,178 @@
 {% extends 'base.html' %}
-{% block title %}Fabricantes — VacunaTrack{% endblock %}
-{% block page_title %}Fabricantes de Vacunas{% endblock %}
+{% block title %}Fabricantes y Proveedores — VacunaTrack{% endblock %}
+{% block page_title %}Fabricantes y Proveedores{% endblock %}
 
 {% block content %}
-<div class="crud-layout">
 
-  <div class="card">
-    <div class="card-header"><span class="card-title"><i class="fa-solid fa-industry" style="color:var(--warning)"></i> Nuevo Fabricante</span></div>
-    <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.fabricantes') }}">
-        <div class="form-group"><label class="form-label">Nombre del fabricante <span class="required">*</span></label>
-          <input type="text" name="nombre" class="form-control" required></div>
-        <div class="form-group"><label class="form-label">País <span class="required">*</span></label>
-          <select name="pais_id" class="form-select" required>
-            <option value="">— Selecciona país —</option>
-            {% for p in paises %}
-            <option value="{{ p.pais_id }}">{{ p.pais_nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group"><label class="form-label">Teléfono de contacto</label>
-          <input type="tel" name="telefono" class="form-control"></div>
-        <button type="submit" class="btn btn-primary btn-full mt-8">
-          <i class="fa-solid fa-plus"></i> Registrar Fabricante
-        </button>
-      </form>
-    </div>
-  </div>
+{% with msgs = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in msgs %}
+  <div class="flash-msg {{ cat }}" style="margin-bottom:16px">{{ msg }}</div>
+  {% endfor %}
+{% endwith %}
 
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-industry" style="color:var(--warning)"></i> Fabricantes ({{ fabricantes|length }})</span>
-    </div>
-    <div class="card-body" style="padding:16px 22px 12px">
-      <input type="text" class="form-control" placeholder="🔍 Buscar fabricante…" data-search-table="tabla-fab">
-    </div>
-    <div class="table-wrapper">
-      <table class="table" id="tabla-fab">
-        <thead><tr><th>Fabricante</th><th>País</th><th>Teléfono</th></tr></thead>
-        <tbody>
-          {% for f in fabricantes %}
-          <tr>
-            <td class="fw-600">{{ f.fabricante_nombre }}</td>
-            <td>{{ f.pais_nombre }}</td>
-            <td>{{ f.fabricante_telefono or '—' }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No fabricantes.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
+<div class="tabs" id="fab-tabs">
+  <button class="tab-btn active" data-tab="tab-fabricantes">🏭 Fabricantes ({{ fabricantes|length }})</button>
+  <button class="tab-btn" data-tab="tab-proveedores">🤝 Proveedores ({{ proveedores|length }})</button>
 </div>
+
+<!-- ── Fabricantes ── -->
+<div class="tab-panel active" id="tab-fabricantes">
+  <div class="crud-layout">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-industry" style="color:var(--warning)"></i> Nuevo Fabricante</span></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.fabricantes') }}">
+          <input type="hidden" name="accion" value="fabricante">
+          <div class="form-group">
+            <label class="form-label">Nombre del fabricante <span class="required">*</span></label>
+            <input type="text" name="nombre" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">País <span class="required">*</span></label>
+            <select name="pais_id" class="form-select" required>
+              <option value="">— Selecciona país —</option>
+              {% for p in paises %}
+              <option value="{{ p.pais_id }}">{{ p.pais_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Teléfono de contacto</label>
+            <input type="tel" name="telefono" class="form-control">
+          </div>
+          <button type="submit" class="btn btn-primary btn-full mt-8">
+            <i class="fa-solid fa-plus"></i> Registrar Fabricante
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-industry" style="color:var(--warning)"></i> Fabricantes registrados</span>
+      </div>
+      <div class="card-body" style="padding:16px 22px 12px">
+        <input type="text" class="form-control" placeholder="🔍 Buscar fabricante…" data-search-table="tabla-fab">
+      </div>
+      <div class="table-wrapper">
+        <table class="table" id="tabla-fab">
+          <thead><tr><th>Fabricante</th><th>País</th><th>Teléfono</th></tr></thead>
+          <tbody>
+            {% for f in fabricantes %}
+            <tr>
+              <td class="fw-600">{{ f.fabricante_nombre }}</td>
+              <td>{{ f.pais_nombre }}</td>
+              <td>{{ f.fabricante_telefono or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No hay fabricantes registrados.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Proveedores ── -->
+<div class="tab-panel" id="tab-proveedores">
+  <div class="crud-layout">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-handshake" style="color:var(--secondary)"></i> Nuevo Proveedor</span></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.fabricantes') }}">
+          <input type="hidden" name="accion" value="proveedor">
+          <div class="form-group">
+            <label class="form-label">Primer nombre <span class="required">*</span></label>
+            <input type="text" name="prim_nombre" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Segundo nombre</label>
+            <input type="text" name="seg_nombre" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Apellido paterno <span class="required">*</span></label>
+            <input type="text" name="apellido_pat" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Apellido materno</label>
+            <input type="text" name="apellido_mat" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Correo electrónico <span class="text-muted fs-sm">(único)</span></label>
+            <input type="email" name="email" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Teléfono <span class="text-muted fs-sm">(único)</span></label>
+            <input type="tel" name="telefono" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Empresa</label>
+            <input type="text" name="empresa" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fabricante al que pertenece <span class="required">*</span></label>
+            <select name="fabricante_id" class="form-select" required>
+              <option value="">— Selecciona fabricante —</option>
+              {% for f in fabricantes %}
+              <option value="{{ f.fabricante_id }}">{{ f.fabricante_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full mt-8">
+            <i class="fa-solid fa-plus"></i> Registrar Proveedor
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-handshake" style="color:var(--secondary)"></i> Proveedores registrados</span>
+      </div>
+      <div class="card-body" style="padding:16px 22px 12px">
+        <input type="text" class="form-control" placeholder="🔍 Buscar proveedor…" data-search-table="tabla-prov">
+      </div>
+      <div class="table-wrapper">
+        <table class="table" id="tabla-prov">
+          <thead><tr><th>Nombre</th><th>Empresa</th><th>Fabricante</th><th>Email</th><th>Teléfono</th></tr></thead>
+          <tbody>
+            {% for p in proveedores %}
+            {% set nombre = (p.proveedor_prim_nombre ~ ' ' ~ (p.proveedor_seg_nombre or '') ~ ' ' ~ p.proveedor_apellido_pat ~ ' ' ~ (p.proveedor_apellido_mat or ''))|trim %}
+            <tr>
+              <td class="fw-600">{{ nombre }}</td>
+              <td>{{ p.proveedor_empresa or '—' }}</td>
+              <td>{{ p.fabricante_nombre or '—' }}</td>
+              <td class="fs-sm">{{ p.proveedor_email or '—' }}</td>
+              <td class="fs-sm">{{ p.proveedor_telefono or '—' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="text-center text-muted" style="padding:40px">No hay proveedores registrados.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('#fab-tabs .tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#fab-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+});
+</script>
 {% endblock %}

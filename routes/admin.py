@@ -494,19 +494,34 @@ def fabricantes():
     if redir:
         return redir
     if request.method == 'POST':
-        f = request.form
+        f    = request.form
+        accion = f.get('accion', 'fabricante')
         try:
-            repo.crear_fabricante({
-                'fabricante_nombre':   f['nombre'],
-                'pais_id':             int(f['pais_id']),
-                'fabricante_telefono': f.get('telefono') or None,
-            })
-            flash('Fabricante registrado.', 'success')
+            if accion == 'proveedor':
+                repo.crear_proveedor({
+                    'proveedor_prim_nombre': f['prim_nombre'],
+                    'proveedor_seg_nombre':  f.get('seg_nombre') or None,
+                    'proveedor_apellido_pat': f['apellido_pat'],
+                    'proveedor_apellido_mat': f.get('apellido_mat') or None,
+                    'proveedor_email':        f.get('email') or None,
+                    'proveedor_telefono':     f.get('telefono') or None,
+                    'proveedor_empresa':      f.get('empresa') or None,
+                    'fabricante_id':          int(f['fabricante_id']),
+                })
+                flash('Proveedor registrado correctamente.', 'success')
+            else:
+                repo.crear_fabricante({
+                    'fabricante_nombre':   f['nombre'],
+                    'pais_id':             int(f['pais_id']),
+                    'fabricante_telefono': f.get('telefono') or None,
+                })
+                flash('Fabricante registrado.', 'success')
         except ValueError as e:
             flash(str(e), 'error')
         return redirect(url_for('admin.fabricantes'))
     return render_template('admin/fabricantes.html',
                            fabricantes=repo.listar_fabricantes(),
+                           proveedores=repo.listar_proveedores(),
                            paises=repo.listar_paises())
 
 
