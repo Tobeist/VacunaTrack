@@ -2,18 +2,25 @@
 {% block title %}Inventario y Alertas — VacunaTrack{% endblock %}
 {% block page_title %}Inventario y Alertas{% endblock %}
 
+{% block extra_css %}
+<style>
+  tr.inv-pending { background: #EFF6FF; }
+  tr.inv-pending:hover { background: #DBEAFE; }
+</style>
+{% endblock %}
+
 {% block content %}
 
 <div class="stats-grid" style="margin-bottom:24px">
   <div class="stat-card">
     <div class="sc-icon green"><i class="fa-solid fa-check-circle" style="font-size:18px;color:var(--success)"></i></div>
     <div class="sc-label">Inventarios activos</div>
-    <div class="sc-value">{{ inventario|selectattr('inventario_activo','equalto',True)|list|length }}</div>
+    <div class="sc-value">{{ inventarios|selectattr('inventario_activo','equalto',True)|list|length }}</div>
   </div>
   <div class="stat-card">
-    <div class="sc-icon red"><i class="fa-solid fa-circle-xmark" style="font-size:18px;color:var(--danger)"></i></div>
-    <div class="sc-label">Inventarios inactivos</div>
-    <div class="sc-value">{{ inventario|selectattr('inventario_activo','equalto',False)|list|length }}</div>
+    <div class="sc-icon" style="background:#EFF6FF"><i class="fa-solid fa-clock" style="font-size:18px;color:#3B82F6"></i></div>
+    <div class="sc-label">Pendientes de recepción</div>
+    <div class="sc-value">{{ inventarios|selectattr('inventario_activo','equalto',False)|list|length }}</div>
   </div>
   <div class="stat-card">
     <div class="sc-icon orange"><i class="fa-solid fa-triangle-exclamation" style="font-size:18px;color:var(--orange)"></i></div>
@@ -31,7 +38,8 @@
   <span><strong>Leyenda filas:</strong></span>
   <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#F0FDF4;border:1px solid #86EFAC;display:inline-block;border-radius:2px"></span> Stock suficiente</span>
   <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFFBEB;border:1px solid #FDE68A;display:inline-block;border-radius:2px"></span> Stock bajo</span>
-  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFF5F5;border:1px solid #FCA5A5;display:inline-block;border-radius:2px"></span> Caducado / Sin stock</span>
+  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFF5F5;border:1px solid #FCA5A5;display:inline-block;border-radius:2px"></span> Sin stock</span>
+  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#EFF6FF;border:1px solid #BFDBFE;display:inline-block;border-radius:2px"></span> Pendiente de recepción</span>
 </div>
 
 <div class="tabs" id="inv-tabs">
@@ -55,9 +63,13 @@
           <th>Caducidad</th><th>Stock inicial</th><th>Stock actual</th><th>Estado</th>
         </tr></thead>
         <tbody>
-          {% for inv in inventario %}
-          {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
-          {% set row_class = 'inv-expired' if not inv.inventario_activo else ('inv-low' if pct < 20 else 'inv-ok') %}
+          {% for inv in inventarios %}
+          {% if not inv.inventario_activo %}
+            {% set row_class = 'inv-pending' %}
+          {% else %}
+            {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
+            {% set row_class = 'inv-expired' if pct == 0 else ('inv-low' if pct < 20 else 'inv-ok') %}
+          {% endif %}
           <tr class="{{ row_class }}">
             <td class="fw-600">{{ inv.centro_nombre }}</td>
             <td>{{ inv.vacuna_nombre }}</td>
@@ -66,23 +78,28 @@
             <td class="fs-sm">{{ inv.lote_fecha_caducidad|format_date }}</td>
             <td class="text-center">{{ inv.inventario_stock_inicial }}</td>
             <td>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div style="flex:1;background:var(--border);border-radius:3px;height:6px;min-width:60px">
-                  <div style="width:{{ [pct,100]|min }}%;height:100%;background:{{ 'var(--danger)' if pct < 10 else ('var(--warning)' if pct < 30 else 'var(--success)') }};border-radius:3px"></div>
+              {% if inv.inventario_activo %}
+                {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="flex:1;background:var(--border);border-radius:3px;height:6px;min-width:60px">
+                    <div style="width:{{ [pct,100]|min }}%;height:100%;background:{{ 'var(--danger)' if pct < 10 else ('var(--warning)' if pct < 30 else 'var(--success)') }};border-radius:3px"></div>
+                  </div>
+                  <span class="fw-600">{{ inv.inventario_stock_actual }}</span>
                 </div>
-                <span class="fw-600">{{ inv.inventario_stock_actual }}</span>
-              </div>
+              {% else %}
+                <span class="text-muted fs-sm">—</span>
+              {% endif %}
             </td>
             <td>
               {% if inv.inventario_activo %}
                 <span class="badge badge-aplicada">Activo</span>
               {% else %}
-                <span class="badge badge-atrasada">Inactivo</span>
+                <span class="badge badge-proxima">Pendiente</span>
               {% endif %}
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted" style="padding:40px">No inventario registrado.</td></tr>
+          <tr><td colspan="8" class="text-center text-muted" style="padding:40px">No hay inventarios registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
