@@ -135,7 +135,6 @@ def register_application():
             'centro_id':                centro_id,
             'lote_id':                  inv['lote_id'],
             'dosis_id':                 dosis_id,
-            'aplicacion_timestamp':     datetime.now(),
             'aplicacion_observaciones': observaciones,
         }
         try:
@@ -173,6 +172,39 @@ def api_dosis_por_inventario(inventario_id):
         d['vacuna_nombre'] = d.get('vacuna_nombre', nombre)
     dosis.sort(key=lambda x: x['dosis_edad_oportuna_dias'])
     return jsonify(dosis)
+
+
+@clinical_bp.route('/api/dosis-aplicables/<int:paciente_id>')
+def api_dosis_aplicables(paciente_id):
+    paciente = repo.obtener_paciente(paciente_id)
+    if not paciente:
+        return jsonify([])
+    esquema_id = paciente.get('esquema_id')
+    if not esquema_id:
+        return jsonify([])
+    historial = repo.historial_vacunacion_paciente(paciente_id, esquema_id)
+    birth_raw = paciente.get('paciente_fecha_nac')
+    if hasattr(birth_raw, 'date'):
+        birth = birth_raw.date()
+    elif isinstance(birth_raw, date):
+        birth = birth_raw
+    else:
+        birth = None
+    if birth is None:
+        return jsonify([])
+    enriched = enrich_history(historial, birth)
+    aplicables = [
+        {
+            'dosis_id':    r['dosis_id'],
+            'vacuna_nombre': r.get('vacuna_nombre', ''),
+            'dosis_tipo':  r.get('dosis_tipo', ''),
+            'status':      r['status'],
+            'status_label': r['status_label'],
+        }
+        for r in enriched
+        if r['status'] in ('aplicable', 'atrasada', 'cerca_limite')
+    ]
+    return jsonify(aplicables)
 
 
 @clinical_bp.route('/inventario/confirmar', methods=['GET', 'POST'])

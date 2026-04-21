@@ -457,14 +457,14 @@ def dosis_ya_aplicada(paciente_id: int, dosis_id: int) -> bool:
 def registrar_aplicacion(datos: dict) -> dict:
     """
     datos: paciente_id, usuario_id, centro_id, lote_id, dosis_id,
-           aplicacion_timestamp, aplicacion_observaciones.
-    El SP valida stock y dosis; el trigger descuenta el inventario automáticamente.
+           aplicacion_observaciones.
+    El SP usa NOW() internamente; el trigger descuenta el inventario automáticamente.
     """
     if db.using_postgres():
         r = _sp('sp_registrar_aplicacion', [
             datos['paciente_id'], datos['usuario_id'], datos['centro_id'],
             datos['lote_id'], datos['dosis_id'],
-            datos['aplicacion_timestamp'], datos.get('aplicacion_observaciones'),
+            datos.get('aplicacion_observaciones'),
         ])
         return db.call_read_sp_one('sp_obtener_aplicacion', [r['p_id']]) or {}
     nueva = dict(datos)

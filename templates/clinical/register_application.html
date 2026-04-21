@@ -14,7 +14,7 @@
 
         <div class="form-group">
           <label class="form-label">Paciente <span class="required">*</span></label>
-          <select name="paciente_id" class="form-select" required>
+          <select name="paciente_id" id="sel-paciente" class="form-select" required>
             <option value="">— Selecciona paciente —</option>
             {% for p in pacientes %}
             <option value="{{ p.paciente_id }}"
@@ -45,14 +45,10 @@
 
         <div class="form-group">
           <label class="form-label">Dosis <span class="required">*</span></label>
-          <select name="dosis_id" class="form-select" required>
-            <option value="">— Selecciona dosis —</option>
-            {% for d in dosis_list %}
-            <option value="{{ d.dosis_id }}">
-              {{ d.vacuna_nombre }} — {{ d.dosis_tipo }}
-            </option>
-            {% endfor %}
+          <select name="dosis_id" id="sel-dosis" class="form-select" required>
+            <option value="">— Selecciona paciente primero —</option>
           </select>
+          <div id="dosis-hint" class="form-hint" style="display:none"></div>
         </div>
 
         <div class="form-group">
@@ -81,4 +77,61 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SEL_PACIENTE = document.getElementById('sel-paciente');
+const SEL_DOSIS    = document.getElementById('sel-dosis');
+const DOSIS_HINT   = document.getElementById('dosis-hint');
+
+const STATUS_LABEL = {
+  aplicable:    'Aplicable',
+  atrasada:     'Atrasada',
+  cerca_limite: 'Cerca del límite',
+};
+
+async function cargarDosis(pacienteId) {
+  SEL_DOSIS.innerHTML = '<option value="">Cargando…</option>';
+  SEL_DOSIS.disabled = true;
+  DOSIS_HINT.style.display = 'none';
+
+  if (!pacienteId) {
+    SEL_DOSIS.innerHTML = '<option value="">— Selecciona paciente primero —</option>';
+    SEL_DOSIS.disabled = false;
+    return;
+  }
+
+  try {
+    const res  = await fetch(`/clinico/api/dosis-aplicables/${pacienteId}`);
+    const data = await res.json();
+
+    SEL_DOSIS.innerHTML = '<option value="">— Selecciona dosis —</option>';
+    if (data.length === 0) {
+      SEL_DOSIS.innerHTML = '<option value="">Sin dosis pendientes para este paciente</option>';
+      DOSIS_HINT.textContent = 'No hay dosis aplicables, atrasadas o próximas al límite para este paciente.';
+      DOSIS_HINT.style.display = 'block';
+    } else {
+      data.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.dosis_id;
+        const lbl = STATUS_LABEL[d.status] || d.status_label;
+        opt.textContent = `${d.vacuna_nombre} — ${d.dosis_tipo} (${lbl})`;
+        SEL_DOSIS.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    SEL_DOSIS.innerHTML = '<option value="">Error al cargar dosis</option>';
+  }
+
+  SEL_DOSIS.disabled = false;
+}
+
+SEL_PACIENTE.addEventListener('change', () => cargarDosis(SEL_PACIENTE.value));
+
+// Pre-cargar si ya hay un paciente seleccionado (ej: viene de buscar paciente)
+if (SEL_PACIENTE.value) {
+  cargarDosis(SEL_PACIENTE.value);
+}
+</script>
 {% endblock %}

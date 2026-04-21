@@ -668,7 +668,6 @@ def aplicaciones():
             'centro_id':                inv['centro_id'],
             'lote_id':                  inv['lote_id'],
             'dosis_id':                 did,
-            'aplicacion_timestamp':     datetime.now(),
             'aplicacion_observaciones': f.get('observaciones', ''),
         }
         try:
