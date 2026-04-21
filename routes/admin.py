@@ -537,16 +537,15 @@ def lotes():
                 flash(str(e), 'error')
 
         elif accion == 'asignar_inventario':
-            from datetime import datetime as _dt
             try:
                 repo.asignar_inventario({
                     'centro_id':                int(f['centro_id']),
                     'lote_id':                  int(f['lote_id']),
                     'inventario_stock_inicial': int(f['stock']),
                     'inventario_stock_actual':  int(f['stock']),
-                    'inventario_activo_desde':  _dt.now(),
+                    'inventario_activo_desde':  None,
                 })
-                flash('Lote asignado al inventario.', 'success')
+                flash('Inventario asignado. El responsable del centro debe confirmar su recepción.', 'success')
             except ValueError as e:
                 flash(str(e), 'error')
 
@@ -568,10 +567,12 @@ def inventario():
     redir = _require_admin()
     if redir:
         return redir
+    from datetime import date
     return render_template('admin/inventario.html',
                            inventarios=repo.listar_inventarios(),
                            alertas_inv=repo.listar_alertas_inventario(),
-                           alertas_dosis=repo.listar_alertas_dosis())
+                           alertas_dosis=repo.listar_alertas_dosis(),
+                           today=date.today())
 
 
 # ── Aplicaciones ──────────────────────────────────────────────────

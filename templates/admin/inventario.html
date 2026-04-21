@@ -64,8 +64,11 @@
         </tr></thead>
         <tbody>
           {% for inv in inventarios %}
+          {% set caducado = inv.lote_fecha_caducidad and inv.lote_fecha_caducidad < today %}
           {% if not inv.inventario_activo %}
             {% set row_class = 'inv-pending' %}
+          {% elif caducado %}
+            {% set row_class = 'inv-expired' %}
           {% else %}
             {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
             {% set row_class = 'inv-expired' if pct == 0 else ('inv-low' if pct < 20 else 'inv-ok') %}
@@ -75,7 +78,10 @@
             <td>{{ inv.vacuna_nombre }}</td>
             <td class="fs-sm" style="font-family:monospace">{{ inv.lote_codigo }}</td>
             <td class="fs-sm">{{ inv.fabricante_nombre }}</td>
-            <td class="fs-sm">{{ inv.lote_fecha_caducidad|format_date }}</td>
+            <td class="fs-sm {% if caducado %}text-danger fw-600{% endif %}">
+              {{ inv.lote_fecha_caducidad|format_date }}
+              {% if caducado %}<span style="font-size:0.7rem"> ⚠</span>{% endif %}
+            </td>
             <td class="text-center">{{ inv.inventario_stock_inicial }}</td>
             <td>
               {% if inv.inventario_activo %}
@@ -91,10 +97,12 @@
               {% endif %}
             </td>
             <td>
-              {% if inv.inventario_activo %}
-                <span class="badge badge-aplicada">Activo</span>
-              {% else %}
+              {% if not inv.inventario_activo %}
                 <span class="badge badge-proxima">Pendiente</span>
+              {% elif caducado %}
+                <span class="badge badge-atrasada">Caducado</span>
+              {% else %}
+                <span class="badge badge-aplicada">Activo</span>
               {% endif %}
             </td>
           </tr>

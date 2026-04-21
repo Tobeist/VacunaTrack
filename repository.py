@@ -534,7 +534,7 @@ def inventarios_pendientes_de_centro(centro_id: int) -> list[dict]:
 
 def confirmar_recepcion_inventario(lote_codigo: str, responsable_id: int) -> dict:
     if db.using_postgres():
-        return _sp('sp_confirmar_recepcion_inventario', [lote_codigo, responsable_id], out_count=2)
+        return db.call_write_sp('sp_confirmar_recepcion_inventario', [lote_codigo, responsable_id], out_count=2)
     return {'p_ok': 0, 'p_msg': 'Función solo disponible con PostgreSQL.'}
 
 
