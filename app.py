@@ -1154,10 +1154,12 @@ def padecimientos():
     if request.method == 'POST':
         f = request.form
         try:
-            repo.crear_padecimiento({
+            nuevo = repo.crear_padecimiento({
                 'padecimiento_nombre':      f['nombre'],
                 'padecimiento_descripcion': f.get('descripcion') or None,
             })
+            for vid in f.getlist('vacuna_ids'):
+                repo.vincular_vacuna_padecimiento(int(vid), nuevo['padecimiento_id'])
             flash('Padecimiento registrado.', 'success')
         except ValueError as e:
             flash(str(e), 'error')

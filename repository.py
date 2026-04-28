@@ -453,6 +453,10 @@ def crear_padecimiento(datos: dict) -> dict:
     return db.call_read_sp_one('sp_obtener_padecimiento', [r['p_id']]) or {}
 
 
+def vincular_vacuna_padecimiento(vacuna_id: int, padecimiento_id: int) -> None:
+    db.call_write_sp('sp_vincular_vacuna_padecimiento', [vacuna_id, padecimiento_id])
+
+
 # ─────────────────────────────────────────────
 # FABRICANTES
 # ─────────────────────────────────────────────

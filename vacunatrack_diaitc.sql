@@ -1836,6 +1836,21 @@ EXCEPTION
     WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al crear padecimiento: ' || SQLERRM;
 END; $$;
 
+CREATE OR REPLACE PROCEDURE sp_vincular_vacuna_padecimiento(
+    IN  p_vacuna_id       INTEGER,
+    IN  p_padecimiento_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(150), OUT p_id INTEGER)
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO vacunas_padecimientos(vacuna_id, padecimiento_id)
+    VALUES(p_vacuna_id, p_padecimiento_id)
+    RETURNING vac_pad_id INTO p_id;
+    p_ok := 1; p_msg := 'Vínculo registrado';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 1; p_msg := 'Ya estaba vinculado'; p_id := NULL;
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al vincular: ' || SQLERRM;
+END; $$;
+
 CREATE OR REPLACE PROCEDURE sp_crear_fabricante(
     IN  p_nombre    VARCHAR(150),
     IN  p_pais_id   INTEGER,
