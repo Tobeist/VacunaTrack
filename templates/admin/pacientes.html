@@ -41,8 +41,8 @@
           <div class="form-group"><label class="form-label">UID NFC (pulsera)</label>
             <div style="display:flex;gap:8px;align-items:center">
               <input type="text" name="nfc" id="nfc-uid-admin" class="form-control" style="flex:1;min-width:0;width:auto" placeholder="Ej: 04:A3:2B:1C:5D:6E">
-              <button type="button" class="btn btn-outline" style="white-space:nowrap;flex-shrink:0" onclick="scanNfcIntoField('nfc-uid-admin')">
-                <i class="fa-solid fa-wifi"></i> Escanear
+              <button type="button" class="btn btn-outline btn-sm" style="flex-shrink:0;padding:9px 10px" title="Escanear NFC" onclick="scanNfcIntoField('nfc-uid-admin')">
+                <i class="fa-solid fa-wifi"></i>
               </button>
             </div>
             <p class="text-muted fs-sm mt-4">Opcional. En Android Chrome puedes escanear el tag directamente; en otros dispositivos escribe el UID manualmente.</p>
