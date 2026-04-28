@@ -9,7 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from werkzeug.security import generate_password_hash as _gph
 from werkzeug.utils import secure_filename
 from functools import partial
-from datetime import date, datetime
+from datetime import date, datetime, time as _time
 from utils.helpers import enrich_history, days_to_human, generate_temp_password, validar_aplicacion
 import repository as repo
 
@@ -68,6 +68,13 @@ def capitalize_filter(value):
 
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
+
+def _parse_time(s: str | None) -> _time | None:
+    if not s:
+        return None
+    parts = s.split(':')
+    return _time(int(parts[0]), int(parts[1]))
+
 
 def _require_admin():
     if session.get('user_role') != 'admin':
@@ -942,8 +949,8 @@ def centros():
             'centro_numero':         f.get('numero') or None,
             'centro_codigo_postal':  f.get('cp') or None,
             'ciudad_id':             int(f['ciudad_id']),
-            'centro_horario_inicio': f.get('horario_inicio') or None,
-            'centro_horario_fin':    f.get('horario_fin') or None,
+            'centro_horario_inicio': _parse_time(f.get('horario_inicio')),
+            'centro_horario_fin':    _parse_time(f.get('horario_fin')),
             'centro_latitud':        float(f['latitud']) if f.get('latitud') else None,
             'centro_longitud':       float(f['longitud']) if f.get('longitud') else None,
             'centro_telefono':       f.get('telefono') or None,
