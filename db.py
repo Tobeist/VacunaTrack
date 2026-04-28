@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 import psycopg
 from psycopg.rows import dict_row
+from psycopg.types.numeric import Int4Dumper
 from flask import g
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -15,6 +16,9 @@ def get_db():
                 'Crea un archivo .env o define la variable de entorno.'
             )
         g.db = psycopg.connect(DATABASE_URL)
+        # Send Python int as int4 (INTEGER) instead of default int8 (BIGINT)
+        # so SP overload resolution matches INTEGER parameters correctly.
+        g.db.adapters.register_dumper(int, Int4Dumper)
         with g.db.cursor() as _tz:
             _tz.execute("SET TIME ZONE 'America/Mexico_City'")
         g.db.commit()

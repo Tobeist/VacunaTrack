@@ -10,6 +10,7 @@ from werkzeug.security import generate_password_hash as _gph
 from werkzeug.utils import secure_filename
 from functools import partial
 from datetime import date, datetime, time as _time
+from decimal import Decimal as _Decimal
 from utils.helpers import enrich_history, days_to_human, generate_temp_password, validar_aplicacion
 import repository as repo
 
@@ -951,8 +952,8 @@ def centros():
             'ciudad_id':             int(f['ciudad_id']),
             'centro_horario_inicio': _parse_time(f.get('horario_inicio')),
             'centro_horario_fin':    _parse_time(f.get('horario_fin')),
-            'centro_latitud':        float(f['latitud']) if f.get('latitud') else None,
-            'centro_longitud':       float(f['longitud']) if f.get('longitud') else None,
+            'centro_latitud':        _Decimal(f['latitud']) if f.get('latitud') else None,
+            'centro_longitud':       _Decimal(f['longitud']) if f.get('longitud') else None,
             'centro_telefono':       f.get('telefono') or None,
             'centro_beacon':         f.get('beacon') or None,
         }
