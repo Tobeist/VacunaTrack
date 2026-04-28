@@ -47,7 +47,7 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--primary)"></i> Aplicaciones (últimos 12 meses)</span>
-      <a href="{{ url_for('admin.reportes') }}" class="btn btn-secondary btn-sm">Ver más</a>
+      <a href="{{ url_for('reportes') }}" class="btn btn-secondary btn-sm">Ver más</a>
     </div>
     <div class="card-body">
       <div style="position:relative;height:280px">
@@ -59,7 +59,7 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-bell" style="color:var(--danger)"></i> Alertas recientes</span>
-      <a href="{{ url_for('admin.inventario') }}" class="btn btn-secondary btn-sm">Todas</a>
+      <a href="{{ url_for('inventario') }}" class="btn btn-secondary btn-sm">Todas</a>
     </div>
     <div class="card-body" style="padding:0">
       {% if alertas %}
@@ -92,12 +92,12 @@
 
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:20px">
   {% set shortcuts = [
-    (url_for('admin.pacientes'),    'fa-baby',        'var(--primary)',   'Nuevo Paciente'),
-    (url_for('admin.tutores'),      'fa-users',       'var(--secondary)', 'Nuevo Tutor'),
-    (url_for('admin.responsables'), 'fa-user-doctor', 'var(--success)',   'Nuevo Responsable'),
-    (url_for('admin.lotes'),        'fa-boxes-stacked','var(--warning)',  'Nuevo Lote'),
-    (url_for('admin.reportes'),     'fa-chart-bar',   'var(--orange)',    'Ver Reportes'),
-    (url_for('admin.inventario'),   'fa-warehouse',   'var(--danger)',    'Ver Inventario'),
+    (url_for('pacientes'),    'fa-baby',        'var(--primary)',   'Nuevo Paciente'),
+    (url_for('tutores'),      'fa-users',       'var(--secondary)', 'Nuevo Tutor'),
+    (url_for('responsables'), 'fa-user-doctor', 'var(--success)',   'Nuevo Responsable'),
+    (url_for('lotes'),        'fa-boxes-stacked','var(--warning)',  'Nuevo Lote'),
+    (url_for('reportes'),     'fa-chart-bar',   'var(--orange)',    'Ver Reportes'),
+    (url_for('inventario'),   'fa-warehouse',   'var(--danger)',    'Ver Inventario'),
   ] %}
   {% for href, icon, color, label in shortcuts %}
   <a href="{{ href }}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-decoration:none;transition:var(--transition);box-shadow:var(--shadow-sm)"

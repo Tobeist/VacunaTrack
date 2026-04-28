@@ -22,7 +22,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-industry" style="color:var(--warning)"></i> Nuevo Fabricante</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('admin.fabricantes') }}">
+        <form method="POST" action="{{ url_for('fabricantes') }}">
           <input type="hidden" name="accion" value="fabricante">
           <div class="form-group">
             <label class="form-label">Nombre del fabricante <span class="required">*</span></label>
@@ -83,7 +83,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-handshake" style="color:var(--secondary)"></i> Nuevo Proveedor</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('admin.fabricantes') }}">
+        <form method="POST" action="{{ url_for('fabricantes') }}">
           <input type="hidden" name="accion" value="proveedor">
           <div class="form-group">
             <label class="form-label">Primer nombre <span class="required">*</span></label>

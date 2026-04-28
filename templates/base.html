@@ -19,103 +19,103 @@
   <nav class="sidebar-nav">
     {% if session.user_role == 'admin' %}
       <div class="sidebar-section-label">General</div>
-      <a href="{{ url_for('admin.dashboard') }}" class="sidebar-item {% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
+      <a href="{{ url_for('dashboard') }}" class="sidebar-item {% if request.endpoint == 'dashboard' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-gauge"></i></span> Inicio
       </a>
 
       <div class="sidebar-section-label">Personas</div>
-      <a href="{{ url_for('admin.tutores') }}" class="sidebar-item {% if request.endpoint == 'admin.tutores' %}active{% endif %}">
+      <a href="{{ url_for('tutores') }}" class="sidebar-item {% if request.endpoint == 'tutores' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-users"></i></span> Tutores
       </a>
-      <a href="{{ url_for('admin.responsables') }}" class="sidebar-item {% if request.endpoint == 'admin.responsables' %}active{% endif %}">
+      <a href="{{ url_for('responsables') }}" class="sidebar-item {% if request.endpoint == 'responsables' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-user-doctor"></i></span> Responsables
       </a>
-      <a href="{{ url_for('admin.administradores') }}" class="sidebar-item {% if request.endpoint == 'admin.administradores' %}active{% endif %}">
+      <a href="{{ url_for('administradores') }}" class="sidebar-item {% if request.endpoint == 'administradores' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-user-shield"></i></span> Administradores
       </a>
-      <a href="{{ url_for('admin.pacientes') }}" class="sidebar-item {% if request.endpoint == 'admin.pacientes' %}active{% endif %}">
+      <a href="{{ url_for('pacientes') }}" class="sidebar-item {% if request.endpoint == 'pacientes' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-baby"></i></span> Pacientes
       </a>
-      <a href="{{ url_for('admin.relaciones') }}" class="sidebar-item {% if request.endpoint == 'admin.relaciones' %}active{% endif %}">
+      <a href="{{ url_for('relaciones') }}" class="sidebar-item {% if request.endpoint == 'relaciones' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-link"></i></span> Relaciones Pac-Tutor
       </a>
 
       <div class="sidebar-section-label">Clínica</div>
-      <a href="{{ url_for('admin.centros') }}" class="sidebar-item {% if request.endpoint == 'admin.centros' %}active{% endif %}">
+      <a href="{{ url_for('centros') }}" class="sidebar-item {% if request.endpoint == 'centros' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-hospital"></i></span> Centros de Salud
       </a>
-      <a href="{{ url_for('admin.esquemas') }}" class="sidebar-item {% if request.endpoint == 'admin.esquemas' %}active{% endif %}">
+      <a href="{{ url_for('esquemas') }}" class="sidebar-item {% if request.endpoint == 'esquemas' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-calendar-check"></i></span> Esquemas
       </a>
-      <a href="{{ url_for('admin.vacunas') }}" class="sidebar-item {% if request.endpoint == 'admin.vacunas' %}active{% endif %}">
+      <a href="{{ url_for('vacunas') }}" class="sidebar-item {% if request.endpoint == 'vacunas' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-syringe"></i></span> Vacunas
       </a>
-      <a href="{{ url_for('admin.padecimientos') }}" class="sidebar-item {% if request.endpoint == 'admin.padecimientos' %}active{% endif %}">
+      <a href="{{ url_for('padecimientos') }}" class="sidebar-item {% if request.endpoint == 'padecimientos' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-virus"></i></span> Padecimientos
       </a>
-      <a href="{{ url_for('admin.aplicaciones') }}" class="sidebar-item {% if request.endpoint == 'admin.aplicaciones' %}active{% endif %}">
+      <a href="{{ url_for('aplicaciones') }}" class="sidebar-item {% if request.endpoint == 'aplicaciones' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-notes-medical"></i></span> Aplicaciones
       </a>
 
       <div class="sidebar-section-label">Inventario</div>
-      <a href="{{ url_for('admin.fabricantes') }}" class="sidebar-item {% if request.endpoint == 'admin.fabricantes' %}active{% endif %}">
+      <a href="{{ url_for('fabricantes') }}" class="sidebar-item {% if request.endpoint == 'fabricantes' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-industry"></i></span> Fabricantes y Proveedores
       </a>
-      <a href="{{ url_for('admin.lotes') }}" class="sidebar-item {% if request.endpoint == 'admin.lotes' %}active{% endif %}">
+      <a href="{{ url_for('lotes') }}" class="sidebar-item {% if request.endpoint == 'lotes' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-boxes-stacked"></i></span> Lotes
       </a>
-      <a href="{{ url_for('admin.inventario') }}" class="sidebar-item {% if request.endpoint == 'admin.inventario' %}active{% endif %}">
+      <a href="{{ url_for('inventario') }}" class="sidebar-item {% if request.endpoint == 'inventario' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-warehouse"></i></span> Inventario y Alertas
       </a>
 
       <div class="sidebar-section-label">Análisis</div>
-      <a href="{{ url_for('admin.reportes') }}" class="sidebar-item {% if request.endpoint == 'admin.reportes' %}active{% endif %}">
+      <a href="{{ url_for('reportes') }}" class="sidebar-item {% if request.endpoint == 'reportes' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-chart-bar"></i></span> Reportes
       </a>
 
       <div class="sidebar-section-label">Catálogos</div>
-      <a href="{{ url_for('admin.geografia') }}" class="sidebar-item {% if request.endpoint == 'admin.geografia' %}active{% endif %}">
+      <a href="{{ url_for('geografia') }}" class="sidebar-item {% if request.endpoint == 'geografia' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-earth-americas"></i></span> Geografía
       </a>
 
       <div class="sidebar-section-label">Cuenta</div>
-      <a href="{{ url_for('admin.perfil') }}" class="sidebar-item {% if request.endpoint == 'admin.perfil' %}active{% endif %}">
+      <a href="{{ url_for('perfil') }}" class="sidebar-item {% if request.endpoint == 'perfil' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-user"></i></span> Mi Perfil
       </a>
 
     {% elif session.user_role == 'responsable' %}
       <div class="sidebar-section-label">Clínica</div>
-      <a href="{{ url_for('clinical.lookup') }}" class="sidebar-item {% if request.endpoint == 'clinical.lookup' %}active{% endif %}">
+      <a href="{{ url_for('lookup') }}" class="sidebar-item {% if request.endpoint == 'lookup' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-wifi"></i></span> Buscar Paciente
       </a>
-      <a href="{{ url_for('clinical.register_application') }}" class="sidebar-item {% if request.endpoint == 'clinical.register_application' %}active{% endif %}">
+      <a href="{{ url_for('register_application') }}" class="sidebar-item {% if request.endpoint == 'register_application' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-syringe"></i></span> Registrar Aplicación
       </a>
-      <a href="{{ url_for('clinical.confirmar_inventario') }}" class="sidebar-item {% if request.endpoint == 'clinical.confirmar_inventario' %}active{% endif %}">
+      <a href="{{ url_for('confirmar_inventario') }}" class="sidebar-item {% if request.endpoint == 'confirmar_inventario' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-box-open"></i></span> Confirmar Inventario
       </a>
 
       <div class="sidebar-section-label">Cuenta</div>
-      <a href="{{ url_for('clinical.profile') }}" class="sidebar-item {% if request.endpoint == 'clinical.profile' %}active{% endif %}">
+      <a href="{{ url_for('profile') }}" class="sidebar-item {% if request.endpoint == 'profile' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-user"></i></span> Mi Perfil
       </a>
 
     {% elif session.user_role == 'tutor' %}
       <div class="sidebar-section-label">Mis Hijos</div>
-      <a href="{{ url_for('public.tutor_dashboard') }}" class="sidebar-item {% if request.endpoint == 'public.tutor_dashboard' %}active{% endif %}">
+      <a href="{{ url_for('tutor_dashboard') }}" class="sidebar-item {% if request.endpoint == 'tutor_dashboard' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-house-medical"></i></span> Inicio
       </a>
-      <a href="{{ url_for('public.find_centers') }}" class="sidebar-item {% if request.endpoint == 'public.find_centers' %}active{% endif %}">
+      <a href="{{ url_for('find_centers') }}" class="sidebar-item {% if request.endpoint == 'find_centers' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-map-location-dot"></i></span> Buscar Centros
       </a>
 
       <div class="sidebar-section-label">Información Pública</div>
-      <a href="{{ url_for('public.schemes') }}" class="sidebar-item {% if request.endpoint == 'public.schemes' %}active{% endif %}">
+      <a href="{{ url_for('schemes') }}" class="sidebar-item {% if request.endpoint == 'schemes' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-list-check"></i></span> Esquemas Oficiales
       </a>
 
       <div class="sidebar-section-label">Cuenta</div>
-      <a href="{{ url_for('public.tutor_profile') }}" class="sidebar-item {% if request.endpoint == 'public.tutor_profile' %}active{% endif %}">
+      <a href="{{ url_for('tutor_profile') }}" class="sidebar-item {% if request.endpoint == 'tutor_profile' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-user"></i></span> Mi Perfil
       </a>
     {% endif %}
@@ -147,10 +147,10 @@
     <span class="topbar-title">{% block page_title %}VacunaTrack{% endblock %}</span>
   </div>
   <div class="topbar-right">
-    <a href="{{ url_for('auth.change_password') }}" class="btn-icon" title="Cambiar contraseña">
+    <a href="{{ url_for('change_password') }}" class="btn-icon" title="Cambiar contraseña">
       <i class="fa-solid fa-key"></i>
     </a>
-    <a href="{{ url_for('auth.logout') }}" class="btn btn-secondary btn-sm">
+    <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm">
       <i class="fa-solid fa-arrow-right-from-bracket"></i>
       <span class="btn-logout-text">Salir</span>
     </a>
@@ -163,7 +163,7 @@
   <div class="first-login-banner">
     <i class="fa-solid fa-shield-halved" style="color:var(--primary)"></i>
     <span>Por seguridad, <strong>configura tu contraseña</strong> antes de continuar.</span>
-    <a href="{{ url_for('auth.change_password') }}" class="btn btn-primary btn-sm" style="margin-left:auto">Cambiar ahora</a>
+    <a href="{{ url_for('change_password') }}" class="btn btn-primary btn-sm" style="margin-left:auto">Cambiar ahora</a>
   </div>
   {% endif %}
 

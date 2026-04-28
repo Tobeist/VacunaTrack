@@ -8,7 +8,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-link" style="color:var(--primary)"></i> Crear Relación</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.relaciones') }}" id="form-relacion">
+      <form method="POST" action="{{ url_for('relaciones') }}" id="form-relacion">
 
         <div class="form-group">
           <label class="form-label">Paciente <span class="required">*</span></label>
@@ -57,7 +57,7 @@
             <td class="fw-600">{{ r.paciente }}</td>
             <td>{{ r.tutor }}</td>
             <td>
-              <form method="POST" action="{{ url_for('admin.eliminar_relacion', rid=r.pac_tut_id) }}" style="display:inline">
+              <form method="POST" action="{{ url_for('eliminar_relacion', rid=r.pac_tut_id) }}" style="display:inline">
                 <button type="submit" class="btn btn-danger btn-sm"
                         data-confirm="¿Eliminar la relación entre {{ r.paciente }} y {{ r.tutor }}?">🗑</button>
               </form>

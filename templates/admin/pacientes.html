@@ -8,7 +8,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-baby" style="color:var(--primary)"></i> Registrar Paciente</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.pacientes') }}">
+      <form method="POST" action="{{ url_for('pacientes') }}">
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -95,11 +95,11 @@
             <td><span class="badge badge-primary">{{ p.esquema_nombre }}</span></td>
             <td>
               <div style="display:flex;gap:6px;align-items:center">
-                <form method="POST" action="{{ url_for('admin.subir_foto_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data" style="display:inline-flex;align-items:center;gap:4px">
+                <form method="POST" action="{{ url_for('subir_foto_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data" style="display:inline-flex;align-items:center;gap:4px">
                   <input type="file" name="foto" accept="image/*" style="display:none" id="foto-pac-{{ p.paciente_id }}" onchange="this.form.submit()">
                   <button type="button" class="btn btn-secondary btn-sm" title="Subir foto" onclick="document.getElementById('foto-pac-{{ p.paciente_id }}').click()">📷</button>
                 </form>
-                <form method="POST" action="{{ url_for('admin.eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
+                <form method="POST" action="{{ url_for('eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm"
                           data-confirm="¿Eliminar al paciente {{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}?">🗑</button>
                 </form>

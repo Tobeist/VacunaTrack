@@ -1,31 +1,20 @@
-# db.py — Gestión de conexión a PostgreSQL para VacunaTrack
-#
-# Uso:
-#   from db import get_db, query, execute, query_one
-#
-# Si DATABASE_URL no está definida, el sistema usa data.py (modo mock).
-# Para conectar a PostgreSQL, crea un archivo .env con:
-#   DATABASE_URL=postgresql://usuario:contraseña@localhost:5432/vacunatrack
-
 from __future__ import annotations
 import os
-import psycopg2
-import psycopg2.extras
+import psycopg
+from psycopg.rows import dict_row
 from flask import g
 
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 
 def get_db():
-    """Retorna la conexión a PostgreSQL del contexto actual de Flask.
-    Reutiliza la misma conexión durante el ciclo de vida de la petición."""
     if 'db' not in g:
         if not DATABASE_URL:
             raise RuntimeError(
                 'DATABASE_URL no está definida. '
                 'Crea un archivo .env o define la variable de entorno.'
             )
-        g.db = psycopg2.connect(DATABASE_URL)
+        g.db = psycopg.connect(DATABASE_URL)
         with g.db.cursor() as _tz:
             _tz.execute("SET TIME ZONE 'America/Mexico_City'")
         g.db.commit()
@@ -33,31 +22,27 @@ def get_db():
 
 
 def close_db(e=None):
-    """Cierra la conexión al finalizar cada petición."""
     db = g.pop('db', None)
     if db is not None:
         db.close()
 
 
 def query(sql: str, params=None) -> list[dict]:
-    """Ejecuta un SELECT y retorna una lista de dicts."""
     conn = get_db()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, params or ())
         return [dict(row) for row in cur.fetchall()]
 
 
 def query_one(sql: str, params=None) -> dict | None:
-    """Ejecuta un SELECT y retorna la primera fila como dict, o None."""
     conn = get_db()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, params or ())
         row = cur.fetchone()
         return dict(row) if row else None
 
 
 def execute(sql: str, params=None) -> None:
-    """Ejecuta un INSERT/UPDATE/DELETE y hace commit."""
     conn = get_db()
     with conn.cursor() as cur:
         cur.execute(sql, params or ())
@@ -65,9 +50,8 @@ def execute(sql: str, params=None) -> None:
 
 
 def execute_returning(sql: str, params=None) -> dict | None:
-    """Ejecuta un INSERT ... RETURNING y retorna la fila insertada."""
     conn = get_db()
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, params or ())
         row = cur.fetchone()
         conn.commit()
@@ -75,12 +59,11 @@ def execute_returning(sql: str, params=None) -> dict | None:
 
 
 def call_read_sp(name: str, in_params: list | None = None) -> list[dict]:
-    """Llama a un stored procedure de lectura (REFCURSOR) y retorna los resultados."""
     conn = get_db()
     params = list(in_params or [])
     placeholders = ', '.join(['%s'] * len(params) + ["'_cur'"])
     call_sql = f"CALL {name}({placeholders})"
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(call_sql, params)
         cur.execute("FETCH ALL FROM _cur")
         rows = [dict(row) for row in cur.fetchall()]
@@ -89,22 +72,15 @@ def call_read_sp(name: str, in_params: list | None = None) -> list[dict]:
 
 
 def call_read_sp_one(name: str, in_params: list | None = None) -> dict | None:
-    """Llama a un SP de lectura (REFCURSOR) y retorna la primera fila o None."""
     rows = call_read_sp(name, in_params)
     return rows[0] if rows else None
 
 
 def call_write_sp(name: str, in_params: list, out_count: int = 3) -> dict:
-    """Llama a un stored procedure de escritura y retorna sus parámetros OUT.
-
-    Los SPs de escritura tienen la forma:
-      sp_xxx(IN ..., OUT p_ok SMALLINT, OUT p_msg VARCHAR, [OUT p_id INTEGER])
-    Retorna un dict con p_ok, p_msg y opcionalmente p_id.
-    """
     conn = get_db()
     placeholders = ['%s'] * len(in_params) + ['NULL'] * out_count
     sql = f"CALL {name}({', '.join(placeholders)})"
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor(row_factory=dict_row) as cur:
         cur.execute(sql, in_params)
         row = cur.fetchone()
         conn.commit()
@@ -112,10 +88,8 @@ def call_write_sp(name: str, in_params: list, out_count: int = 3) -> dict:
 
 
 def init_app(app):
-    """Registra el cierre de conexión en el contexto de la app Flask."""
     app.teardown_appcontext(close_db)
 
 
 def using_postgres() -> bool:
-    """Retorna True si DATABASE_URL está configurada (modo PostgreSQL activo)."""
     return bool(DATABASE_URL)

@@ -15,7 +15,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-boxes-stacked" style="color:var(--warning)"></i> Registrar Lote</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('admin.lotes') }}">
+        <form method="POST" action="{{ url_for('lotes') }}">
           <input type="hidden" name="accion" value="nuevo_lote">
           <div class="form-group"><label class="form-label">Código de lote <span class="required">*</span></label>
             <input type="text" name="codigo" class="form-control" placeholder="Ej: LOT-2024-001" required></div>
@@ -102,7 +102,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Asignar lote a centro</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('admin.lotes') }}">
+        <form method="POST" action="{{ url_for('lotes') }}">
           <input type="hidden" name="accion" value="asignar_inventario">
           <div class="form-group"><label class="form-label">Lote <span class="required">*</span></label>
             <select name="lote_id" class="form-select" required>
@@ -139,7 +139,7 @@
         <p class="mb-8">Cada lote puede asignarse a múltiples centros. El stock se maneja de forma independiente por centro.</p>
         <p class="mb-8">Cuando un responsable clínico registra una aplicación, el stock del inventario seleccionado se reduce en 1.</p>
         <p class="mb-8">Si el stock llega a 0 o la fecha de caducidad del lote es pasada, el inventario se <strong>desactiva automáticamente</strong> y deja de estar disponible para nuevas aplicaciones.</p>
-        <p>Puedes monitorear alertas de bajo stock y caducidad en la sección <a href="{{ url_for('admin.inventario') }}">Inventario y Alertas</a>.</p>
+        <p>Puedes monitorear alertas de bajo stock y caducidad en la sección <a href="{{ url_for('inventario') }}">Inventario y Alertas</a>.</p>
       </div>
     </div>
 

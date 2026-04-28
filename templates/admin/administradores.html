@@ -8,7 +8,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Nuevo Administrador</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.administradores') }}">
+      <form method="POST" action="{{ url_for('administradores') }}">
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -60,7 +60,7 @@
             <td class="fs-sm" style="font-family:monospace">{{ a.admin_curp or '—' }}</td>
             <td>
               {% if a.admin_id != session.user_id %}
-              <form method="POST" action="{{ url_for('admin.eliminar_admin', aid=a.admin_id) }}" style="display:inline">
+              <form method="POST" action="{{ url_for('eliminar_admin', aid=a.admin_id) }}" style="display:inline">
                 <button type="submit" class="btn btn-danger btn-sm"
                         data-confirm="¿Eliminar al administrador {{ a.admin_prim_nombre|cap }}?">🗑</button>
               </form>

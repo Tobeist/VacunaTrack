@@ -10,7 +10,7 @@
     </div>
     <div class="card-body">
 
-      <form method="POST" action="{{ url_for('clinical.register_application') }}">
+      <form method="POST" action="{{ url_for('register_application') }}">
 
         <div class="form-group">
           <label class="form-label">Paciente <span class="required">*</span></label>
@@ -61,7 +61,7 @@
           <button type="submit" class="btn btn-success btn-lg" style="flex:1">
             <i class="fa-solid fa-check"></i> Registrar Aplicación
           </button>
-          <a href="{{ url_for('clinical.lookup') }}" class="btn btn-secondary btn-lg">
+          <a href="{{ url_for('lookup') }}" class="btn btn-secondary btn-lg">
             <i class="fa-solid fa-xmark"></i> Cancelar
           </a>
         </div>

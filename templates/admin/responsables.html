@@ -9,7 +9,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-user-doctor" style="color:var(--secondary)"></i> Registrar Personal Clínico</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.responsables') }}">
+      <form method="POST" action="{{ url_for('responsables') }}">
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -87,7 +87,7 @@
             <td>{{ r.centro_nombre or '—' }}</td>
             <td><span class="badge badge-primary">{{ r.cedulas|length }}</span></td>
             <td>
-              <form method="POST" action="{{ url_for('admin.eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
+              <form method="POST" action="{{ url_for('eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
                 <button type="submit" class="btn btn-danger btn-sm"
                         data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}?">🗑</button>
               </form>

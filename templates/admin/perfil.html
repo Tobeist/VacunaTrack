@@ -9,7 +9,7 @@
   <div class="card mb-20">
     <div style="background:linear-gradient(135deg,#5B21B6,var(--primary));padding:28px;border-radius:var(--radius-lg) var(--radius-lg) 0 0">
       <div style="display:flex;align-items:center;gap:18px">
-        <form method="POST" action="{{ url_for('admin.subir_foto_perfil') }}" enctype="multipart/form-data" style="position:relative;cursor:pointer" title="Cambiar foto de perfil">
+        <form method="POST" action="{{ url_for('admin_subir_foto_perfil') }}" enctype="multipart/form-data" style="position:relative;cursor:pointer" title="Cambiar foto de perfil">
           <input type="file" name="foto" accept="image/*" style="display:none" id="foto-admin-input" onchange="this.form.submit()">
           <label for="foto-admin-input" style="cursor:pointer;display:block">
             {% if admin.admin_imagen %}
@@ -90,7 +90,7 @@
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--primary)"></i> Seguridad</span></div>
     <div class="card-body">
       <p class="text-muted fs-sm mb-16">Cambia tu contraseña regularmente para mantener la seguridad de tu cuenta.</p>
-      <a href="{{ url_for('auth.change_password') }}" class="btn btn-primary">
+      <a href="{{ url_for('change_password') }}" class="btn btn-primary">
         <i class="fa-solid fa-lock"></i> Cambiar contraseña
       </a>
     </div>

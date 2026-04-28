@@ -10,12 +10,12 @@
 <body style="background:var(--bg)">
 
 <nav style="background:#fff;border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)">
-  <a href="{{ url_for('public.landing') }}" style="display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;color:var(--primary);text-decoration:none">
+  <a href="{{ url_for('landing') }}" style="display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;color:var(--primary);text-decoration:none">
     <span style="font-size:22px">💉</span> VacunaTrack
   </a>
   <div style="display:flex;gap:12px">
-    <a href="{{ url_for('public.landing') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
-    <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión</a>
+    <a href="{{ url_for('landing') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
+    <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión</a>
   </div>
 </nav>
 

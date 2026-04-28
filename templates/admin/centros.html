@@ -8,7 +8,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Registrar Centro</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.centros') }}">
+      <form method="POST" action="{{ url_for('centros') }}">
         <div class="form-group"><label class="form-label">Nombre del centro <span class="required">*</span></label>
           <input type="text" name="nombre" class="form-control" required></div>
         <div class="form-row form-row-2">
@@ -73,7 +73,7 @@
             <td class="fs-sm">{{ c.centro_horario_inicio|format_time }} – {{ c.centro_horario_fin|format_time }}</td>
             <td class="fs-sm" style="font-family:monospace">{{ c.centro_beacon or '—' }}</td>
             <td>
-              <form method="POST" action="{{ url_for('admin.eliminar_centro', cid=c.centro_id) }}" style="display:inline">
+              <form method="POST" action="{{ url_for('eliminar_centro', cid=c.centro_id) }}" style="display:inline">
                 <button type="submit" class="btn btn-danger btn-sm" data-confirm="¿Eliminar {{ c.centro_nombre }}?">🗑</button>
               </form>
             </td>

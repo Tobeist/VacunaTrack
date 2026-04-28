@@ -38,7 +38,7 @@
       </div>
       {% endif %}
 
-      <form method="POST" action="{{ url_for('admin.esquemas') }}" id="form-publicar">
+      <form method="POST" action="{{ url_for('esquemas') }}" id="form-publicar">
         {% if esquema_actual %}
         <input type="hidden" name="esquema_anterior_id" value="{{ esquema_actual.esquema_id }}">
         {% endif %}
@@ -150,7 +150,7 @@
             <td>
               {% if e.esquema_vigente_hasta %}
               <form method="POST"
-                    action="{{ url_for('admin.eliminar_esquema', eid=e.esquema_id) }}"
+                    action="{{ url_for('eliminar_esquema', eid=e.esquema_id) }}"
                     style="display:inline">
                 <button type="submit" class="btn btn-danger btn-sm"
                         data-confirm="¿Eliminar esquema {{ e.esquema_nombre }}?">
@@ -244,7 +244,7 @@
         </div>
 
         <div style="display:flex;gap:8px">
-          <form method="POST" action="{{ url_for('admin.resolver_conflicto_esquema') }}"
+          <form method="POST" action="{{ url_for('resolver_conflicto_esquema') }}"
                 style="flex:1">
             <input type="hidden" name="paciente_id"      value="{{ c.paciente_id }}">
             <input type="hidden" name="esquema_nuevo_id" value="{{ c.esquema_nuevo_id }}">
@@ -254,7 +254,7 @@
               <i class="fa-solid fa-arrow-up-right-dots"></i> Actualizar
             </button>
           </form>
-          <form method="POST" action="{{ url_for('admin.resolver_conflicto_esquema') }}"
+          <form method="POST" action="{{ url_for('resolver_conflicto_esquema') }}"
                 style="flex:1">
             <input type="hidden" name="paciente_id"      value="{{ c.paciente_id }}">
             <input type="hidden" name="esquema_nuevo_id" value="{{ c.esquema_nuevo_id }}">
