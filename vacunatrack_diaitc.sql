@@ -641,7 +641,13 @@ JOIN login          l  ON l.usuario_id  = u.usuario_id
 LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
 
 CREATE OR REPLACE VIEW vw_cedulas AS
-SELECT * FROM cedulas;
+SELECT c.*,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS responsable_nombre,
+    u.usuario_telefono  AS responsable_telefono,
+    cs.centro_nombre
+FROM cedulas   c
+JOIN usuarios  u  ON u.usuario_id  = c.usuario_id
+LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
 
 CREATE OR REPLACE VIEW vw_pacientes AS
 SELECT p.*, e.esquema_nombre
@@ -702,7 +708,20 @@ JOIN usuarios      u  ON u.usuario_id = a.usuario_id
 JOIN centros_salud cs ON cs.centro_id = a.centro_id;
 
 CREATE OR REPLACE VIEW vw_dosis_esquemas AS
-SELECT * FROM dosis_esquemas;
+SELECT de.*,
+    d.dosis_tipo,
+    d.dosis_cant_ml,
+    d.dosis_area_aplicacion,
+    d.dosis_edad_oportuna_dias,
+    d.dosis_intervalo_min_dias,
+    d.dosis_limite_edad_dias,
+    d.vacuna_id,
+    v.vacuna_nombre,
+    e.esquema_nombre
+FROM dosis_esquemas de
+JOIN dosis    d  ON d.dosis_id   = de.dosis_id
+JOIN vacunas  v  ON v.vacuna_id  = d.vacuna_id
+JOIN esquemas e  ON e.esquema_id = de.esquema_id;
 
 CREATE OR REPLACE VIEW vw_inventarios AS
 SELECT i.inventario_id,
@@ -770,10 +789,28 @@ FROM dosis   d
 JOIN vacunas v ON v.vacuna_id = d.vacuna_id;
 
 CREATE OR REPLACE VIEW vw_vacunas AS
-SELECT * FROM vacunas;
+SELECT v.*,
+    COUNT(DISTINCT vp.padecimiento_id)                                          AS total_padecimientos,
+    COALESCE(STRING_AGG(p.padecimiento_nombre, ', ' ORDER BY p.padecimiento_nombre), '—') AS padecimientos,
+    COUNT(DISTINCT a.aplicacion_id)                                             AS total_aplicaciones
+FROM vacunas v
+LEFT JOIN vacunas_padecimientos vp ON vp.vacuna_id       = v.vacuna_id
+LEFT JOIN padecimientos         p  ON p.padecimiento_id  = vp.padecimiento_id
+LEFT JOIN dosis                 d  ON d.vacuna_id         = v.vacuna_id
+LEFT JOIN aplicaciones          a  ON a.dosis_id          = d.dosis_id
+GROUP BY v.vacuna_id;
 
 CREATE OR REPLACE VIEW vw_esquemas AS
-SELECT * FROM esquemas;
+SELECT e.*,
+    COUNT(DISTINCT de.dosis_id)                                        AS total_dosis,
+    COUNT(DISTINCT d.vacuna_id)                                        AS total_vacunas,
+    COUNT(DISTINCT a.paciente_id)                                      AS total_pacientes
+FROM esquemas e
+LEFT JOIN dosis_esquemas de ON de.esquema_id  = e.esquema_id
+LEFT JOIN dosis          d  ON d.dosis_id     = de.dosis_id
+LEFT JOIN pacientes      pa ON pa.esquema_id  = e.esquema_id
+LEFT JOIN aplicaciones   a  ON a.dosis_id     = de.dosis_id
+GROUP BY e.esquema_id;
 
 CREATE OR REPLACE VIEW vw_padecimientos AS
 SELECT p.*,
@@ -794,7 +831,13 @@ FROM centros_salud cs
 JOIN ciudades ci ON ci.ciudad_id = cs.ciudad_id;
 
 CREATE OR REPLACE VIEW vw_paises AS
-SELECT * FROM paises;
+SELECT p.*,
+    COUNT(DISTINCT e.estado_id)  AS total_estados,
+    COUNT(DISTINCT c.ciudad_id)  AS total_ciudades
+FROM paises   p
+LEFT JOIN estados   e ON e.pais_id   = p.pais_id
+LEFT JOIN ciudades  c ON c.estado_id = e.estado_id
+GROUP BY p.pais_id;
 
 CREATE OR REPLACE VIEW vw_estados AS
 SELECT e.*, p.pais_nombre
