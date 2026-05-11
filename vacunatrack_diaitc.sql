@@ -871,6 +871,83 @@ JOIN pacientes p ON p.paciente_id = ad.paciente_id
 JOIN dosis     d ON d.dosis_id    = ad.dosis_id
 JOIN vacunas   v ON v.vacuna_id   = d.vacuna_id;
 
+-- Vista especializada: pacientes con su(s) tutor(es).
+-- Permite filtrar por tutor_id directamente sin JOIN en el SP.
+CREATE OR REPLACE VIEW vw_pacientes_por_tutor AS
+SELECT
+    p.paciente_id,
+    p.paciente_prim_nombre,
+    p.paciente_seg_nombre,
+    p.paciente_apellido_pat,
+    p.paciente_apellido_mat,
+    p.paciente_curp,
+    p.paciente_num_cert_nac,
+    p.paciente_fecha_nac,
+    p.paciente_sexo,
+    p.paciente_nfc,
+    p.paciente_imagen,
+    p.esquema_id,
+    e.esquema_nombre,
+    pt.tutor_id,
+    pt.pac_tut_id,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS tutor_nombre,
+    u.usuario_telefono  AS tutor_telefono,
+    l.login_correo      AS tutor_email
+FROM pacientes          p
+JOIN esquemas           e  ON e.esquema_id  = p.esquema_id
+JOIN pacientes_tutores  pt ON pt.paciente_id = p.paciente_id
+JOIN usuarios           u  ON u.usuario_id  = pt.tutor_id
+JOIN login              l  ON l.usuario_id  = u.usuario_id;
+
+-- Vista especializada: historial de vacunación completo por paciente.
+-- Combina el esquema de dosis con las aplicaciones registradas.
+-- Permite filtrar por (paciente_id, esquema_id) sin JOIN en el SP.
+CREATE OR REPLACE VIEW vw_historial_vacunacion AS
+SELECT
+    vde.dosis_id,
+    vde.vacuna_id,
+    vde.vacuna_nombre,
+    vde.dosis_tipo,
+    vde.dosis_cant_ml,
+    vde.dosis_area_aplicacion,
+    vde.dosis_edad_oportuna_dias,
+    vde.dosis_intervalo_min_dias,
+    vde.dosis_limite_edad_dias,
+    vde.dosis_vigente_desde,
+    vde.dosis_vigente_hasta,
+    vde.esquema_id,
+    vde.dosis_esq_id,
+    a.paciente_id,
+    a.aplicacion_id,
+    a.aplicacion_timestamp,
+    a.aplicacion_observaciones,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS responsable,
+    cs.centro_nombre
+FROM vw_dosis_esquemas_detalle vde
+LEFT JOIN aplicaciones   a  ON a.dosis_id    = vde.dosis_id
+LEFT JOIN usuarios       u  ON u.usuario_id  = a.usuario_id
+LEFT JOIN centros_salud  cs ON cs.centro_id  = a.centro_id;
+
+-- Vista especializada: centros de salud con jerarquía geográfica completa.
+-- Incluye ciudad, estado y país para evitar JOINs repetidos en reportes.
+CREATE OR REPLACE VIEW vw_centros_detalle AS
+SELECT
+    cs.*,
+    ci.ciudad_nombre,
+    e.estado_id,
+    e.estado_nombre,
+    pa.pais_id,
+    pa.pais_nombre,
+    COUNT(DISTINCT i.inventario_id)  AS total_inventarios,
+    COUNT(DISTINCT a.aplicacion_id)  AS total_aplicaciones
+FROM centros_salud cs
+JOIN ciudades   ci ON ci.ciudad_id = cs.ciudad_id
+JOIN estados    e  ON e.estado_id  = ci.estado_id
+JOIN paises     pa ON pa.pais_id   = e.pais_id
+LEFT JOIN inventarios   i ON i.centro_id = cs.centro_id
+LEFT JOIN aplicaciones  a ON a.centro_id = cs.centro_id
+GROUP BY cs.centro_id, ci.ciudad_nombre, e.estado_id, e.estado_nombre, pa.pais_id, pa.pais_nombre;
+
 -- ─────────────────────────────────────────────────────────
 -- STORED PROCEDURE: stock disponible de un lote en un centro
 -- Usa vw_inventarios para no acceder directamente a la tabla base.
