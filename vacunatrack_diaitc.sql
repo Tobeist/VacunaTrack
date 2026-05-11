@@ -1083,9 +1083,9 @@ CREATE OR REPLACE PROCEDURE sp_pacientes_de_tutor(
 LANGUAGE plpgsql AS $$
 BEGIN
     OPEN p_resultados FOR
-        SELECT vp.* FROM vw_pacientes vp
-        JOIN pacientes_tutores pt ON pt.paciente_id = vp.paciente_id
-        WHERE pt.tutor_id = p_tutor_id;
+        SELECT * FROM vw_pacientes_por_tutor
+        WHERE tutor_id = p_tutor_id
+        ORDER BY paciente_apellido_pat, paciente_prim_nombre;
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_listar_relaciones(INOUT p_resultados REFCURSOR)
@@ -1115,14 +1115,10 @@ CREATE OR REPLACE PROCEDURE sp_historial_vacunacion_paciente(
 LANGUAGE plpgsql AS $$
 BEGIN
     OPEN p_resultados FOR
-        SELECT vde.*,
-            ar.aplicacion_timestamp, ar.aplicacion_observaciones,
-            ar.responsable, ar.centro_nombre
-        FROM vw_dosis_esquemas_detalle vde
-        LEFT JOIN vw_aplicaciones_responsable ar
-            ON ar.dosis_id = vde.dosis_id AND ar.paciente_id = p_paciente_id
-        WHERE vde.esquema_id = p_esquema_id
-        ORDER BY vde.vacuna_id, vde.dosis_edad_oportuna_dias;
+        SELECT * FROM vw_historial_vacunacion
+        WHERE esquema_id = p_esquema_id
+          AND (paciente_id = p_paciente_id OR paciente_id IS NULL)
+        ORDER BY vacuna_id, dosis_edad_oportuna_dias;
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_listar_inventarios(INOUT p_resultados REFCURSOR)
@@ -1248,7 +1244,8 @@ END; $$;
 CREATE OR REPLACE PROCEDURE sp_listar_dosis_esquemas(INOUT p_resultados REFCURSOR)
 LANGUAGE plpgsql AS $$
 BEGIN
-    OPEN p_resultados FOR SELECT * FROM vw_dosis_esquemas ORDER BY esquema_id, dosis_id;
+    OPEN p_resultados FOR
+        SELECT * FROM vw_dosis_esquemas ORDER BY esquema_id, vacuna_nombre, dosis_edad_oportuna_dias;
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_listar_padecimientos(INOUT p_resultados REFCURSOR)
@@ -1273,14 +1270,14 @@ END; $$;
 CREATE OR REPLACE PROCEDURE sp_listar_centros(INOUT p_resultados REFCURSOR)
 LANGUAGE plpgsql AS $$
 BEGIN
-    OPEN p_resultados FOR SELECT * FROM vw_centros ORDER BY centro_nombre;
+    OPEN p_resultados FOR SELECT * FROM vw_centros_detalle ORDER BY centro_nombre;
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_obtener_centro(
     IN p_id INTEGER, INOUT p_resultados REFCURSOR)
 LANGUAGE plpgsql AS $$
 BEGIN
-    OPEN p_resultados FOR SELECT * FROM vw_centros WHERE centro_id = p_id;
+    OPEN p_resultados FOR SELECT * FROM vw_centros_detalle WHERE centro_id = p_id;
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_listar_paises(INOUT p_resultados REFCURSOR)
@@ -2201,7 +2198,7 @@ CREATE OR REPLACE PROCEDURE sp_obtener_centro_por_beacon(
     IN p_beacon_id VARCHAR(100), INOUT p_resultados REFCURSOR)
 LANGUAGE plpgsql AS $$
 BEGIN
-    OPEN p_resultados FOR SELECT * FROM vw_centros WHERE centro_beacon = p_beacon_id;
+    OPEN p_resultados FOR SELECT * FROM vw_centros_detalle WHERE centro_beacon = p_beacon_id;
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_vacunas_en_centro(
@@ -2252,7 +2249,7 @@ SELECT
     (SELECT COUNT(*) FROM vw_pacientes)    AS pacientes,
     (SELECT COUNT(*) FROM vw_tutores)      AS tutores,
     (SELECT COUNT(*) FROM vw_responsables) AS responsables,
-    (SELECT COUNT(*) FROM vw_centros)      AS centros,
+    (SELECT COUNT(*) FROM vw_centros_detalle) AS centros,
     (SELECT COUNT(*) FROM vw_aplicaciones
      WHERE DATE(aplicacion_timestamp) = CURRENT_DATE) AS aplicaciones_hoy,
     (SELECT COUNT(*) FROM vw_alertas_inventario) AS alertas_inv,
