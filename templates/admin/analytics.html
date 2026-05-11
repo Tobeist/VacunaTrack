@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+{% block title %}Analytics MongoDB — VacunaTrack{% endblock %}
+{% block page_title %}Analytics MongoDB{% endblock %}
+
+{% block content %}
+
+<div class="card mb-20">
+  <div class="card-body" style="padding:14px 22px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="background:#00a65122;color:#00a651;border-radius:20px;padding:4px 14px;font-size:0.8rem;font-weight:600">
+        <i class="fa-solid fa-circle" style="font-size:8px;margin-right:4px"></i> MongoDB conectado
+      </span>
+      <span class="text-muted fs-sm">Fuente de datos: colecciones <code>logs_aplicaciones</code>, <code>logs_acceso</code>, <code>eventos_inventario</code></span>
+      <div style="margin-left:auto;display:flex;gap:8px" id="resumen-badges">
+        <span class="badge badge-primary" id="badge-aplicaciones">— aplicaciones</span>
+        <span class="badge badge-success" id="badge-accesos">— accesos</span>
+        <span class="badge badge-warning" id="badge-inventario">— inventario</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Fila 1: Serie de tiempo + Top vacunas -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-chart-line" style="color:var(--primary)"></i>
+        Aplicaciones por mes — serie de tiempo
+      </span>
+      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_aplicaciones</span>
+    </div>
+    <div class="card-body">
+      <div id="chart-serie-tiempo" style="height:300px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-chart-pie" style="color:var(--secondary)"></i>
+        Distribución por vacuna
+      </span>
+      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_aplicaciones</span>
+    </div>
+    <div class="card-body">
+      <div id="chart-vacunas-pie" style="height:300px"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Fila 2: Por centro + Accesos por rol -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-hospital" style="color:var(--success)"></i>
+        Aplicaciones por centro de salud
+      </span>
+      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_aplicaciones</span>
+    </div>
+    <div class="card-body">
+      <div id="chart-centros-bar" style="height:300px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-users" style="color:var(--warning)"></i>
+        Actividad de accesos por rol
+      </span>
+      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_acceso</span>
+    </div>
+    <div class="card-body">
+      <div id="chart-accesos-donut" style="height:300px"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Fila 3: Resumen de colecciones (gráfica de columnas) -->
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">
+      <i class="fa-solid fa-database" style="color:var(--orange)"></i>
+      Volumen de datos por colección MongoDB
+    </span>
+    <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · todas las colecciones</span>
+  </div>
+  <div class="card-body">
+    <div id="chart-colecciones" style="height:260px"></div>
+  </div>
+</div>
+
+<!-- Tabla de últimos accesos -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">
+      <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i>
+      Últimos accesos registrados
+    </span>
+    <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_acceso</span>
+  </div>
+  <div class="table-wrapper">
+    <table class="table" id="tabla-accesos">
+      <thead><tr>
+        <th>Timestamp</th><th>Evento</th><th>Email</th><th>Rol</th><th>IP</th>
+      </tr></thead>
+      <tbody id="accesos-tbody">
+        <tr><td colspan="5" class="text-center text-muted" style="padding:30px">Cargando…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script>
+
+const HC_COLORS = ['#7C3AED','#2563EB','#16A34A','#D97706','#EA580C','#DC2626','#8B5CF6','#0891B2','#BE185D','#0D9488'];
+
+function emptyChart(containerId, message) {
+  document.getElementById(containerId).innerHTML =
+    `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">${message}</div>`;
+}
+
+// ── 1. Serie de tiempo ────────────────────────────────────────────────────────
+fetch('/admin/api/mongo/aplicaciones-por-mes')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) { emptyChart('chart-serie-tiempo', 'Sin datos aún. Registra aplicaciones.'); return; }
+    Highcharts.chart('chart-serie-tiempo', {
+      chart: { type: 'areaspline', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: { categories: data.map(d => d.label), labels: { style: { fontSize: '11px' } } },
+      yAxis: { min: 0, title: { text: 'Aplicaciones' }, allowDecimals: false },
+      tooltip: { shared: true, valueSuffix: ' aplicaciones' },
+      legend: { enabled: false },
+      series: [{
+        name: 'Aplicaciones',
+        data: data.map(d => d.total),
+        color: '#7C3AED',
+        fillColor: { linearGradient: { x1:0,y1:0,x2:0,y2:1 },
+          stops: [[0,'rgba(124,58,237,0.35)'], [1,'rgba(124,58,237,0.02)']] },
+        marker: { enabled: true, radius: 4 },
+      }],
+      plotOptions: { areaspline: { dataLabels: { enabled: true, style: { fontSize:'10px' } } } }
+    });
+  })
+  .catch(() => emptyChart('chart-serie-tiempo', 'Error al conectar con MongoDB.'));
+
+// ── 2. Distribución por vacuna (pie) ─────────────────────────────────────────
+fetch('/admin/api/mongo/top-vacunas')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) { emptyChart('chart-vacunas-pie', 'Sin datos aún.'); return; }
+    Highcharts.chart('chart-vacunas-pie', {
+      chart: { type: 'pie', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      title: { text: null },
+      credits: { enabled: false },
+      tooltip: { pointFormat: '<b>{point.y}</b> aplicaciones ({point.percentage:.1f}%)' },
+      legend: { enabled: true, layout: 'vertical', align: 'right', verticalAlign: 'middle',
+        itemStyle: { fontSize: '11px', fontWeight: '500' } },
+      plotOptions: {
+        pie: {
+          allowPointSelect: true,
+          cursor: 'pointer',
+          showInLegend: true,
+          dataLabels: { enabled: false },
+          innerSize: '40%',
+        }
+      },
+      series: [{
+        name: 'Aplicaciones',
+        colorByPoint: true,
+        data: data.map((d, i) => ({ name: d.vacuna, y: d.total, color: HC_COLORS[i % HC_COLORS.length] })),
+      }],
+    });
+  })
+  .catch(() => emptyChart('chart-vacunas-pie', 'Error al conectar con MongoDB.'));
+
+// ── 3. Aplicaciones por centro (barras horizontales) ─────────────────────────
+fetch('/admin/api/mongo/aplicaciones-por-centro')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) { emptyChart('chart-centros-bar', 'Sin datos aún.'); return; }
+    Highcharts.chart('chart-centros-bar', {
+      chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: { categories: data.map(d => d.centro), labels: { style: { fontSize: '11px' } } },
+      yAxis: { min: 0, title: { text: null }, allowDecimals: false },
+      legend: { enabled: false },
+      tooltip: { valueSuffix: ' aplicaciones' },
+      series: [{
+        name: 'Aplicaciones',
+        data: data.map((d, i) => ({ y: d.total, color: HC_COLORS[i % HC_COLORS.length] })),
+        dataLabels: { enabled: true, style: { fontSize: '10px' } },
+      }],
+      plotOptions: { bar: { borderRadius: 3 } }
+    });
+  })
+  .catch(() => emptyChart('chart-centros-bar', 'Error al conectar con MongoDB.'));
+
+// ── 4. Accesos por rol (donut) ────────────────────────────────────────────────
+fetch('/admin/api/mongo/ultimos-accesos')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) { emptyChart('chart-accesos-donut', 'Sin datos aún. Inicia sesión para generar logs.'); return; }
+    const counts = {};
+    data.forEach(d => { const rol = d.rol || 'desconocido'; counts[rol] = (counts[rol] || 0) + 1; });
+    const series = Object.entries(counts).map(([rol, total], i) => ({
+      name: rol, y: total, color: HC_COLORS[i % HC_COLORS.length]
+    }));
+    Highcharts.chart('chart-accesos-donut', {
+      chart: { type: 'pie', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      title: { text: null },
+      credits: { enabled: false },
+      tooltip: { pointFormat: '<b>{point.y}</b> accesos recientes' },
+      plotOptions: {
+        pie: {
+          innerSize: '55%',
+          allowPointSelect: true,
+          cursor: 'pointer',
+          showInLegend: true,
+          dataLabels: { enabled: true, format: '{point.name}<br>{point.y}',
+            style: { fontSize: '11px', fontWeight: '500' } },
+        }
+      },
+      legend: { enabled: true, layout: 'vertical', align: 'right', verticalAlign: 'middle',
+        itemStyle: { fontSize: '11px' } },
+      series: [{ name: 'Accesos', colorByPoint: true, data: series }],
+    });
+  })
+  .catch(() => emptyChart('chart-accesos-donut', 'Error al conectar con MongoDB.'));
+
+// ── 5. Volumen por colección + resumen badges ─────────────────────────────────
+fetch('/admin/api/mongo/resumen-logs')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('badge-aplicaciones').textContent = data.aplicaciones + ' aplicaciones';
+    document.getElementById('badge-accesos').textContent      = data.accesos + ' accesos';
+    document.getElementById('badge-inventario').textContent   = data.inventario + ' inventario';
+
+    const colecciones = [
+      { name: 'logs_aplicaciones', y: data.aplicaciones, color: '#7C3AED' },
+      { name: 'logs_acceso',       y: data.accesos,       color: '#2563EB' },
+      { name: 'eventos_inventario',y: data.inventario,    color: '#D97706' },
+      { name: 'logs_sistema',      y: data.sistema,       color: '#16A34A' },
+    ];
+
+    Highcharts.chart('chart-colecciones', {
+      chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: { categories: colecciones.map(c => c.name), labels: { style: { fontSize: '11px' } } },
+      yAxis: { min: 0, title: { text: 'Documentos' }, allowDecimals: false },
+      legend: { enabled: false },
+      tooltip: { valueSuffix: ' documentos' },
+      series: [{
+        name: 'Documentos',
+        colorByPoint: true,
+        data: colecciones,
+        dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: '600' } },
+      }],
+      plotOptions: { column: { borderRadius: 4 } }
+    });
+  })
+  .catch(() => emptyChart('chart-colecciones', 'Error al conectar con MongoDB.'));
+
+// ── Tabla últimos accesos ─────────────────────────────────────────────────────
+fetch('/admin/api/mongo/ultimos-accesos')
+  .then(r => r.json())
+  .then(data => {
+    const tbody = document.getElementById('accesos-tbody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:30px">Sin registros aún.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(d => {
+      const ts  = d.timestamp ? new Date(d.timestamp).toLocaleString('es-MX') : '—';
+      const ev  = d.evento === 'login' ? '<span class="badge badge-success">login</span>'
+                : d.evento === 'logout' ? '<span class="badge badge-secondary">logout</span>'
+                : '<span class="badge badge-danger">fallido</span>';
+      return `<tr>
+        <td class="fs-sm" style="font-family:monospace">${ts}</td>
+        <td>${ev}</td>
+        <td class="fs-sm">${d.email || '—'}</td>
+        <td>${d.rol ? `<span class="badge badge-primary">${d.rol}</span>` : '—'}</td>
+        <td class="fs-sm text-muted">${d.ip || '—'}</td>
+      </tr>`;
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('accesos-tbody').innerHTML =
+      '<tr><td colspan="5" class="text-center text-muted" style="padding:30px">Error al cargar datos.</td></tr>';
+  });
+
+</script>
+{% endblock %}

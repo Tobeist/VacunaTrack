@@ -711,16 +711,7 @@ def dashboard():
                         'ts': a['alerta_dosis_pac_timestamp'], 'paciente': a.get('paciente')})
     alertas.sort(key=lambda x: x['ts'] or datetime.min, reverse=True)
 
-    _hasta = date.today().isoformat()
-    _desde = (date.today().replace(year=date.today().year - 2)).isoformat()
-    meses_data = repo.chart_por_mes(_desde, _hasta)
-    for r in meses_data:
-        r.pop('mes_orden', None)
-    chart_labels = _json.dumps([r['mes'] for r in meses_data])
-    chart_data   = _json.dumps([r['total'] for r in meses_data])
-
-    return render_template('admin/dashboard.html', stats=stats, alertas=alertas[:10],
-                           chart_labels=chart_labels, chart_data=chart_data)
+    return render_template('admin/dashboard.html', stats=stats, alertas=alertas[:10])
 
 
 @app.route('/admin/tutores', methods=['GET', 'POST'])
@@ -1478,6 +1469,14 @@ def api_estados(pais_id):
 @app.route('/admin/api/ciudades/<int:estado_id>')
 def api_ciudades(estado_id):
     return jsonify(repo.listar_ciudades(estado_id=estado_id))
+
+
+@app.route('/admin/analytics')
+def analytics():
+    redir = _require_admin()
+    if redir:
+        return redir
+    return render_template('admin/analytics.html')
 
 
 @app.route('/admin/reportes')

@@ -50,9 +50,7 @@
       <a href="{{ url_for('reportes') }}" class="btn btn-secondary btn-sm">Ver más</a>
     </div>
     <div class="card-body">
-      <div style="position:relative;height:280px">
-        <canvas id="dash-chart"></canvas>
-      </div>
+      <div id="dash-chart" style="height:280px"></div>
     </div>
   </div>
 
@@ -114,18 +112,33 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://code.highcharts.com/highcharts.js"></script>
 <script>
-new Chart(document.getElementById('dash-chart').getContext('2d'), {
-  type: 'bar',
-  data: {
-    labels: {{ chart_labels | safe }},
-    datasets: [{ label: 'Aplicaciones', data: {{ chart_data | safe }},
-      backgroundColor: 'rgba(124,58,237,0.75)', borderColor: '#7C3AED', borderWidth: 1, borderRadius: 4 }]
-  },
-  options: { responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-});
+fetch('/admin/api/mongo/aplicaciones-por-mes')
+  .then(r => r.json())
+  .then(data => {
+    const labels = data.map(d => d.label);
+    const values = data.map(d => d.total);
+    Highcharts.chart('dash-chart', {
+      chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: { categories: labels, labels: { style: { fontSize: '11px' } } },
+      yAxis: { min: 0, title: { text: null }, allowDecimals: false },
+      legend: { enabled: false },
+      tooltip: { headerFormat: '<b>{point.key}</b><br>', pointFormat: '{point.y} aplicaciones' },
+      series: [{
+        name: 'Aplicaciones',
+        data: values,
+        color: '#7C3AED',
+        borderRadius: 4,
+      }],
+      plotOptions: { column: { dataLabels: { enabled: true, style: { fontSize: '10px' } } } }
+    });
+  })
+  .catch(() => {
+    document.getElementById('dash-chart').innerHTML =
+      '<p style="color:var(--text-muted);text-align:center;padding:40px">Sin datos en MongoDB aún.<br>Registra aplicaciones para ver la gráfica.</p>';
+  });
 </script>
 {% endblock %}
