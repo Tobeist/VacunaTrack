@@ -13,6 +13,7 @@ from datetime import date, datetime, time as _time
 from decimal import Decimal as _Decimal
 from utils.helpers import enrich_history, days_to_human, generate_temp_password, validar_aplicacion
 import repository as repo
+import mongo_db as mdb
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -110,6 +111,14 @@ def login():
             session['user_name']  = f"{user['first_name']} {user['last_name']}"
             session['user_email'] = user['email']
 
+            mdb.log_acceso(
+                evento='login',
+                pg_usuario_id=user['id'],
+                email=email,
+                rol=user['role'],
+                ip=request.remote_addr,
+            )
+
             if user['role'] == 'admin':
                 return redirect(url_for('dashboard'))
             elif user['role'] == 'responsable':
@@ -117,6 +126,12 @@ def login():
             else:
                 return redirect(url_for('tutor_dashboard'))
         else:
+            mdb.log_acceso(
+                evento='login_fallido',
+                pg_usuario_id=None,
+                email=email,
+                ip=request.remote_addr,
+            )
             flash('Correo o contraseña incorrectos.', 'error')
 
     return render_template('auth/login.html')
@@ -124,6 +139,13 @@ def login():
 
 @app.route('/logout')
 def logout():
+    mdb.log_acceso(
+        evento='logout',
+        pg_usuario_id=session.get('user_id'),
+        email=session.get('user_email', ''),
+        rol=session.get('user_role'),
+        ip=request.remote_addr,
+    )
     session.clear()
     return redirect(url_for('login'))
 
@@ -527,7 +549,21 @@ def register_application():
             'aplicacion_observaciones': observaciones,
         }
         try:
-            repo.registrar_aplicacion(datos)
+            result = repo.registrar_aplicacion(datos)
+            mdb.log_aplicacion(
+                pg_aplicacion_id=result.get('p_id') if result else None,
+                pg_paciente_id=paciente_id,
+                pg_usuario_id=responsable_id,
+                pg_centro_id=centro_id,
+                pg_lote_id=inv['lote_id'],
+                pg_dosis_id=dosis_id,
+                vacuna_nombre=dosis['vacuna_nombre'] if dosis and 'vacuna_nombre' in dosis else '—',
+                paciente_nombre=(f"{paciente['paciente_prim_nombre']} {paciente['paciente_apellido_pat']}"
+                                 if paciente else '—'),
+                responsable_nombre=session.get('user_name', '—'),
+                centro_nombre=inv.get('centro_nombre', '—'),
+                observaciones=observaciones or None,
+            )
             flash('Aplicación registrada correctamente.', 'success')
         except ValueError as e:
             flash(str(e), 'error')
@@ -865,7 +901,16 @@ def pacientes():
             'esquema_id':            int(f['esquema_id']),
         }
         try:
-            repo.crear_paciente(datos)
+            result = repo.crear_paciente(datos)
+            mdb.log_sistema(
+                evento='paciente_creado',
+                entidad='paciente',
+                pg_entidad_id=result.get('p_id') if result else None,
+                pg_usuario_id=session.get('user_id'),
+                descripcion=(f"Paciente {datos['paciente_prim_nombre']} "
+                             f"{datos['paciente_apellido_pat']} registrado"),
+                meta={'curp': datos.get('paciente_curp'), 'sexo': datos['paciente_sexo']},
+            )
             flash('Paciente registrado.', 'success')
         except ValueError as e:
             flash(str(e), 'error')
@@ -1232,13 +1277,29 @@ def lotes():
 
         elif accion == 'asignar_inventario':
             try:
-                repo.asignar_inventario({
-                    'centro_id':               int(f['centro_id']),
-                    'lote_id':                 int(f['lote_id']),
-                    'inventario_stock_inicial': int(f['stock']),
-                    'inventario_stock_actual':  int(f['stock']),
+                centro_id_inv = int(f['centro_id'])
+                lote_id_inv   = int(f['lote_id'])
+                stock_inv     = int(f['stock'])
+                result_inv = repo.asignar_inventario({
+                    'centro_id':               centro_id_inv,
+                    'lote_id':                 lote_id_inv,
+                    'inventario_stock_inicial': stock_inv,
+                    'inventario_stock_actual':  stock_inv,
                     'inventario_activo_desde':  None,
                 })
+                centros_map = {c['centro_id']: c['centro_nombre'] for c in repo.listar_centros()}
+                vacunas_map = {v['vacuna_id']: v['vacuna_nombre'] for v in repo.listar_vacunas()}
+                lote_obj    = repo.obtener_lote(lote_id_inv)
+                mdb.log_inventario(
+                    evento='asignacion',
+                    pg_inventario_id=result_inv.get('p_id') if result_inv else None,
+                    pg_centro_id=centro_id_inv,
+                    pg_lote_id=lote_id_inv,
+                    pg_usuario_id=session['user_id'],
+                    vacuna_nombre=vacunas_map.get(lote_obj['vacuna_id'], '—') if lote_obj else '—',
+                    centro_nombre=centros_map.get(centro_id_inv, '—'),
+                    stock=stock_inv,
+                )
                 flash('Inventario asignado. El responsable del centro debe confirmar su recepción.', 'success')
             except ValueError as e:
                 flash(str(e), 'error')
@@ -1344,7 +1405,21 @@ def aplicaciones():
             'aplicacion_observaciones': f.get('observaciones', ''),
         }
         try:
-            repo.registrar_aplicacion(datos)
+            result = repo.registrar_aplicacion(datos)
+            mdb.log_aplicacion(
+                pg_aplicacion_id=result.get('p_id') if result else None,
+                pg_paciente_id=pid,
+                pg_usuario_id=resp_id,
+                pg_centro_id=inv['centro_id'],
+                pg_lote_id=inv['lote_id'],
+                pg_dosis_id=did,
+                vacuna_nombre=dos['vacuna_nombre'] if dos and 'vacuna_nombre' in dos else '—',
+                paciente_nombre=(f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}"
+                                 if pac else '—'),
+                responsable_nombre=session.get('user_name', '—'),
+                centro_nombre=inv.get('centro_nombre', '—'),
+                observaciones=f.get('observaciones') or None,
+            )
             flash('Aplicación registrada.', 'success')
         except ValueError as e:
             flash(str(e), 'error')
@@ -1436,6 +1511,66 @@ def api_report_data():
             r.pop('mes_orden', None)
 
     return jsonify({'por_mes': por_mes, 'top_vacunas': top_vac, 'total': resumen['total']})
+
+
+# ── MongoDB analytics API ─────────────────────────────────────────────────────
+
+@app.route('/admin/api/mongo/aplicaciones-por-mes')
+def api_mongo_aplicaciones_por_mes():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    raw = mdb.aplicaciones_por_mes(12)
+    data = [
+        {
+            'año':  r['_id']['year'],
+            'mes':  r['_id']['month'],
+            'label': f"{r['_id']['year']}-{r['_id']['month']:02d}",
+            'total': r['total'],
+        }
+        for r in raw
+    ]
+    return jsonify(data)
+
+
+@app.route('/admin/api/mongo/top-vacunas')
+def api_mongo_top_vacunas():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    raw = mdb.top_vacunas(10)
+    data = [{'vacuna': r['_id'], 'total': r['total']} for r in raw]
+    return jsonify(data)
+
+
+@app.route('/admin/api/mongo/aplicaciones-por-centro')
+def api_mongo_aplicaciones_por_centro():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    raw = mdb.aplicaciones_por_centro(10)
+    data = [{'centro': r['_id'], 'total': r['total']} for r in raw]
+    return jsonify(data)
+
+
+@app.route('/admin/api/mongo/resumen-logs')
+def api_mongo_resumen_logs():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    return jsonify(mdb.resumen_logs())
+
+
+@app.route('/admin/api/mongo/ultimos-accesos')
+def api_mongo_ultimos_accesos():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    docs = mdb.ultimos_accesos(20)
+    for d in docs:
+        if hasattr(d.get('timestamp'), 'isoformat'):
+            d['timestamp'] = d['timestamp'].isoformat()
+    return jsonify(docs)
 
 
 @app.route('/admin/perfil')
