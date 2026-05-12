@@ -2334,6 +2334,149 @@ BEGIN
 END; $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- STORED PROCEDURES CON TABLAS TEMPORALES — Reportes / Rankings / Agregaciones
+-- Cada SP crea una tabla temporal ON COMMIT DROP para cálculos intermedios,
+-- aplica ranking/agregación sobre ella y retorna el cursor al cliente.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- 1. Ranking de centros de salud por actividad en un período
+CREATE OR REPLACE PROCEDURE sp_ranking_centros_actividad(
+    IN  p_meses       INTEGER,        -- ventana de lookback en meses
+    INOUT p_resultados REFCURSOR
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    -- Tabla temporal: conteos por centro
+    CREATE TEMP TABLE tmp_ranking_centros ON COMMIT DROP AS
+    SELECT
+        cs.centro_id,
+        cs.centro_nombre,
+        ci.ciudad_nombre,
+        COUNT(a.aplicacion_id)                                              AS total_aplicaciones,
+        COUNT(a.aplicacion_id)
+            FILTER (WHERE a.aplicacion_timestamp >= NOW() - (p_meses || ' months')::INTERVAL)
+                                                                            AS aplicaciones_periodo,
+        COUNT(DISTINCT a.paciente_id)                                       AS pacientes_atendidos,
+        COUNT(DISTINCT DATE(a.aplicacion_timestamp))                        AS dias_con_actividad
+    FROM centros_salud cs
+    LEFT JOIN aplicaciones  a  ON a.centro_id  = cs.centro_id
+    JOIN      ciudades      ci ON ci.ciudad_id  = cs.ciudad_id
+    GROUP BY cs.centro_id, cs.centro_nombre, ci.ciudad_nombre;
+
+    -- Cursor: agrega ranking y porcentaje sobre la tabla temporal
+    OPEN p_resultados FOR
+        SELECT *,
+            RANK() OVER (ORDER BY aplicaciones_periodo DESC)            AS ranking,
+            ROUND(100.0 * aplicaciones_periodo /
+                NULLIF(SUM(aplicaciones_periodo) OVER (), 0), 2)        AS pct_del_total
+        FROM tmp_ranking_centros
+        ORDER BY aplicaciones_periodo DESC;
+END; $$;
+
+-- 2. Reporte de cobertura vacunal por esquema
+CREATE OR REPLACE PROCEDURE sp_reporte_cobertura_vacunal(
+    IN  p_esquema_id   INTEGER,
+    INOUT p_resultados REFCURSOR
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_total_pacientes INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO v_total_pacientes
+    FROM pacientes WHERE esquema_id = p_esquema_id;
+
+    -- Tabla temporal: aplicaciones por dosis del esquema
+    CREATE TEMP TABLE tmp_cobertura ON COMMIT DROP AS
+    SELECT
+        v.vacuna_id,
+        v.vacuna_nombre,
+        d.dosis_id,
+        d.dosis_tipo,
+        d.dosis_edad_oportuna_dias,
+        v_total_pacientes                                                   AS total_pacientes,
+        COUNT(DISTINCT a.paciente_id)                                       AS pacientes_con_dosis,
+        COUNT(a.aplicacion_id)                                              AS total_aplicaciones
+    FROM dosis_esquemas de
+    JOIN dosis        d  ON d.dosis_id   = de.dosis_id
+    JOIN vacunas      v  ON v.vacuna_id  = d.vacuna_id
+    LEFT JOIN aplicaciones a ON a.dosis_id = d.dosis_id
+        AND a.paciente_id IN (
+            SELECT paciente_id FROM pacientes WHERE esquema_id = p_esquema_id
+        )
+    WHERE de.esquema_id = p_esquema_id
+    GROUP BY v.vacuna_id, v.vacuna_nombre, d.dosis_id, d.dosis_tipo, d.dosis_edad_oportuna_dias;
+
+    -- Cursor: calcula porcentaje y clasifica nivel de cobertura
+    OPEN p_resultados FOR
+        SELECT *,
+            ROUND(100.0 * pacientes_con_dosis / NULLIF(total_pacientes, 0), 2) AS pct_cobertura,
+            CASE
+                WHEN total_pacientes = 0                                                      THEN 'SIN_DATOS'
+                WHEN ROUND(100.0 * pacientes_con_dosis / NULLIF(total_pacientes,0), 2) >= 80 THEN 'ALTA'
+                WHEN ROUND(100.0 * pacientes_con_dosis / NULLIF(total_pacientes,0), 2) >= 50 THEN 'MEDIA'
+                ELSE                                                                               'BAJA'
+            END AS nivel_cobertura
+        FROM tmp_cobertura
+        ORDER BY vacuna_nombre, dosis_edad_oportuna_dias;
+END; $$;
+
+-- 3. Pacientes con dosis atrasadas, ordenados por urgencia
+CREATE OR REPLACE PROCEDURE sp_pacientes_dosis_urgentes(
+    IN  p_centro_id   INTEGER,        -- NULL = todos los centros
+    INOUT p_resultados REFCURSOR
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    -- Tabla temporal: dosis vencidas (pasó edad oportuna, no aplicada, sin exceder límite)
+    CREATE TEMP TABLE tmp_urgencias ON COMMIT DROP AS
+    SELECT
+        p.paciente_id,
+        INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente_nombre,
+        p.paciente_fecha_nac,
+        EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER                    AS edad_dias,
+        v.vacuna_nombre,
+        d.dosis_id,
+        d.dosis_tipo,
+        d.dosis_edad_oportuna_dias,
+        d.dosis_limite_edad_dias,
+        (EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER
+            - d.dosis_edad_oportuna_dias)                                          AS dias_atraso,
+        (d.dosis_limite_edad_dias
+            - EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER)            AS dias_para_limite
+    FROM pacientes       p
+    JOIN dosis_esquemas  de ON de.esquema_id = p.esquema_id
+    JOIN dosis           d  ON d.dosis_id    = de.dosis_id
+    JOIN vacunas         v  ON v.vacuna_id   = d.vacuna_id
+    -- La dosis no ha sido aplicada
+    WHERE NOT EXISTS (
+        SELECT 1 FROM aplicaciones a
+        WHERE a.paciente_id = p.paciente_id AND a.dosis_id = d.dosis_id
+    )
+    -- El paciente ya superó la edad oportuna de la dosis
+    AND EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac) > d.dosis_edad_oportuna_dias
+    -- La dosis aún está dentro del límite de edad (o no tiene límite)
+    AND (d.dosis_limite_edad_dias IS NULL
+         OR EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac) <= d.dosis_limite_edad_dias)
+    -- Filtro por centro (si se proporciona)
+    AND (p_centro_id IS NULL OR EXISTS (
+        SELECT 1 FROM aplicaciones a2
+        WHERE a2.paciente_id = p.paciente_id AND a2.centro_id = p_centro_id
+    ));
+
+    -- Cursor: agrega nivel de urgencia y ranking sobre la tabla temporal
+    OPEN p_resultados FOR
+        SELECT *,
+            CASE
+                WHEN dias_atraso > 60              THEN 'CRITICO'
+                WHEN dias_atraso BETWEEN 30 AND 60 THEN 'URGENTE'
+                ELSE                                    'PENDIENTE'
+            END                                                         AS nivel_urgencia,
+            RANK() OVER (ORDER BY dias_atraso DESC)                     AS ranking_urgencia
+        FROM tmp_urgencias
+        ORDER BY dias_atraso DESC;
+END; $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Confirmación de recepción de inventario
 -- ─────────────────────────────────────────────────────────────────────────────
 

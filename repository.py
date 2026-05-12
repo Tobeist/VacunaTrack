@@ -622,6 +622,18 @@ def resumen_periodo(desde: str, hasta: str,
     return {'total': int(row['total']) if row else 0}
 
 
+def ranking_centros_actividad(meses: int = 6) -> list[dict]:
+    return db.call_read_sp('sp_ranking_centros_actividad', [meses])
+
+
+def reporte_cobertura_vacunal(esquema_id: int) -> list[dict]:
+    return db.call_read_sp('sp_reporte_cobertura_vacunal', [esquema_id])
+
+
+def pacientes_dosis_urgentes(centro_id: int | None = None) -> list[dict]:
+    return db.call_read_sp('sp_pacientes_dosis_urgentes', [centro_id])
+
+
 # ── Fotos de perfil ──────────────────────────────────────────────
 
 def actualizar_imagen_usuario(usuario_id: int, ruta: str) -> None:

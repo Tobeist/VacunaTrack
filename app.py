@@ -1476,7 +1476,62 @@ def analytics():
     redir = _require_admin()
     if redir:
         return redir
-    return render_template('admin/analytics.html')
+    return render_template('admin/analytics.html',
+                           esquemas=repo.listar_esquemas(),
+                           centros=repo.listar_centros())
+
+
+# ── Analytics API — SPs con tablas temporales ─────────────────────────────────
+
+@app.route('/admin/api/ranking-centros')
+def api_ranking_centros():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    meses = request.args.get('meses', 6, type=int)
+    rows  = repo.ranking_centros_actividad(meses)
+    for r in rows:
+        for k in ('ranking', 'aplicaciones_periodo', 'total_aplicaciones',
+                  'pacientes_atendidos', 'dias_con_actividad'):
+            if r.get(k) is not None:
+                r[k] = int(r[k])
+        if r.get('pct_del_total') is not None:
+            r['pct_del_total'] = float(r['pct_del_total'])
+    return jsonify(rows)
+
+
+@app.route('/admin/api/cobertura-vacunal')
+def api_cobertura_vacunal():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    esquema_id = request.args.get('esquema_id', 1, type=int)
+    rows = repo.reporte_cobertura_vacunal(esquema_id)
+    for r in rows:
+        for k in ('total_pacientes', 'pacientes_con_dosis', 'total_aplicaciones',
+                  'dosis_edad_oportuna_dias'):
+            if r.get(k) is not None:
+                r[k] = int(r[k])
+        if r.get('pct_cobertura') is not None:
+            r['pct_cobertura'] = float(r['pct_cobertura'])
+    return jsonify(rows)
+
+
+@app.route('/admin/api/dosis-urgentes')
+def api_dosis_urgentes():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    centro_id = request.args.get('centro_id', type=int)
+    rows = repo.pacientes_dosis_urgentes(centro_id)
+    for r in rows:
+        for k in ('edad_dias', 'dosis_edad_oportuna_dias', 'dias_atraso',
+                  'dias_para_limite', 'ranking_urgencia'):
+            if r.get(k) is not None:
+                r[k] = int(r[k])
+        if isinstance(r.get('paciente_fecha_nac'), date):
+            r['paciente_fecha_nac'] = str(r['paciente_fecha_nac'])
+    return jsonify(rows)
 
 
 @app.route('/admin/reportes')

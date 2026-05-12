@@ -117,6 +117,103 @@
   </div>
 </div>
 
+<!-- ── Sección: SPs con tablas temporales ──────────────────────────────── -->
+<div class="card mb-20" style="margin-top:28px">
+  <div class="card-header">
+    <span class="card-title" style="font-size:1rem;font-weight:700">
+      <i class="fa-solid fa-database" style="color:var(--primary)"></i>
+      Reportes con tablas temporales — PostgreSQL
+    </span>
+    <span class="badge badge-primary" style="font-size:0.7rem">3 SPs · CREATE TEMP TABLE</span>
+  </div>
+  <div class="card-body" style="padding:10px 22px 4px">
+    <p class="text-muted fs-sm">Estos reportes utilizan tablas temporales (<code>ON COMMIT DROP</code>) para cálculos intermedios de ranking, cobertura y urgencia.</p>
+  </div>
+</div>
+
+<!-- 1. Ranking de centros -->
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">
+      <i class="fa-solid fa-ranking-star" style="color:var(--warning)"></i>
+      Ranking de centros por actividad
+    </span>
+    <span class="badge badge-secondary" style="font-size:0.7rem">PostgreSQL · sp_ranking_centros_actividad · tmp_ranking_centros</span>
+    <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+      <label class="form-label mb-0 fs-sm">Últimos</label>
+      <select id="sel-meses-ranking" class="form-select" style="width:110px;padding:5px 8px">
+        <option value="3">3 meses</option>
+        <option value="6" selected>6 meses</option>
+        <option value="12">12 meses</option>
+      </select>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="chart-ranking-centros" style="height:300px"></div>
+  </div>
+  <div class="table-wrapper">
+    <table class="table" id="tabla-ranking">
+      <thead><tr><th>#</th><th>Centro</th><th>Ciudad</th><th>Aplicaciones (período)</th><th>Pacientes atendidos</th><th>Días activo</th><th>% del total</th></tr></thead>
+      <tbody id="tbody-ranking"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 2. Cobertura vacunal -->
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">
+      <i class="fa-solid fa-shield-virus" style="color:var(--success)"></i>
+      Cobertura vacunal por esquema
+    </span>
+    <span class="badge badge-secondary" style="font-size:0.7rem">PostgreSQL · sp_reporte_cobertura_vacunal · tmp_cobertura</span>
+    <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+      <select id="sel-esquema-cob" class="form-select" style="width:220px;padding:5px 8px">
+        {% for e in esquemas %}
+        <option value="{{ e.esquema_id }}">{{ e.esquema_nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="chart-cobertura" style="height:300px"></div>
+  </div>
+  <div class="table-wrapper">
+    <table class="table" id="tabla-cobertura">
+      <thead><tr><th>Vacuna</th><th>Dosis</th><th>Edad oportuna</th><th>Pacientes totales</th><th>Con dosis aplicada</th><th>% Cobertura</th><th>Nivel</th></tr></thead>
+      <tbody id="tbody-cobertura"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 3. Dosis urgentes -->
+<div class="card mb-20">
+  <div class="card-header">
+    <span class="card-title">
+      <i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>
+      Pacientes con dosis atrasadas — ranking de urgencia
+    </span>
+    <span class="badge badge-secondary" style="font-size:0.7rem">PostgreSQL · sp_pacientes_dosis_urgentes · tmp_urgencias</span>
+    <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+      <select id="sel-centro-urg" class="form-select" style="width:200px;padding:5px 8px">
+        <option value="">Todos los centros</option>
+        {% for c in centros %}
+        <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+  <div class="card-body">
+    <div id="chart-urgencias" style="height:300px"></div>
+  </div>
+  <div class="table-wrapper">
+    <table class="table" id="tabla-urgencias">
+      <thead><tr><th>#</th><th>Paciente</th><th>Vacuna</th><th>Tipo dosis</th><th>Días de atraso</th><th>Días para límite</th><th>Urgencia</th></tr></thead>
+      <tbody id="tbody-urgencias"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -302,6 +399,134 @@ fetch('/admin/api/mongo/ultimos-accesos')
     document.getElementById('accesos-tbody').innerHTML =
       '<tr><td colspan="5" class="text-center text-muted" style="padding:30px">Error al cargar datos.</td></tr>';
   });
+
+// ── Reportes con tablas temporales (PostgreSQL) ───────────────────────────────
+
+const NIVEL_BADGE = {
+  ALTA:     'badge-success',
+  MEDIA:    'badge-warning',
+  BAJA:     'badge-danger',
+  SIN_DATOS:'badge-secondary',
+  CRITICO:  'badge-danger',
+  URGENTE:  'badge-warning',
+  PENDIENTE:'badge-primary',
+};
+
+function loadRanking() {
+  const meses = document.getElementById('sel-meses-ranking').value;
+  fetch('/admin/api/ranking-centros?meses=' + meses)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) { emptyChart('chart-ranking-centros','Sin datos de aplicaciones aún.'); return; }
+      Highcharts.chart('chart-ranking-centros', {
+        chart: { type: 'bar', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
+        title: { text: null }, credits: { enabled: false },
+        xAxis: { categories: data.map(d => d.centro_nombre), labels:{style:{fontSize:'11px'}} },
+        yAxis: { min:0, title:{text:'Aplicaciones'}, allowDecimals:false },
+        legend: { enabled:false },
+        tooltip: { valueSuffix:' aplicaciones en el período' },
+        series: [{ name:'Aplicaciones', data: data.map((d,i)=>({y:d.aplicaciones_periodo, color:HC_COLORS[i%HC_COLORS.length]})),
+          dataLabels:{enabled:true,style:{fontSize:'10px'}} }],
+        plotOptions: { bar:{borderRadius:3} }
+      });
+      document.getElementById('tbody-ranking').innerHTML = data.map(d => `
+        <tr>
+          <td class="fw-600">${d.ranking}</td>
+          <td class="fw-600">${d.centro_nombre}</td>
+          <td class="text-muted fs-sm">${d.ciudad_nombre}</td>
+          <td>${d.aplicaciones_periodo}</td>
+          <td>${d.pacientes_atendidos}</td>
+          <td>${d.dias_con_actividad}</td>
+          <td><span class="badge badge-primary">${d.pct_del_total ?? 0}%</span></td>
+        </tr>`).join('');
+    })
+    .catch(() => emptyChart('chart-ranking-centros','Error al obtener datos.'));
+}
+
+function loadCobertura() {
+  const eid = document.getElementById('sel-esquema-cob').value;
+  fetch('/admin/api/cobertura-vacunal?esquema_id=' + eid)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) { emptyChart('chart-cobertura','Sin dosis en este esquema.'); return; }
+      const labels = data.map(d => d.vacuna_nombre + ' (' + d.dosis_tipo + ')');
+      const vals   = data.map(d => d.pct_cobertura ?? 0);
+      const colors = data.map(d =>
+        d.nivel_cobertura === 'ALTA' ? '#16A34A' :
+        d.nivel_cobertura === 'MEDIA' ? '#D97706' : '#DC2626');
+      Highcharts.chart('chart-cobertura', {
+        chart: { type:'column', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
+        title: { text:null }, credits:{enabled:false},
+        xAxis: { categories:labels, labels:{style:{fontSize:'10px'},rotation:-20} },
+        yAxis: { min:0, max:100, title:{text:'% Cobertura'}, plotLines:[{value:80,color:'#16A34A',dashStyle:'Dash',width:2,label:{text:'Meta 80%',style:{color:'#16A34A'}}},{value:50,color:'#D97706',dashStyle:'Dash',width:1}] },
+        legend: {enabled:false},
+        tooltip: { valueSuffix:'% de cobertura' },
+        series: [{ name:'Cobertura', colorByPoint:true, data:vals.map((v,i)=>({y:v,color:colors[i]})),
+          dataLabels:{enabled:true,format:'{point.y:.1f}%',style:{fontSize:'10px'}} }],
+        plotOptions: { column:{borderRadius:3} }
+      });
+      document.getElementById('tbody-cobertura').innerHTML = data.map(d => `
+        <tr>
+          <td class="fw-600">${d.vacuna_nombre}</td>
+          <td class="fs-sm">${d.dosis_tipo}</td>
+          <td class="fs-sm">${d.dosis_edad_oportuna_dias} días</td>
+          <td>${d.total_pacientes}</td>
+          <td>${d.pacientes_con_dosis}</td>
+          <td><strong>${d.pct_cobertura ?? 0}%</strong></td>
+          <td><span class="badge ${NIVEL_BADGE[d.nivel_cobertura] || 'badge-secondary'}">${d.nivel_cobertura}</span></td>
+        </tr>`).join('');
+    })
+    .catch(() => emptyChart('chart-cobertura','Error al obtener datos.'));
+}
+
+function loadUrgencias() {
+  const cid = document.getElementById('sel-centro-urg').value;
+  fetch('/admin/api/dosis-urgentes' + (cid ? '?centro_id='+cid : ''))
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) {
+        emptyChart('chart-urgencias','Sin dosis atrasadas. ¡Todos los pacientes están al día!');
+        document.getElementById('tbody-urgencias').innerHTML =
+          '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">Sin pacientes con dosis atrasadas.</td></tr>';
+        return;
+      }
+      const criticos  = data.filter(d => d.nivel_urgencia === 'CRITICO').length;
+      const urgentes  = data.filter(d => d.nivel_urgencia === 'URGENTE').length;
+      const pendientes= data.filter(d => d.nivel_urgencia === 'PENDIENTE').length;
+      Highcharts.chart('chart-urgencias', {
+        chart: { type:'pie', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
+        title: { text: data.length + ' pacientes con dosis atrasadas', style:{fontSize:'13px'} },
+        credits:{enabled:false},
+        tooltip:{ pointFormat:'<b>{point.y}</b> pacientes ({point.percentage:.1f}%)' },
+        plotOptions:{ pie:{ innerSize:'50%', dataLabels:{enabled:true,format:'{point.name}: {point.y}'} } },
+        series:[{ name:'Urgencia', colorByPoint:true, data:[
+          {name:'Crítico (>60 días)', y:criticos,  color:'#DC2626'},
+          {name:'Urgente (30-60 días)',y:urgentes,  color:'#D97706'},
+          {name:'Pendiente (<30 días)',y:pendientes,color:'#7C3AED'},
+        ]}]
+      });
+      document.getElementById('tbody-urgencias').innerHTML = data.map(d => `
+        <tr>
+          <td class="fw-600">${d.ranking_urgencia}</td>
+          <td class="fw-600">${d.paciente_nombre}</td>
+          <td class="fs-sm">${d.vacuna_nombre}</td>
+          <td class="fs-sm">${d.dosis_tipo}</td>
+          <td><strong style="color:${d.nivel_urgencia==='CRITICO'?'var(--danger)':d.nivel_urgencia==='URGENTE'?'var(--warning)':'var(--primary)'}">${d.dias_atraso} días</strong></td>
+          <td class="fs-sm text-muted">${d.dias_para_limite ?? '—'}</td>
+          <td><span class="badge ${NIVEL_BADGE[d.nivel_urgencia]}">${d.nivel_urgencia}</span></td>
+        </tr>`).join('');
+    })
+    .catch(() => emptyChart('chart-urgencias','Error al obtener datos.'));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadRanking();
+  loadCobertura();
+  loadUrgencias();
+  document.getElementById('sel-meses-ranking').addEventListener('change', loadRanking);
+  document.getElementById('sel-esquema-cob').addEventListener('change', loadCobertura);
+  document.getElementById('sel-centro-urg').addEventListener('change', loadUrgencias);
+});
 
 </script>
 {% endblock %}
