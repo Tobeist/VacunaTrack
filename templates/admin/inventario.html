@@ -61,7 +61,7 @@
       <table class="table" id="tabla-inv">
         <thead><tr>
           <th>Centro</th><th>Vacuna</th><th>Lote</th><th>Fabricante</th>
-          <th>Caducidad</th><th>Stock inicial</th><th>Stock actual</th><th>Estado</th>
+          <th>Caducidad</th><th>Stock inicial</th><th>Stock actual</th><th>Estado</th><th>Acciones</th>
         </tr></thead>
         <tbody>
           {% for inv in inventarios %}
@@ -106,9 +106,46 @@
                 <span class="badge badge-aplicada">Activo</span>
               {% endif %}
             </td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-inv-{{ inv.inventario_id }}"
+                        title="Editar">✏️</button>
+                <form method="POST" action="{{ url_for('eliminar_inventario', iid=inv.inventario_id) }}" style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar este inventario ({{ inv.vacuna_nombre }} en {{ inv.centro_nombre }})? Esta acción no se puede deshacer.">🗑</button>
+                </form>
+              </div>
+            </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-inv-{{ inv.inventario_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Inventario</span>
+                <button class="btn-close" data-close-modal="edit-inv-{{ inv.inventario_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_inventario', iid=inv.inventario_id) }}">
+                <div class="modal-body">
+                  <p class="text-muted fs-sm mb-8">{{ inv.vacuna_nombre }} · Lote {{ inv.lote_codigo }} · {{ inv.centro_nombre }}</p>
+                  <div class="form-group"><label class="form-label">Stock actual</label>
+                    <input type="number" name="stock_actual" class="form-control" min="0" value="{{ inv.inventario_stock_actual }}" required></div>
+                  <div class="form-group">
+                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                      <input type="checkbox" name="activo" value="1" {% if inv.inventario_activo %}checked{% endif %}>
+                      Inventario activo
+                    </label>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-inv-{{ inv.inventario_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
-          <tr><td colspan="8" class="text-center text-muted" style="padding:40px">No hay inventarios registrados.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted" style="padding:40px">No hay inventarios registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>

@@ -87,12 +87,64 @@
             <td>{{ r.centro_nombre or '—' }}</td>
             <td><span class="badge badge-primary">{{ r.cedulas|length }}</span></td>
             <td>
-              <form method="POST" action="{{ url_for('eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
-                <button type="submit" class="btn btn-danger btn-sm"
-                        data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}?">🗑</button>
-              </form>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-resp-{{ r.responsable_id }}"
+                        title="Editar">✏️</button>
+                <form method="POST" action="{{ url_for('eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
+                </form>
+              </div>
             </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-resp-{{ r.responsable_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Responsable</span>
+                <button class="btn-close" data-close-modal="edit-resp-{{ r.responsable_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_responsable', rid=r.responsable_id) }}">
+                <div class="modal-body">
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Primer nombre</label>
+                      <input type="text" name="prim_nombre" class="form-control" value="{{ r.responsable_prim_nombre|cap }}" required></div>
+                    <div class="form-group"><label class="form-label">Segundo nombre</label>
+                      <input type="text" name="seg_nombre" class="form-control" value="{{ (r.responsable_seg_nombre or '')|cap }}"></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Apellido paterno</label>
+                      <input type="text" name="apellido_pat" class="form-control" value="{{ r.responsable_apellido_pat|cap }}" required></div>
+                    <div class="form-group"><label class="form-label">Apellido materno</label>
+                      <input type="text" name="apellido_mat" class="form-control" value="{{ (r.responsable_apellido_mat or '')|cap }}"></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">RFC</label>
+                      <input type="text" name="rfc" class="form-control" value="{{ r.responsable_rfc or '' }}" maxlength="13" style="text-transform:uppercase"></div>
+                    <div class="form-group"><label class="form-label">CURP</label>
+                      <input type="text" name="curp" class="form-control" value="{{ r.responsable_curp or '' }}" maxlength="18" style="text-transform:uppercase"></div>
+                  </div>
+                  <div class="form-group"><label class="form-label">Correo electrónico</label>
+                    <input type="email" name="email" class="form-control" value="{{ r.responsable_email }}" required></div>
+                  <div class="form-group"><label class="form-label">Teléfono</label>
+                    <input type="tel" name="telefono" class="form-control" value="{{ r.responsable_telefono or '' }}"></div>
+                  <div class="form-group"><label class="form-label">Centro de salud</label>
+                    <select name="centro_id" class="form-select" required>
+                      <option value="">— Selecciona centro —</option>
+                      {% for c in centros %}
+                      <option value="{{ c.centro_id }}" {% if c.centro_id == r.centro_id %}selected{% endif %}>{{ c.centro_nombre }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-resp-{{ r.responsable_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
           <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No responsables registrados.</td></tr>
           {% endfor %}

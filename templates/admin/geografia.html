@@ -29,15 +29,45 @@
       <div class="card-header"><span class="card-title">Países</span></div>
       <div class="table-wrapper">
         <table class="table">
-          <thead><tr><th>#</th><th>País</th></tr></thead>
+          <thead><tr><th>#</th><th>País</th><th>Acciones</th></tr></thead>
           <tbody>
             {% for p in paises %}
             <tr>
               <td class="text-muted fs-sm">{{ p.pais_id }}</td>
               <td class="fw-600">{{ p.pais_nombre }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-pais-{{ p.pais_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('eliminar_pais', pid=p.pais_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar el país {{ p.pais_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                  </form>
+                </div>
+              </td>
             </tr>
+
+            <div class="modal-overlay" id="edit-pais-{{ p.pais_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar País</span>
+                  <button class="btn-close" data-close-modal="edit-pais-{{ p.pais_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('editar_pais', pid=p.pais_id) }}">
+                  <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Nombre del país</label>
+                      <input type="text" name="nombre" class="form-control" value="{{ p.pais_nombre }}" required></div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-pais-{{ p.pais_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             {% else %}
-            <tr><td colspan="2" class="text-center text-muted" style="padding:30px">No países.</td></tr>
+            <tr><td colspan="3" class="text-center text-muted" style="padding:30px">No países.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -76,15 +106,53 @@
       </div>
       <div class="table-wrapper">
         <table class="table" id="tabla-estados">
-          <thead><tr><th>Estado</th><th>País</th></tr></thead>
+          <thead><tr><th>Estado</th><th>País</th><th>Acciones</th></tr></thead>
           <tbody>
             {% for e in estados %}
             <tr>
               <td class="fw-600">{{ e.estado_nombre }}</td>
               <td>{{ e.pais_nombre }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-estado-{{ e.estado_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('eliminar_estado', eid=e.estado_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar el estado {{ e.estado_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                  </form>
+                </div>
+              </td>
             </tr>
+
+            <div class="modal-overlay" id="edit-estado-{{ e.estado_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar Estado</span>
+                  <button class="btn-close" data-close-modal="edit-estado-{{ e.estado_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('editar_estado', eid=e.estado_id) }}">
+                  <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Nombre del estado</label>
+                      <input type="text" name="nombre" class="form-control" value="{{ e.estado_nombre }}" required></div>
+                    <div class="form-group"><label class="form-label">País</label>
+                      <select name="pais_id" class="form-select" required>
+                        <option value="">— Selecciona país —</option>
+                        {% for pa in paises %}
+                        <option value="{{ pa.pais_id }}" {% if pa.pais_id == e.pais_id %}selected{% endif %}>{{ pa.pais_nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-estado-{{ e.estado_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             {% else %}
-            <tr><td colspan="2" class="text-center text-muted" style="padding:30px">No estados.</td></tr>
+            <tr><td colspan="3" class="text-center text-muted" style="padding:30px">No estados.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -123,15 +191,53 @@
       </div>
       <div class="table-wrapper">
         <table class="table" id="tabla-ciudades">
-          <thead><tr><th>Ciudad</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Ciudad</th><th>Estado</th><th>Acciones</th></tr></thead>
           <tbody>
             {% for c in ciudades %}
             <tr>
               <td class="fw-600">{{ c.ciudad_nombre }}</td>
               <td>{{ c.estado_nombre }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-ciudad-{{ c.ciudad_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('eliminar_ciudad', cid=c.ciudad_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar la ciudad {{ c.ciudad_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                  </form>
+                </div>
+              </td>
             </tr>
+
+            <div class="modal-overlay" id="edit-ciudad-{{ c.ciudad_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar Ciudad</span>
+                  <button class="btn-close" data-close-modal="edit-ciudad-{{ c.ciudad_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('editar_ciudad', cid=c.ciudad_id) }}">
+                  <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Nombre de la ciudad</label>
+                      <input type="text" name="nombre" class="form-control" value="{{ c.ciudad_nombre }}" required></div>
+                    <div class="form-group"><label class="form-label">Estado</label>
+                      <select name="estado_id" class="form-select" required>
+                        <option value="">— Selecciona estado —</option>
+                        {% for es in estados %}
+                        <option value="{{ es.estado_id }}" {% if es.estado_id == c.estado_id %}selected{% endif %}>{{ es.estado_nombre }} ({{ es.pais_nombre }})</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-ciudad-{{ c.ciudad_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             {% else %}
-            <tr><td colspan="2" class="text-center text-muted" style="padding:30px">No ciudades.</td></tr>
+            <tr><td colspan="3" class="text-center text-muted" style="padding:30px">No ciudades.</td></tr>
             {% endfor %}
           </tbody>
         </table>

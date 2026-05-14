@@ -73,11 +73,72 @@
             <td class="fs-sm">{{ c.centro_horario_inicio|format_time }} – {{ c.centro_horario_fin|format_time }}</td>
             <td class="fs-sm" style="font-family:monospace">{{ c.centro_beacon or '—' }}</td>
             <td>
-              <form method="POST" action="{{ url_for('eliminar_centro', cid=c.centro_id) }}" style="display:inline">
-                <button type="submit" class="btn btn-danger btn-sm" data-confirm="¿Eliminar {{ c.centro_nombre }}?">🗑</button>
-              </form>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-centro-{{ c.centro_id }}"
+                        title="Editar">✏️</button>
+                <form method="POST" action="{{ url_for('eliminar_centro', cid=c.centro_id) }}" style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar {{ c.centro_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                </form>
+              </div>
             </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-centro-{{ c.centro_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Centro</span>
+                <button class="btn-close" data-close-modal="edit-centro-{{ c.centro_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_centro', cid=c.centro_id) }}">
+                <div class="modal-body">
+                  <div class="form-group"><label class="form-label">Nombre del centro</label>
+                    <input type="text" name="nombre" class="form-control" value="{{ c.centro_nombre }}" required></div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Calle</label>
+                      <input type="text" name="calle" class="form-control" value="{{ c.centro_calle or '' }}"></div>
+                    <div class="form-group"><label class="form-label">Número</label>
+                      <input type="text" name="numero" class="form-control" value="{{ c.centro_numero or '' }}"></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">C.P.</label>
+                      <input type="text" name="cp" class="form-control" value="{{ c.centro_codigo_postal or '' }}" maxlength="5"></div>
+                    <div class="form-group"><label class="form-label">Ciudad</label>
+                      <select name="ciudad_id" class="form-select" required>
+                        <option value="">— Selecciona —</option>
+                        {% for ci in ciudades %}
+                        <option value="{{ ci.ciudad_id }}" {% if ci.ciudad_id == c.ciudad_id %}selected{% endif %}>{{ ci.ciudad_nombre }} ({{ ci.estado_nombre }})</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Horario inicio</label>
+                      <input type="time" name="horario_inicio" class="form-control" value="{{ c.centro_horario_inicio|format_time if c.centro_horario_inicio else '' }}"></div>
+                    <div class="form-group"><label class="form-label">Horario fin</label>
+                      <input type="time" name="horario_fin" class="form-control" value="{{ c.centro_horario_fin|format_time if c.centro_horario_fin else '' }}"></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Latitud</label>
+                      <input type="number" name="latitud" class="form-control" step="any" value="{{ c.centro_latitud if c.centro_latitud is not none else '' }}"></div>
+                    <div class="form-group"><label class="form-label">Longitud</label>
+                      <input type="number" name="longitud" class="form-control" step="any" value="{{ c.centro_longitud if c.centro_longitud is not none else '' }}"></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Teléfono</label>
+                      <input type="tel" name="telefono" class="form-control" value="{{ c.centro_telefono or '' }}"></div>
+                    <div class="form-group"><label class="form-label">UID Beacon</label>
+                      <input type="text" name="beacon" class="form-control" value="{{ c.centro_beacon or '' }}"></div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-centro-{{ c.centro_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
           <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No centros registrados.</td></tr>
           {% endfor %}

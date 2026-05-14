@@ -42,16 +42,63 @@
     </div>
     <div class="table-wrapper">
       <table class="table" id="tabla-pad">
-        <thead><tr><th>Padecimiento</th><th>Descripción</th><th>Vacunas</th></tr></thead>
+        <thead><tr><th>Padecimiento</th><th>Descripción</th><th>Vacunas</th><th>Acciones</th></tr></thead>
         <tbody>
           {% for p in padecimientos %}
           <tr>
             <td class="fw-600">{{ p.padecimiento_nombre }}</td>
             <td class="fs-sm text-muted">{{ p.padecimiento_descripcion or '—' }}</td>
             <td class="fs-sm">{{ p.vacunas or '—' }}</td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-pad-{{ p.padecimiento_id }}"
+                        title="Editar">✏️</button>
+                <form method="POST" action="{{ url_for('eliminar_padecimiento', pid=p.padecimiento_id) }}" style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar el padecimiento {{ p.padecimiento_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                </form>
+              </div>
+            </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-pad-{{ p.padecimiento_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Padecimiento</span>
+                <button class="btn-close" data-close-modal="edit-pad-{{ p.padecimiento_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_padecimiento', pid=p.padecimiento_id) }}">
+                <div class="modal-body">
+                  <div class="form-group"><label class="form-label">Nombre</label>
+                    <input type="text" name="nombre" class="form-control" value="{{ p.padecimiento_nombre }}" required></div>
+                  <div class="form-group"><label class="form-label">Descripción</label>
+                    <textarea name="descripcion" class="form-textarea">{{ p.padecimiento_descripcion or '' }}</textarea></div>
+                  <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+                    <div class="form-label mb-8">Vacunas relacionadas</div>
+                    {% if p.vacunas %}
+                    <p class="text-muted fs-sm mb-8">Actualmente: {{ p.vacunas }}</p>
+                    {% endif %}
+                    <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px">
+                      {% for v in vacunas %}
+                      <label style="display:flex;align-items:center;gap:8px;padding:5px 4px;cursor:pointer;font-size:0.85rem">
+                        <input type="checkbox" name="vacuna_ids" value="{{ v.vacuna_id }}"
+                          {% if v.vacuna_id in vacunas_por_padecimiento.get(p.padecimiento_id, []) %}checked{% endif %}>
+                        {{ v.vacuna_nombre }}
+                      </label>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-pad-{{ p.padecimiento_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
-          <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No padecimientos registrados.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted" style="padding:40px">No padecimientos registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>

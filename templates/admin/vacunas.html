@@ -40,7 +40,7 @@
     </div>
     <div class="table-wrapper">
       <table class="table" id="tabla-vacunas">
-        <thead><tr><th>Vacuna</th><th>Dosis</th><th>Detalle</th></tr></thead>
+        <thead><tr><th>Vacuna</th><th>Dosis</th><th>Detalle</th><th>Acciones</th></tr></thead>
         <tbody>
           {% for v in vacunas %}
           <tr>
@@ -51,14 +51,44 @@
                 <i class="fa-solid fa-eye"></i> Ver dosis
               </button>
             </td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-vacuna-{{ v.vacuna_id }}"
+                        title="Editar">✏️</button>
+                <form method="POST" action="{{ url_for('eliminar_vacuna', vid=v.vacuna_id) }}" style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar la vacuna {{ v.vacuna_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                </form>
+              </div>
+            </td>
           </tr>
           <tr id="dosis-detail-{{ v.vacuna_id }}" style="display:none">
-            <td colspan="3" style="background:var(--bg);padding:0">
+            <td colspan="4" style="background:var(--bg);padding:0">
               <div id="dosis-content-{{ v.vacuna_id }}" style="padding:12px 16px"></div>
             </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-vacuna-{{ v.vacuna_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Vacuna</span>
+                <button class="btn-close" data-close-modal="edit-vacuna-{{ v.vacuna_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_vacuna', vid=v.vacuna_id) }}">
+                <div class="modal-body">
+                  <div class="form-group"><label class="form-label">Nombre de la vacuna</label>
+                    <input type="text" name="nombre" class="form-control" value="{{ v.vacuna_nombre }}" required></div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-vacuna-{{ v.vacuna_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
-          <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No vacunas.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted" style="padding:40px">No vacunas.</td></tr>
           {% endfor %}
         </tbody>
       </table>

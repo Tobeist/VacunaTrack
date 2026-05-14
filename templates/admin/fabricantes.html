@@ -57,16 +57,56 @@
       </div>
       <div class="table-wrapper">
         <table class="table" id="tabla-fab">
-          <thead><tr><th>Fabricante</th><th>País</th><th>Teléfono</th></tr></thead>
+          <thead><tr><th>Fabricante</th><th>País</th><th>Teléfono</th><th>Acciones</th></tr></thead>
           <tbody>
             {% for f in fabricantes %}
             <tr>
               <td class="fw-600">{{ f.fabricante_nombre }}</td>
               <td>{{ f.pais_nombre }}</td>
               <td>{{ f.fabricante_telefono or '—' }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-fab-{{ f.fabricante_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('eliminar_fabricante', fid=f.fabricante_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar el fabricante {{ f.fabricante_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                  </form>
+                </div>
+              </td>
             </tr>
+
+            <div class="modal-overlay" id="edit-fab-{{ f.fabricante_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar Fabricante</span>
+                  <button class="btn-close" data-close-modal="edit-fab-{{ f.fabricante_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('editar_fabricante', fid=f.fabricante_id) }}">
+                  <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Nombre del fabricante</label>
+                      <input type="text" name="nombre" class="form-control" value="{{ f.fabricante_nombre }}" required></div>
+                    <div class="form-group"><label class="form-label">País</label>
+                      <select name="pais_id" class="form-select" required>
+                        <option value="">— Selecciona país —</option>
+                        {% for pa in paises %}
+                        <option value="{{ pa.pais_id }}" {% if pa.pais_id == f.pais_id %}selected{% endif %}>{{ pa.pais_nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Teléfono de contacto</label>
+                      <input type="tel" name="telefono" class="form-control" value="{{ f.fabricante_telefono or '' }}"></div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-fab-{{ f.fabricante_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             {% else %}
-            <tr><td colspan="3" class="text-center text-muted" style="padding:40px">No hay fabricantes registrados.</td></tr>
+            <tr><td colspan="4" class="text-center text-muted" style="padding:40px">No hay fabricantes registrados.</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -138,7 +178,7 @@
       </div>
       <div class="table-wrapper">
         <table class="table" id="tabla-prov">
-          <thead><tr><th>Nombre</th><th>Empresa</th><th>Fabricante</th><th>Email</th><th>Teléfono</th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Empresa</th><th>Fabricante</th><th>Email</th><th>Teléfono</th><th>Acciones</th></tr></thead>
           <tbody>
             {% for p in proveedores %}
             {% set nombre = (p.proveedor_prim_nombre ~ ' ' ~ (p.proveedor_seg_nombre or '') ~ ' ' ~ p.proveedor_apellido_pat ~ ' ' ~ (p.proveedor_apellido_mat or ''))|trim %}
@@ -148,9 +188,63 @@
               <td>{{ p.fabricante_nombre or '—' }}</td>
               <td class="fs-sm">{{ p.proveedor_email or '—' }}</td>
               <td class="fs-sm">{{ p.proveedor_telefono or '—' }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-prov-{{ p.proveedor_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('eliminar_proveedor', pid=p.proveedor_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar el proveedor {{ nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                  </form>
+                </div>
+              </td>
             </tr>
+
+            <div class="modal-overlay" id="edit-prov-{{ p.proveedor_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar Proveedor</span>
+                  <button class="btn-close" data-close-modal="edit-prov-{{ p.proveedor_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('editar_proveedor', pid=p.proveedor_id) }}">
+                  <div class="modal-body">
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">Primer nombre</label>
+                        <input type="text" name="prim_nombre" class="form-control" value="{{ p.proveedor_prim_nombre|cap }}" required></div>
+                      <div class="form-group"><label class="form-label">Segundo nombre</label>
+                        <input type="text" name="seg_nombre" class="form-control" value="{{ (p.proveedor_seg_nombre or '')|cap }}"></div>
+                    </div>
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">Apellido paterno</label>
+                        <input type="text" name="apellido_pat" class="form-control" value="{{ p.proveedor_apellido_pat|cap }}" required></div>
+                      <div class="form-group"><label class="form-label">Apellido materno</label>
+                        <input type="text" name="apellido_mat" class="form-control" value="{{ (p.proveedor_apellido_mat or '')|cap }}"></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">Correo electrónico</label>
+                      <input type="email" name="email" class="form-control" value="{{ p.proveedor_email or '' }}"></div>
+                    <div class="form-group"><label class="form-label">Teléfono</label>
+                      <input type="tel" name="telefono" class="form-control" value="{{ p.proveedor_telefono or '' }}"></div>
+                    <div class="form-group"><label class="form-label">Empresa</label>
+                      <input type="text" name="empresa" class="form-control" value="{{ p.proveedor_empresa or '' }}"></div>
+                    <div class="form-group"><label class="form-label">Fabricante</label>
+                      <select name="fabricante_id" class="form-select" required>
+                        <option value="">— Selecciona fabricante —</option>
+                        {% for fa in fabricantes %}
+                        <option value="{{ fa.fabricante_id }}" {% if fa.fabricante_id == p.fabricante_id %}selected{% endif %}>{{ fa.fabricante_nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-prov-{{ p.proveedor_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             {% else %}
-            <tr><td colspan="5" class="text-center text-muted" style="padding:40px">No hay proveedores registrados.</td></tr>
+            <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No hay proveedores registrados.</td></tr>
             {% endfor %}
           </tbody>
         </table>
