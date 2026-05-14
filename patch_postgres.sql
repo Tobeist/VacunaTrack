@@ -288,6 +288,123 @@ BEGIN
         ORDER BY vacuna_nombre, dosis_edad_oportuna_dias;
 END; $$;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TRIGGER: validar edad del paciente para la dosis (BEFORE INSERT en aplicaciones)
+-- Complementa trg_validar_intervalo_dosis, que sólo verifica el intervalo mínimo.
+-- Este trigger verifica que el paciente tenga la edad mínima recomendada y que
+-- no haya superado el límite de edad para la dosis.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_validar_edad_paciente_dosis()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_edad_oportuna INTEGER;
+    v_limite_edad   INTEGER;
+    v_fecha_nac     DATE;
+    v_edad_dias     INTEGER;
+BEGIN
+    SELECT d.dosis_edad_oportuna_dias, d.dosis_limite_edad_dias
+    INTO   v_edad_oportuna, v_limite_edad
+    FROM   dosis d WHERE d.dosis_id = NEW.dosis_id;
+
+    SELECT p.paciente_fecha_nac INTO v_fecha_nac
+    FROM   pacientes p WHERE p.paciente_id = NEW.paciente_id;
+
+    v_edad_dias := EXTRACT(DAY FROM NEW.aplicacion_timestamp - v_fecha_nac::TIMESTAMP)::INTEGER;
+
+    IF v_edad_dias < v_edad_oportuna THEN
+        RAISE EXCEPTION
+            'El paciente tiene % días de vida. La edad mínima para esta dosis es % días.',
+            v_edad_dias, v_edad_oportuna;
+    END IF;
+
+    IF v_limite_edad IS NOT NULL AND v_edad_dias >= v_limite_edad THEN
+        RAISE EXCEPTION
+            'El paciente tiene % días de vida y superó el límite de edad (% días) para esta dosis.',
+            v_edad_dias, v_limite_edad;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_validar_edad_paciente_dosis ON aplicaciones;
+CREATE TRIGGER trg_validar_edad_paciente_dosis
+BEFORE INSERT ON aplicaciones
+FOR EACH ROW
+EXECUTE FUNCTION trg_fn_validar_edad_paciente_dosis();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TRIGGER: prevenir doble aplicación de la misma dosis al mismo paciente
+-- Flask ya hace esta comprobación vía sp_dosis_ya_aplicada, pero sin restricción
+-- en la BD cualquier acceso directo al SP sp_registrar_aplicacion podría duplicar.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_prevenir_doble_aplicacion()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM aplicaciones
+        WHERE paciente_id = NEW.paciente_id AND dosis_id = NEW.dosis_id
+    ) THEN
+        RAISE EXCEPTION
+            'La dosis % ya fue registrada para el paciente %.',
+            NEW.dosis_id, NEW.paciente_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_prevenir_doble_aplicacion ON aplicaciones;
+CREATE TRIGGER trg_prevenir_doble_aplicacion
+BEFORE INSERT ON aplicaciones
+FOR EACH ROW
+EXECUTE FUNCTION trg_fn_prevenir_doble_aplicacion();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TRIGGER: alerta automática cuando el stock de inventario baja a umbral crítico
+-- Resuelve el bug de alertas_inventario vacía: trg_descontar_inventario
+-- solo descuenta, nunca inserta alertas.
+-- Umbral CERCA_AGOTAR: ≤5 unidades. Umbral AGOTADO: 0 unidades.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_alerta_stock_bajo()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.inventario_stock_actual = 0 AND OLD.inventario_stock_actual > 0 THEN
+        INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
+        VALUES(NEW.inventario_id, 'AGOTADO');
+    ELSIF NEW.inventario_stock_actual <= 5 AND OLD.inventario_stock_actual > 5 THEN
+        INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
+        VALUES(NEW.inventario_id, 'CERCA_AGOTAR');
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_alerta_stock_bajo ON inventarios;
+CREATE TRIGGER trg_alerta_stock_bajo
+AFTER UPDATE OF inventario_stock_actual ON inventarios
+FOR EACH ROW
+EXECUTE FUNCTION trg_fn_alerta_stock_bajo();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SP: registrar evento GPS en PostgreSQL
+-- La tabla eventos_gps existía pero nunca se escribía; Flask sólo usaba MongoDB.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE PROCEDURE sp_registrar_evento_gps(
+    IN  p_tutor_id  INTEGER,
+    IN  p_latitud   NUMERIC(11,8),
+    IN  p_longitud  NUMERIC(11,8),
+    OUT p_ok        SMALLINT,
+    OUT p_msg       VARCHAR(150)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO eventos_gps(tutor_id, evento_latitud, evento_longitud)
+    VALUES(p_tutor_id, p_latitud, p_longitud);
+    p_ok := 1; p_msg := 'Evento GPS registrado';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := SQLERRM;
+END; $$;
+
 CREATE OR REPLACE PROCEDURE sp_pacientes_dosis_urgentes(
     IN  p_centro_id   INTEGER,        -- NULL = todos los centros
     INOUT p_resultados REFCURSOR

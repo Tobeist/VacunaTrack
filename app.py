@@ -313,6 +313,20 @@ def api_nearby_centers():
     if user_lat is not None:
         centros.sort(key=lambda x: x['distancia_km'] if x['distancia_km'] is not None else 9999)
 
+    if user_lat is not None and user_lng is not None:
+        mdb.log_gps(
+            lat=user_lat,
+            lon=user_lng,
+            vacuna_id=vacuna_id,
+            centros_encontrados=len(centros),
+            pg_usuario_id=session.get('user_id'),
+        )
+        if session.get('user_role') == 'tutor' and session.get('user_id'):
+            try:
+                repo.registrar_evento_gps(session['user_id'], user_lat, user_lng)
+            except Exception:
+                pass
+
     return jsonify(centros)
 
 
@@ -348,6 +362,12 @@ def api_beacon_info():
     tutor_id  = session['user_id']
 
     repo.registrar_lectura_beacon(centro_id, tutor_id)
+    mdb.log_beacon(
+        pg_centro_id=centro_id,
+        beacon_id=beacon_id,
+        pg_tutor_id=tutor_id,
+        metodo='beacon_id' if beacon_id else 'gps_proximity',
+    )
 
     vacunas_centro = {v['vacuna_id']: v for v in repo.vacunas_en_centro(centro_id)}
     hijos          = repo.pacientes_de_tutor(tutor_id)
@@ -1621,6 +1641,28 @@ def api_mongo_ultimos_accesos():
     if redir:
         return jsonify({'error': 'No autorizado'}), 401
     docs = mdb.ultimos_accesos(20)
+    for d in docs:
+        if hasattr(d.get('timestamp'), 'isoformat'):
+            d['timestamp'] = d['timestamp'].isoformat()
+    return jsonify(docs)
+
+
+@app.route('/admin/api/mongo/eventos-beacon')
+def api_mongo_eventos_beacon():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    raw = mdb.eventos_beacon_por_centro(10)
+    data = [{'centro_id': r['_id'], 'total': r['total']} for r in raw]
+    return jsonify(data)
+
+
+@app.route('/admin/api/mongo/busquedas-gps')
+def api_mongo_busquedas_gps():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    docs = mdb.busquedas_gps_recientes(20)
     for d in docs:
         if hasattr(d.get('timestamp'), 'isoformat'):
             d['timestamp'] = d['timestamp'].isoformat()

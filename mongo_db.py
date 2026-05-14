@@ -13,6 +13,8 @@ Collections:
   eventos_inventario — one document per inventory assignment or transfer
   logs_acceso        — one document per login / logout event
   logs_sistema       — general operational events (patient created, etc.)
+  eventos_beacon     — one document per beacon detection / center check-in
+  busquedas_gps      — one document per GPS-based center search (high-volume geospatial)
 """
 
 from __future__ import annotations
@@ -159,6 +161,49 @@ def log_sistema(
         pass
 
 
+def log_beacon(
+    *,
+    pg_centro_id: int,
+    beacon_id: str | None,
+    pg_tutor_id: int,
+    metodo: str,            # 'beacon_id' | 'gps_proximity'
+) -> None:
+    """Log a beacon detection / center check-in event."""
+    try:
+        get_db().eventos_beacon.insert_one({
+            'timestamp':    _now(),
+            'pg_centro_id': pg_centro_id,
+            'beacon_id':    beacon_id,
+            'pg_tutor_id':  pg_tutor_id,
+            'metodo':       metodo,
+        })
+    except PyMongoError:
+        pass
+
+
+def log_gps(
+    *,
+    lat: float,
+    lon: float,
+    vacuna_id: int | None,
+    centros_encontrados: int,
+    pg_usuario_id: int | None,
+) -> None:
+    """Log a GPS-based center search event."""
+    try:
+        get_db().busquedas_gps.insert_one({
+            'timestamp':          _now(),
+            'ubicacion':          {'type': 'Point', 'coordinates': [lon, lat]},
+            'lat':                lat,
+            'lon':                lon,
+            'vacuna_id':          vacuna_id,
+            'centros_encontrados': centros_encontrados,
+            'pg_usuario_id':      pg_usuario_id,
+        })
+    except PyMongoError:
+        pass
+
+
 # ── Read helpers (used by Flask report endpoints) ─────────────────────────────
 
 def aplicaciones_por_mes(meses: int = 12) -> list[dict]:
@@ -235,6 +280,47 @@ def eventos_inventario_recientes(limit: int = 50) -> list[dict]:
         return []
 
 
+def eventos_beacon_por_centro(limit: int = 10) -> list[dict]:
+    """Return beacon check-in counts grouped by center."""
+    try:
+        pipeline = [
+            {'$group': {'_id': '$pg_centro_id', 'total': {'$sum': 1}}},
+            {'$sort': {'total': -1}},
+            {'$limit': limit},
+        ]
+        return list(get_db().eventos_beacon.aggregate(pipeline))
+    except PyMongoError:
+        return []
+
+
+def ultimos_beacons(limit: int = 20) -> list[dict]:
+    """Return the most recent beacon check-in events."""
+    try:
+        docs = (
+            get_db().eventos_beacon
+            .find({}, {'_id': 0})
+            .sort('timestamp', -1)
+            .limit(limit)
+        )
+        return list(docs)
+    except PyMongoError:
+        return []
+
+
+def busquedas_gps_recientes(limit: int = 20) -> list[dict]:
+    """Return the most recent GPS search events."""
+    try:
+        docs = (
+            get_db().busquedas_gps
+            .find({}, {'_id': 0, 'ubicacion': 0})
+            .sort('timestamp', -1)
+            .limit(limit)
+        )
+        return list(docs)
+    except PyMongoError:
+        return []
+
+
 def resumen_logs() -> dict:
     """Return a quick count summary across all collections."""
     try:
@@ -244,6 +330,8 @@ def resumen_logs() -> dict:
             'inventario':    mdb.eventos_inventario.count_documents({}),
             'accesos':       mdb.logs_acceso.count_documents({}),
             'sistema':       mdb.logs_sistema.count_documents({}),
+            'beacon':        mdb.eventos_beacon.count_documents({}),
+            'gps':           mdb.busquedas_gps.count_documents({}),
         }
     except PyMongoError:
-        return {'aplicaciones': 0, 'inventario': 0, 'accesos': 0, 'sistema': 0}
+        return {'aplicaciones': 0, 'inventario': 0, 'accesos': 0, 'sistema': 0, 'beacon': 0, 'gps': 0}

@@ -515,6 +515,10 @@ def registrar_lectura_beacon(centro_id: int, tutor_id: int) -> None:
     _sp('sp_registrar_lectura_beacon', [centro_id, tutor_id], out_count=2)
 
 
+def registrar_evento_gps(tutor_id: int, lat: float, lon: float) -> None:
+    db.call_write_sp('sp_registrar_evento_gps', [tutor_id, lat, lon], out_count=2)
+
+
 def personas_esperando_en_centro(centro_id: int) -> int:
     row = db.call_read_sp_one('sp_personas_esperando_en_centro', [centro_id])
     return int(row['total']) if row else 0
