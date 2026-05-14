@@ -99,13 +99,71 @@
                   <input type="file" name="foto" accept="image/*" style="display:none" id="foto-pac-{{ p.paciente_id }}" onchange="this.form.submit()">
                   <button type="button" class="btn btn-secondary btn-sm" title="Subir foto" onclick="document.getElementById('foto-pac-{{ p.paciente_id }}').click()">📷</button>
                 </form>
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-paciente-{{ p.paciente_id }}"
+                        title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
-                  <button type="submit" class="btn btn-danger btn-sm"
-                          data-confirm="¿Eliminar al paciente {{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}?">🗑</button>
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar al paciente {{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
                 </form>
               </div>
             </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-paciente-{{ p.paciente_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Paciente</span>
+                <button class="btn-close" data-close-modal="edit-paciente-{{ p.paciente_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_paciente', pid=p.paciente_id) }}">
+                <div class="modal-body">
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Primer nombre</label>
+                      <input type="text" name="prim_nombre" class="form-control" value="{{ p.paciente_prim_nombre|cap }}" required></div>
+                    <div class="form-group"><label class="form-label">Segundo nombre</label>
+                      <input type="text" name="seg_nombre" class="form-control" value="{{ (p.paciente_seg_nombre or '')|cap }}"></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Apellido paterno</label>
+                      <input type="text" name="apellido_pat" class="form-control" value="{{ p.paciente_apellido_pat|cap }}" required></div>
+                    <div class="form-group"><label class="form-label">Apellido materno</label>
+                      <input type="text" name="apellido_mat" class="form-control" value="{{ (p.paciente_apellido_mat or '')|cap }}"></div>
+                  </div>
+                  <div class="form-group"><label class="form-label">N° Certificado de Nacimiento</label>
+                    <input type="text" name="num_cert_nac" class="form-control" value="{{ p.paciente_num_cert_nac or '' }}"></div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">CURP</label>
+                      <input type="text" name="curp" class="form-control" value="{{ p.paciente_curp or '' }}" maxlength="18" style="text-transform:uppercase"></div>
+                    <div class="form-group"><label class="form-label">Fecha de nacimiento</label>
+                      <input type="date" name="fecha_nac" class="form-control" value="{{ p.paciente_fecha_nac }}" required></div>
+                  </div>
+                  <div class="form-row form-row-2">
+                    <div class="form-group"><label class="form-label">Sexo</label>
+                      <select name="sexo" class="form-select" required>
+                        <option value="M" {% if p.paciente_sexo == 'M' %}selected{% endif %}>Masculino</option>
+                        <option value="F" {% if p.paciente_sexo == 'F' %}selected{% endif %}>Femenino</option>
+                      </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">UID NFC</label>
+                      <input type="text" name="nfc" class="form-control" value="{{ p.paciente_nfc or '' }}"></div>
+                  </div>
+                  <div class="form-group"><label class="form-label">Esquema de vacunación</label>
+                    <select name="esquema_id" class="form-select" required>
+                      <option value="">— Selecciona esquema —</option>
+                      {% for e in esquemas %}
+                      <option value="{{ e.esquema_id }}" {% if e.esquema_id == p.esquema_id %}selected{% endif %}>{{ e.esquema_nombre }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-paciente-{{ p.paciente_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
           <tr><td colspan="7" class="text-center text-muted" style="padding:40px">No pacientes registrados.</td></tr>
           {% endfor %}

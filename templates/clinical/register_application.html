@@ -28,27 +28,19 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Inventario / Lote <span class="required">*</span></label>
-          <select name="inventario_id" class="form-select" required>
-            <option value="">— Selecciona inventario —</option>
-            {% for inv in inventarios %}
-            <option value="{{ inv.inventario_id }}">
-              {{ inv.vacuna_nombre }} — Lote {{ inv.lote_codigo }}
-              ({{ inv.inventario_stock_actual }} dosis · {{ inv.centro_nombre }})
-            </option>
-            {% endfor %}
-          </select>
-          {% if not inventarios %}
-          <div class="form-error">⚠ Sin inventario activo con stock en tu centro. Contacta al administrador.</div>
-          {% endif %}
-        </div>
-
-        <div class="form-group">
           <label class="form-label">Dosis <span class="required">*</span></label>
-          <select name="dosis_id" id="sel-dosis" class="form-select" required>
+          <select name="dosis_id" id="sel-dosis" class="form-select" required disabled>
             <option value="">— Selecciona paciente primero —</option>
           </select>
           <div id="dosis-hint" class="form-hint" style="display:none"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Inventario / Lote <span class="required">*</span></label>
+          <select name="inventario_id" id="sel-inventario" class="form-select" required disabled>
+            <option value="">— Selecciona dosis primero —</option>
+          </select>
+          <div id="inv-hint" class="form-hint" style="display:none"></div>
         </div>
 
         <div class="form-group">
@@ -83,7 +75,9 @@
 <script>
 const SEL_PACIENTE = document.getElementById('sel-paciente');
 const SEL_DOSIS    = document.getElementById('sel-dosis');
+const SEL_INV      = document.getElementById('sel-inventario');
 const DOSIS_HINT   = document.getElementById('dosis-hint');
+const INV_HINT     = document.getElementById('inv-hint');
 
 const STATUS_LABEL = {
   aplicable:    'Aplicable',
@@ -91,14 +85,20 @@ const STATUS_LABEL = {
   cerca_limite: 'Cerca del límite',
 };
 
+function resetInventario(msg) {
+  SEL_INV.innerHTML = `<option value="">${msg}</option>`;
+  SEL_INV.disabled = true;
+  INV_HINT.style.display = 'none';
+}
+
 async function cargarDosis(pacienteId) {
+  resetInventario('— Selecciona dosis primero —');
   SEL_DOSIS.innerHTML = '<option value="">Cargando…</option>';
   SEL_DOSIS.disabled = true;
   DOSIS_HINT.style.display = 'none';
 
   if (!pacienteId) {
     SEL_DOSIS.innerHTML = '<option value="">— Selecciona paciente primero —</option>';
-    SEL_DOSIS.disabled = false;
     return;
   }
 
@@ -106,32 +106,58 @@ async function cargarDosis(pacienteId) {
     const res  = await fetch(`/clinico/api/dosis-aplicables/${pacienteId}`);
     const data = await res.json();
 
-    SEL_DOSIS.innerHTML = '<option value="">— Selecciona dosis —</option>';
     if (data.length === 0) {
       SEL_DOSIS.innerHTML = '<option value="">Sin dosis pendientes para este paciente</option>';
-      DOSIS_HINT.textContent = 'No hay dosis aplicables, atrasadas o próximas al límite para este paciente.';
+      DOSIS_HINT.textContent = 'Este paciente no tiene dosis aplicables, atrasadas ni próximas al límite.';
       DOSIS_HINT.style.display = 'block';
-    } else {
-      data.forEach(d => {
-        const opt = document.createElement('option');
-        opt.value = d.dosis_id;
-        const lbl = STATUS_LABEL[d.status] || d.status_label;
-        opt.textContent = `${d.vacuna_nombre} — ${d.dosis_tipo} (${lbl})`;
-        SEL_DOSIS.appendChild(opt);
-      });
+      return;
     }
+    SEL_DOSIS.innerHTML = '<option value="">— Selecciona dosis —</option>';
+    data.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.dosis_id;
+      const lbl = STATUS_LABEL[d.status] || d.status_label;
+      opt.textContent = `${d.vacuna_nombre} — ${d.dosis_tipo} (${lbl})`;
+      SEL_DOSIS.appendChild(opt);
+    });
+    SEL_DOSIS.disabled = false;
   } catch (e) {
     SEL_DOSIS.innerHTML = '<option value="">Error al cargar dosis</option>';
   }
+}
 
-  SEL_DOSIS.disabled = false;
+async function cargarInventarios(dosisId) {
+  if (!dosisId) { resetInventario('— Selecciona dosis primero —'); return; }
+  SEL_INV.innerHTML = '<option value="">Cargando…</option>';
+  SEL_INV.disabled = true;
+  INV_HINT.style.display = 'none';
+
+  try {
+    const res = await fetch(`/clinico/api/inventarios-para-dosis/${dosisId}`);
+    const data = await res.json();
+    if (data.length === 0) {
+      SEL_INV.innerHTML = '<option value="">Sin inventario disponible</option>';
+      INV_HINT.textContent = 'No hay lotes activos de esta vacuna en tu centro. Contacta al administrador para reabastecimiento.';
+      INV_HINT.style.display = 'block';
+      INV_HINT.classList.add('text-danger');
+      return;
+    }
+    SEL_INV.innerHTML = '<option value="">— Selecciona inventario —</option>';
+    data.forEach(inv => {
+      const opt = document.createElement('option');
+      opt.value = inv.inventario_id;
+      opt.textContent = `Lote ${inv.lote_codigo} — ${inv.stock} dosis (cad. ${inv.lote_caducidad || 's/f'})`;
+      SEL_INV.appendChild(opt);
+    });
+    SEL_INV.disabled = false;
+  } catch (e) {
+    SEL_INV.innerHTML = '<option value="">Error al cargar inventarios</option>';
+  }
 }
 
 SEL_PACIENTE.addEventListener('change', () => cargarDosis(SEL_PACIENTE.value));
+SEL_DOSIS.addEventListener('change',    () => cargarInventarios(SEL_DOSIS.value));
 
-// Pre-cargar si ya hay un paciente seleccionado (ej: viene de buscar paciente)
-if (SEL_PACIENTE.value) {
-  cargarDosis(SEL_PACIENTE.value);
-}
+if (SEL_PACIENTE.value) cargarDosis(SEL_PACIENTE.value);
 </script>
 {% endblock %}

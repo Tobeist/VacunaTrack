@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from dotenv import load_dotenv
 
@@ -5,15 +6,17 @@ load_dotenv()
 
 import math
 import json as _json
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, g
 from werkzeug.security import generate_password_hash as _gph
 from werkzeug.utils import secure_filename
 from functools import partial
 from datetime import date, datetime, time as _time
-from decimal import Decimal as _Decimal
+from decimal import Decimal as _Decimal, InvalidOperation as _DecInvalid
 from utils.helpers import enrich_history, days_to_human, generate_temp_password, validar_aplicacion
 import repository as repo
 import mongo_db as mdb
+import psycopg as _psycopg
+import re as _re
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 
@@ -76,6 +79,253 @@ def _parse_time(s: str | None) -> _time | None:
         return None
     parts = s.split(':')
     return _time(int(parts[0]), int(parts[1]))
+
+
+# ── Manejo de errores amigable para el usuario ────────────────────────────────
+
+class FormError(ValueError):
+    """Excepción usada por los parsers seguros (_get_*) para errores de form."""
+    pass
+
+
+_FK_TABLE_LABELS = {
+    'tutor':        'tutores',
+    'paciente':     'pacientes',
+    'responsable':  'responsables',
+    'admin':        'administradores',
+    'centro':       'centros',
+    'esquema':      'esquemas',
+    'vacuna':       'vacunas',
+    'dosis':        'dosis',
+    'lote':         'lotes',
+    'inventario':   'inventario',
+    'aplicacion':   'aplicaciones',
+    'pais':         'países',
+    'estado':       'estados',
+    'ciudad':       'ciudades',
+    'fabricante':   'fabricantes',
+    'proveedor':    'proveedores',
+    'padecimiento': 'padecimientos',
+    'relacion':     'relaciones',
+    'pac_tut':      'relaciones',
+}
+
+
+def _rollback_db():
+    """Hace rollback de la conexión actual si está en estado de error."""
+    try:
+        conn = g.get('db') if g else None
+        if conn is not None:
+            conn.rollback()
+    except Exception:
+        pass
+
+
+def _humanize_table_name(raw: str) -> str:
+    if not raw:
+        return ''
+    key = raw.lower().strip().strip('"').replace('_', ' ').split(' ')[0]
+    return _FK_TABLE_LABELS.get(key, raw.lower().replace('_', ' '))
+
+
+def _user_error_msg(exc: Exception) -> str:
+    """Traduce una excepción técnica a un mensaje en español amigable para el usuario.
+    También hace rollback de la conexión para evitar quedarla en estado abortado.
+    """
+    _rollback_db()
+
+    # FormError ya viene en español (de _get_int, _get_date, etc.)
+    if isinstance(exc, FormError):
+        return str(exc)
+
+    # ValueError lanzado por _sp() con p_msg del stored procedure
+    # (cuando el mensaje ya viene del SP en español)
+    if isinstance(exc, ValueError) and not isinstance(exc, FormError):
+        msg = str(exc)
+        # Detectar errores técnicos típicos de int()/date.fromisoformat()
+        if 'invalid literal for int' in msg.lower():
+            return 'Uno de los campos numéricos tiene un valor inválido. Verifica los datos.'
+        if 'invalid isoformat' in msg.lower() or 'unconverted data' in msg.lower():
+            return 'La fecha tiene un formato inválido. Usa el selector de fecha.'
+        if msg and not msg.startswith('<'):
+            return msg
+        return 'No se pudo completar la operación. Verifica los datos ingresados.'
+
+    # Errores de psycopg (PostgreSQL)
+    sqlstate = getattr(exc, 'sqlstate', None)
+    diag = getattr(exc, 'diag', None)
+    detail = getattr(diag, 'message_detail', None) if diag else None
+    table = getattr(diag, 'table_name', None) if diag else None
+    constraint = getattr(diag, 'constraint_name', None) if diag else None
+
+    if sqlstate == '23503':  # foreign_key_violation
+        # Intentamos identificar qué tabla bloquea
+        ref_table = None
+        if detail:
+            m = _re.search(r'on table "([^"]+)"', detail)
+            if m:
+                ref_table = _humanize_table_name(m.group(1))
+            else:
+                m = _re.search(r'in table "([^"]+)"', detail)
+                if m:
+                    ref_table = _humanize_table_name(m.group(1))
+        if ref_table:
+            return f'No se puede completar la operación porque hay registros relacionados en {ref_table}. Elimina o desvincula esos registros primero.'
+        return 'No se puede completar la operación porque existen registros relacionados que dependen de este elemento.'
+
+    if sqlstate == '23505':  # unique_violation
+        field_hint = ''
+        if detail:
+            m = _re.search(r'\(([^)]+)\)=\(([^)]+)\)', detail)
+            if m:
+                field = m.group(1).replace('_', ' ')
+                value = m.group(2)
+                return f'Ya existe un registro con {field} "{value}". Usa un valor diferente.'
+        return 'Ya existe un registro con esos datos. Verifica los campos únicos (correo, CURP, RFC, código, etc.).'
+
+    if sqlstate == '23502':  # not_null_violation
+        col = getattr(diag, 'column_name', None) if diag else None
+        if col:
+            return f'El campo "{col.replace("_", " ")}" es obligatorio y no puede quedar vacío.'
+        return 'Faltan campos obligatorios. Verifica que hayas llenado todos los campos requeridos.'
+
+    if sqlstate == '23514':  # check_violation
+        if constraint:
+            return f'El dato no cumple con la validación "{constraint.replace("_", " ")}". Verifica los valores.'
+        return 'Los datos no cumplen las reglas de validación. Verifica los valores ingresados.'
+
+    if sqlstate == '22P02':  # invalid_text_representation
+        return 'Uno de los datos tiene un formato inválido. Verifica los campos numéricos y fechas.'
+
+    if sqlstate == '22003':  # numeric_value_out_of_range
+        return 'Un valor numérico está fuera del rango permitido.'
+
+    if sqlstate == '22008':  # datetime_field_overflow
+        return 'La fecha está fuera del rango permitido.'
+
+    if sqlstate == '25P02':  # in_failed_sql_transaction
+        return 'La operación anterior falló. Intenta de nuevo desde el inicio.'
+
+    if sqlstate == '42883':  # undefined_function
+        return 'Operación no disponible: falta una actualización en la base de datos. Contacta al administrador.'
+
+    if isinstance(exc, (KeyError,)):
+        campo = str(exc).strip("'\"")
+        return f'Falta el campo "{campo}" en el formulario. Asegúrate de llenar todos los datos.'
+
+    if isinstance(exc, _DecInvalid):
+        return 'Un valor decimal tiene formato inválido (usa punto como separador).'
+
+    if isinstance(exc, TypeError):
+        return 'No se pudo procesar uno de los datos. Verifica que todos los campos estén completos.'
+
+    if isinstance(exc, AttributeError):
+        return 'No se pudo completar la operación: faltan datos relacionados (puede que un registro ya no exista).'
+
+    # Fallback genérico
+    return 'Ocurrió un error al procesar la solicitud. Verifica los datos e intenta de nuevo.'
+
+
+def _flash_error(exc: Exception):
+    """Atajo: traduce la excepción y la muestra como flash de error."""
+    try:
+        app.logger.exception('Error en handler: %s', exc)
+    except Exception:
+        pass
+    flash(_user_error_msg(exc), 'error')
+
+
+# ── Parsers seguros para campos de formulario ────────────────────────────────
+
+def _get_str(f, key: str, label: str | None = None, *, required: bool = False,
+             max_len: int | None = None, upper: bool = False, lower: bool = False) -> str | None:
+    label = label or key.replace('_', ' ')
+    raw = (f.get(key) or '').strip()
+    if not raw:
+        if required:
+            raise FormError(f'El campo "{label}" es obligatorio.')
+        return None
+    if upper:
+        raw = raw.upper()
+    if lower:
+        raw = raw.lower()
+    if max_len and len(raw) > max_len:
+        raise FormError(f'El campo "{label}" no puede tener más de {max_len} caracteres.')
+    return raw
+
+
+def _get_int(f, key: str, label: str | None = None, *, required: bool = True,
+             min_value: int | None = None) -> int | None:
+    label = label or key.replace('_', ' ')
+    raw = (f.get(key) or '').strip()
+    if not raw:
+        if required:
+            raise FormError(f'El campo "{label}" es obligatorio.')
+        return None
+    try:
+        val = int(raw)
+    except (ValueError, TypeError):
+        raise FormError(f'El campo "{label}" debe ser un número entero válido.')
+    if min_value is not None and val < min_value:
+        raise FormError(f'El campo "{label}" debe ser mayor o igual a {min_value}.')
+    return val
+
+
+def _get_float(f, key: str, label: str | None = None, *, required: bool = True,
+               min_value: float | None = None) -> float | None:
+    label = label or key.replace('_', ' ')
+    raw = (f.get(key) or '').strip().replace(',', '.')
+    if not raw:
+        if required:
+            raise FormError(f'El campo "{label}" es obligatorio.')
+        return None
+    try:
+        val = float(raw)
+    except (ValueError, TypeError):
+        raise FormError(f'El campo "{label}" debe ser un número válido.')
+    if min_value is not None and val < min_value:
+        raise FormError(f'El campo "{label}" debe ser mayor o igual a {min_value}.')
+    return val
+
+
+def _get_decimal(f, key: str, label: str | None = None, *, required: bool = False):
+    label = label or key.replace('_', ' ')
+    raw = (f.get(key) or '').strip().replace(',', '.')
+    if not raw:
+        if required:
+            raise FormError(f'El campo "{label}" es obligatorio.')
+        return None
+    try:
+        return _Decimal(raw)
+    except (_DecInvalid, ValueError, TypeError):
+        raise FormError(f'El campo "{label}" debe ser un número decimal válido (ej: 25.6789).')
+
+
+def _get_date(f, key: str, label: str | None = None, *, required: bool = True):
+    label = label or key.replace('_', ' ')
+    raw = (f.get(key) or '').strip()
+    if not raw:
+        if required:
+            raise FormError(f'El campo "{label}" es obligatorio.')
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except (ValueError, TypeError):
+        raise FormError(f'El campo "{label}" tiene un formato de fecha inválido (usa AAAA-MM-DD).')
+
+
+def _get_time_safe(f, key: str, label: str | None = None, *, required: bool = False):
+    label = label or key.replace('_', ' ')
+    raw = (f.get(key) or '').strip()
+    if not raw:
+        if required:
+            raise FormError(f'El campo "{label}" es obligatorio.')
+        return None
+    try:
+        parts = raw.split(':')
+        return _time(int(parts[0]), int(parts[1]))
+    except (ValueError, IndexError, TypeError):
+        raise FormError(f'El campo "{label}" tiene un formato de hora inválido (usa HH:MM).')
 
 
 def _require_admin():
@@ -175,8 +425,8 @@ def change_password():
                     return redirect(url_for('lookup'))
                 else:
                     return redirect(url_for('tutor_dashboard'))
-            except ValueError as e:
-                flash(str(e), 'error')
+            except Exception as e:
+                _flash_error(e)
 
     return render_template('auth/change_password.html')
 
@@ -565,8 +815,8 @@ def register_application():
                 observaciones=observaciones or None,
             )
             flash('Aplicación registrada correctamente.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('lookup'))
 
     inventarios = repo.inventarios_activos_de_centro(centro_id) if centro_id else []
@@ -597,6 +847,46 @@ def api_dosis_por_inventario(inventario_id):
         d['vacuna_nombre'] = d.get('vacuna_nombre', nombre)
     dosis.sort(key=lambda x: x['dosis_edad_oportuna_dias'])
     return jsonify(dosis)
+
+
+@app.route('/clinico/api/inventarios-para-dosis/<int:dosis_id>')
+def api_clinical_inventarios_para_dosis(dosis_id):
+    redir = _require_responsable()
+    if redir:
+        return jsonify([]), 401
+    dosis = repo.obtener_dosis(dosis_id)
+    if not dosis:
+        return jsonify([])
+    responsable = repo.obtener_responsable(session.get('user_id'))
+    centro_id = responsable['centro_id'] if responsable else None
+    invs = repo.inventarios_disponibles_para_vacuna(dosis['vacuna_id'], centro_id=centro_id)
+    return jsonify([{
+        'inventario_id':    inv['inventario_id'],
+        'lote_codigo':      inv.get('lote_codigo', ''),
+        'vacuna_nombre':    inv.get('vacuna_nombre', ''),
+        'stock':            inv.get('inventario_stock_actual', 0),
+        'centro_nombre':    inv.get('centro_nombre', ''),
+        'lote_caducidad':   str(inv['lote_fecha_caducidad']) if inv.get('lote_fecha_caducidad') else None,
+    } for inv in invs])
+
+
+@app.route('/admin/api/inventarios-para-dosis/<int:dosis_id>')
+def api_admin_inventarios_para_dosis(dosis_id):
+    redir = _require_admin()
+    if redir:
+        return jsonify([]), 401
+    dosis = repo.obtener_dosis(dosis_id)
+    if not dosis:
+        return jsonify([])
+    invs = repo.inventarios_disponibles_para_vacuna(dosis['vacuna_id'])
+    return jsonify([{
+        'inventario_id':    inv['inventario_id'],
+        'lote_codigo':      inv.get('lote_codigo', ''),
+        'vacuna_nombre':    inv.get('vacuna_nombre', ''),
+        'stock':            inv.get('inventario_stock_actual', 0),
+        'centro_nombre':    inv.get('centro_nombre', ''),
+        'lote_caducidad':   str(inv['lote_fecha_caducidad']) if inv.get('lote_fecha_caducidad') else None,
+    } for inv in invs])
 
 
 @app.route('/clinico/api/dosis-aplicables/<int:paciente_id>')
@@ -720,23 +1010,23 @@ def tutores():
     if redir:
         return redir
     if request.method == 'POST':
-        f    = request.form
-        temp = generate_temp_password()
-        datos = {
-            'tutor_prim_nombre':  f['prim_nombre'],
-            'tutor_seg_nombre':   f.get('seg_nombre') or None,
-            'tutor_apellido_pat': f['apellido_pat'],
-            'tutor_apellido_mat': f.get('apellido_mat') or None,
-            'tutor_curp':         f.get('curp', '').upper() or None,
-            'tutor_email':        f['email'].lower(),
-            'tutor_telefono':     f.get('telefono') or None,
-            'tutor_contrasena':   generate_password_hash(temp),
-        }
+        f = request.form
         try:
+            temp = generate_temp_password()
+            datos = {
+                'tutor_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+                'tutor_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+                'tutor_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+                'tutor_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+                'tutor_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+                'tutor_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+                'tutor_telefono':     _get_str(f, 'telefono', 'teléfono'),
+                'tutor_contrasena':   generate_password_hash(temp),
+            }
             repo.crear_tutor(datos)
             flash(f'Tutor registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('tutores'))
     return render_template('admin/tutores.html', tutores=repo.listar_tutores())
 
@@ -747,20 +1037,20 @@ def editar_tutor(tid):
     if redir:
         return redir
     f = request.form
-    campos = {
-        'tutor_prim_nombre':  f.get('prim_nombre'),
-        'tutor_seg_nombre':   f.get('seg_nombre') or None,
-        'tutor_apellido_pat': f.get('apellido_pat'),
-        'tutor_apellido_mat': f.get('apellido_mat') or None,
-        'tutor_email':        f.get('email', '').lower() or None,
-        'tutor_telefono':     f.get('telefono') or None,
-        'tutor_curp':         f.get('curp', '').upper() or None,
-    }
     try:
+        campos = {
+            'tutor_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+            'tutor_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+            'tutor_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+            'tutor_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+            'tutor_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+            'tutor_telefono':     _get_str(f, 'telefono', 'teléfono'),
+            'tutor_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+        }
         repo.actualizar_tutor(tid, campos)
         flash('Tutor actualizado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('tutores'))
 
 
@@ -772,8 +1062,8 @@ def eliminar_tutor(tid):
     try:
         repo.eliminar_tutor(tid)
         flash('Tutor eliminado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('tutores'))
 
 
@@ -783,21 +1073,21 @@ def responsables():
     if redir:
         return redir
     if request.method == 'POST':
-        f    = request.form
-        temp = generate_temp_password()
-        datos = {
-            'responsable_prim_nombre':  f['prim_nombre'],
-            'responsable_seg_nombre':   f.get('seg_nombre') or None,
-            'responsable_apellido_pat': f['apellido_pat'],
-            'responsable_apellido_mat': f.get('apellido_mat') or None,
-            'responsable_curp':         f.get('curp', '').strip().upper() or None,
-            'responsable_rfc':          f.get('rfc', '').strip().upper() or None,
-            'responsable_email':        f['email'].lower(),
-            'responsable_telefono':     f.get('telefono') or None,
-            'responsable_contrasena':   generate_password_hash(temp),
-            'centro_id':                int(f['centro_id']),
-        }
+        f = request.form
         try:
+            temp = generate_temp_password()
+            datos = {
+                'responsable_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+                'responsable_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+                'responsable_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+                'responsable_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+                'responsable_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+                'responsable_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
+                'responsable_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+                'responsable_telefono':     _get_str(f, 'telefono', 'teléfono'),
+                'responsable_contrasena':   generate_password_hash(temp),
+                'centro_id':                _get_int(f, 'centro_id', 'centro de salud', required=True),
+            }
             nuevo = repo.crear_responsable(datos)
             rid   = nuevo['responsable_id']
             for num, spec in zip(request.form.getlist('cedula_numero'),
@@ -805,12 +1095,37 @@ def responsables():
                 if num.strip():
                     repo.agregar_cedula(rid, num.strip(), spec.strip() or None)
             flash(f'Responsable registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('responsables'))
     return render_template('admin/responsables.html',
                            responsables=repo.listar_responsables(),
                            centros=repo.listar_centros())
+
+
+@app.route('/admin/responsables/<int:rid>/editar', methods=['POST'])
+def editar_responsable(rid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        campos = {
+            'responsable_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+            'responsable_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+            'responsable_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+            'responsable_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+            'responsable_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+            'responsable_telefono':     _get_str(f, 'telefono', 'teléfono'),
+            'responsable_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+            'responsable_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
+            'centro_id':                _get_int(f, 'centro_id', 'centro de salud', required=True),
+        }
+        repo.actualizar_responsable(rid, campos)
+        flash('Responsable actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('responsables'))
 
 
 @app.route('/admin/responsables/<int:rid>/eliminar', methods=['POST'])
@@ -821,8 +1136,8 @@ def eliminar_responsable(rid):
     try:
         repo.eliminar_responsable(rid)
         flash('Responsable eliminado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('responsables'))
 
 
@@ -832,26 +1147,50 @@ def administradores():
     if redir:
         return redir
     if request.method == 'POST':
-        f    = request.form
-        temp = generate_temp_password()
-        datos = {
-            'admin_prim_nombre':  f['prim_nombre'],
-            'admin_seg_nombre':   f.get('seg_nombre') or None,
-            'admin_apellido_pat': f['apellido_pat'],
-            'admin_apellido_mat': f.get('apellido_mat') or None,
-            'admin_rfc':          f.get('rfc', '').strip().upper() or None,
-            'admin_curp':         f.get('curp', '').strip().upper() or None,
-            'admin_email':        f['email'].lower(),
-            'admin_telefono':     f.get('telefono') or None,
-            'admin_contrasena':   generate_password_hash(temp),
-        }
+        f = request.form
         try:
+            temp = generate_temp_password()
+            datos = {
+                'admin_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+                'admin_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+                'admin_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+                'admin_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+                'admin_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
+                'admin_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+                'admin_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+                'admin_telefono':     _get_str(f, 'telefono', 'teléfono'),
+                'admin_contrasena':   generate_password_hash(temp),
+            }
             repo.crear_admin(datos)
             flash(f'Administrador registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('administradores'))
     return render_template('admin/administradores.html', admins=repo.listar_administradores())
+
+
+@app.route('/admin/administradores/<int:aid>/editar', methods=['POST'])
+def editar_admin(aid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        campos = {
+            'admin_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+            'admin_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+            'admin_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+            'admin_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+            'admin_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+            'admin_telefono':     _get_str(f, 'telefono', 'teléfono'),
+            'admin_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+            'admin_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
+        }
+        repo.actualizar_admin(aid, campos)
+        flash('Administrador actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('administradores'))
 
 
 @app.route('/admin/administradores/<int:aid>/eliminar', methods=['POST'])
@@ -860,10 +1199,13 @@ def eliminar_admin(aid):
     if redir:
         return redir
     try:
-        repo.eliminar_admin(aid, session['user_id'])
+        if aid == session.get('user_id'):
+            flash('No puedes eliminar tu propia cuenta de administrador.', 'error')
+            return redirect(url_for('administradores'))
+        repo.eliminar_admin(aid, session.get('user_id', 0))
         flash('Administrador eliminado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('administradores'))
 
 
@@ -873,25 +1215,27 @@ def pacientes():
     if redir:
         return redir
     if request.method == 'POST':
-        f    = request.form
-        curp = f.get('curp', '').strip().upper() or None
-        cert = f.get('num_cert_nac', '').strip() or None
-        if not curp and not cert:
-            flash('Debes llenar al menos CURP o N° Certificado de Nacimiento.', 'error')
-            return redirect(url_for('pacientes'))
-        datos = {
-            'paciente_prim_nombre':  f['prim_nombre'],
-            'paciente_seg_nombre':   f.get('seg_nombre') or None,
-            'paciente_apellido_pat': f['apellido_pat'],
-            'paciente_apellido_mat': f.get('apellido_mat') or None,
-            'paciente_curp':         curp,
-            'paciente_num_cert_nac': cert,
-            'paciente_fecha_nac':    date.fromisoformat(f['fecha_nac']),
-            'paciente_sexo':         f['sexo'],
-            'paciente_nfc':          f.get('nfc') or None,
-            'esquema_id':            int(f['esquema_id']),
-        }
+        f = request.form
         try:
+            curp = _get_str(f, 'curp', 'CURP', upper=True, max_len=18)
+            cert = _get_str(f, 'num_cert_nac', 'número de certificado de nacimiento', max_len=30)
+            if not curp and not cert:
+                raise FormError('Debes llenar al menos CURP o N° Certificado de Nacimiento.')
+            fecha_nac = _get_date(f, 'fecha_nac', 'fecha de nacimiento', required=True)
+            if fecha_nac > date.today():
+                raise FormError('La fecha de nacimiento no puede ser una fecha futura.')
+            datos = {
+                'paciente_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+                'paciente_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+                'paciente_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+                'paciente_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+                'paciente_curp':         curp,
+                'paciente_num_cert_nac': cert,
+                'paciente_fecha_nac':    fecha_nac,
+                'paciente_sexo':         _get_str(f, 'sexo', 'sexo', required=True),
+                'paciente_nfc':          _get_str(f, 'nfc', 'UID NFC'),
+                'esquema_id':            _get_int(f, 'esquema_id', 'esquema de vacunación', required=True),
+            }
             result = repo.crear_paciente(datos)
             mdb.log_sistema(
                 evento='paciente_creado',
@@ -903,12 +1247,41 @@ def pacientes():
                 meta={'curp': datos.get('paciente_curp'), 'sexo': datos['paciente_sexo']},
             )
             flash('Paciente registrado.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('pacientes'))
     return render_template('admin/pacientes.html',
                            pacientes=repo.listar_pacientes(),
                            esquemas=repo.listar_esquemas())
+
+
+@app.route('/admin/pacientes/<int:pid>/editar', methods=['POST'])
+def editar_paciente(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        fecha_nac = _get_date(f, 'fecha_nac', 'fecha de nacimiento', required=True)
+        if fecha_nac > date.today():
+            raise FormError('La fecha de nacimiento no puede ser una fecha futura.')
+        campos = {
+            'paciente_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+            'paciente_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+            'paciente_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+            'paciente_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+            'paciente_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+            'paciente_num_cert_nac': _get_str(f, 'num_cert_nac', 'número de certificado de nacimiento', max_len=30),
+            'paciente_fecha_nac':    fecha_nac,
+            'paciente_sexo':         _get_str(f, 'sexo', 'sexo', required=True),
+            'paciente_nfc':          _get_str(f, 'nfc', 'UID NFC'),
+            'esquema_id':            _get_int(f, 'esquema_id', 'esquema de vacunación', required=True),
+        }
+        repo.actualizar_paciente(pid, campos)
+        flash('Paciente actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('pacientes'))
 
 
 @app.route('/admin/pacientes/<int:pid>/eliminar', methods=['POST'])
@@ -919,8 +1292,8 @@ def eliminar_paciente(pid):
     try:
         repo.eliminar_paciente(pid)
         flash('Paciente eliminado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('pacientes'))
 
 
@@ -930,18 +1303,22 @@ def relaciones():
     if redir:
         return redir
     if request.method == 'POST':
-        f   = request.form
-        pid = int(f['paciente_id'])
-        tid = int(f['tutor_id'])
-        pac = repo.obtener_paciente(pid)
-        tut = repo.obtener_tutor(tid)
-        pac_nombre = f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}" if pac else '—'
-        tut_nombre = f"{tut['tutor_prim_nombre']} {tut['tutor_apellido_pat']}" if tut else '—'
+        f = request.form
         try:
+            pid = _get_int(f, 'paciente_id', 'paciente', required=True)
+            tid = _get_int(f, 'tutor_id',    'tutor',    required=True)
+            pac = repo.obtener_paciente(pid)
+            tut = repo.obtener_tutor(tid)
+            if not pac:
+                raise FormError('El paciente seleccionado no existe.')
+            if not tut:
+                raise FormError('El tutor seleccionado no existe.')
+            pac_nombre = f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}"
+            tut_nombre = f"{tut['tutor_prim_nombre']} {tut['tutor_apellido_pat']}"
             repo.crear_relacion(pid, tid, pac_nombre, tut_nombre)
             flash('Relación registrada.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('relaciones'))
     pacientes = repo.listar_pacientes()
     tutores   = repo.listar_tutores()
@@ -968,8 +1345,11 @@ def eliminar_relacion(rid):
     redir = _require_admin()
     if redir:
         return redir
-    repo.eliminar_relacion(rid)
-    flash('Relación eliminada.', 'success')
+    try:
+        repo.eliminar_relacion(rid)
+        flash('Relación eliminada.', 'success')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('relaciones'))
 
 
@@ -980,28 +1360,75 @@ def centros():
         return redir
     if request.method == 'POST':
         f = request.form
-        datos = {
-            'centro_nombre':         f['nombre'],
-            'centro_calle':          f.get('calle') or None,
-            'centro_numero':         f.get('numero') or None,
-            'centro_codigo_postal':  f.get('cp') or None,
-            'ciudad_id':             int(f['ciudad_id']),
-            'centro_horario_inicio': _parse_time(f.get('horario_inicio')),
-            'centro_horario_fin':    _parse_time(f.get('horario_fin')),
-            'centro_latitud':        _Decimal(f['latitud']) if f.get('latitud') else None,
-            'centro_longitud':       _Decimal(f['longitud']) if f.get('longitud') else None,
-            'centro_telefono':       f.get('telefono') or None,
-            'centro_beacon':         f.get('beacon') or None,
-        }
         try:
+            h_ini = _get_time_safe(f, 'horario_inicio', 'horario de inicio')
+            h_fin = _get_time_safe(f, 'horario_fin',    'horario de fin')
+            if h_ini and h_fin and h_fin <= h_ini:
+                raise FormError('El horario de fin debe ser posterior al horario de inicio.')
+            lat = _get_decimal(f, 'latitud',  'latitud')
+            lon = _get_decimal(f, 'longitud', 'longitud')
+            if lat is not None and (lat < -90 or lat > 90):
+                raise FormError('La latitud debe estar entre -90 y 90.')
+            if lon is not None and (lon < -180 or lon > 180):
+                raise FormError('La longitud debe estar entre -180 y 180.')
+            datos = {
+                'centro_nombre':         _get_str(f, 'nombre', 'nombre del centro', required=True),
+                'centro_calle':          _get_str(f, 'calle', 'calle'),
+                'centro_numero':         _get_str(f, 'numero', 'número'),
+                'centro_codigo_postal':  _get_str(f, 'cp', 'código postal'),
+                'ciudad_id':             _get_int(f, 'ciudad_id', 'ciudad', required=True),
+                'centro_horario_inicio': h_ini,
+                'centro_horario_fin':    h_fin,
+                'centro_latitud':        lat,
+                'centro_longitud':       lon,
+                'centro_telefono':       _get_str(f, 'telefono', 'teléfono'),
+                'centro_beacon':         _get_str(f, 'beacon', 'beacon'),
+            }
             repo.crear_centro(datos)
             flash('Centro de salud registrado.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('centros'))
     return render_template('admin/centros.html',
                            centros=repo.listar_centros(),
                            ciudades=repo.listar_ciudades())
+
+
+@app.route('/admin/centros/<int:cid>/editar', methods=['POST'])
+def editar_centro(cid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        h_ini = _get_time_safe(f, 'horario_inicio', 'horario de inicio')
+        h_fin = _get_time_safe(f, 'horario_fin',    'horario de fin')
+        if h_ini and h_fin and h_fin <= h_ini:
+            raise FormError('El horario de fin debe ser posterior al horario de inicio.')
+        lat = _get_decimal(f, 'latitud',  'latitud')
+        lon = _get_decimal(f, 'longitud', 'longitud')
+        if lat is not None and (lat < -90 or lat > 90):
+            raise FormError('La latitud debe estar entre -90 y 90.')
+        if lon is not None and (lon < -180 or lon > 180):
+            raise FormError('La longitud debe estar entre -180 y 180.')
+        campos = {
+            'centro_nombre':         _get_str(f, 'nombre', 'nombre del centro', required=True),
+            'centro_calle':          _get_str(f, 'calle', 'calle'),
+            'centro_numero':         _get_str(f, 'numero', 'número'),
+            'centro_codigo_postal':  _get_str(f, 'cp', 'código postal'),
+            'ciudad_id':             _get_int(f, 'ciudad_id', 'ciudad', required=True),
+            'centro_horario_inicio': h_ini,
+            'centro_horario_fin':    h_fin,
+            'centro_latitud':        lat,
+            'centro_longitud':       lon,
+            'centro_telefono':       _get_str(f, 'telefono', 'teléfono'),
+            'centro_beacon':         _get_str(f, 'beacon', 'beacon'),
+        }
+        repo.actualizar_centro(cid, campos)
+        flash('Centro de salud actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('centros'))
 
 
 @app.route('/admin/centros/<int:cid>/eliminar', methods=['POST'])
@@ -1012,8 +1439,8 @@ def eliminar_centro(cid):
     try:
         repo.eliminar_centro(cid)
         flash('Centro eliminado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('centros'))
 
 
@@ -1025,20 +1452,20 @@ def esquemas():
 
     if request.method == 'POST':
         f = request.form
-        nombre              = f.get('nombre', '').strip()
-        fecha_vigencia      = date.fromisoformat(f['fecha_vigencia'])
-        esquema_anterior_id = f.get('esquema_anterior_id', type=int)
-        dosis_seleccionadas = set(f.getlist('dosis_ids', type=int))
-
-        nuevas_vacunas    = f.getlist('nueva_vacuna_id',      type=int)
-        nuevas_tipos      = f.getlist('nueva_tipo')
-        nuevas_ml         = f.getlist('nueva_cant_ml')
-        nuevas_areas      = f.getlist('nueva_area')
-        nuevas_edades     = f.getlist('nueva_edad_dias',      type=int)
-        nuevas_intervalos = f.getlist('nueva_intervalo_dias', type=int)
-        nuevas_limites    = f.getlist('nueva_limite_dias')
-
         try:
+            nombre         = _get_str(f, 'nombre', 'nombre del esquema', required=True)
+            fecha_vigencia = _get_date(f, 'fecha_vigencia', 'fecha de vigencia', required=True)
+            esquema_anterior_id = f.get('esquema_anterior_id', type=int)
+            dosis_seleccionadas = set(f.getlist('dosis_ids', type=int))
+
+            nuevas_vacunas    = f.getlist('nueva_vacuna_id',      type=int)
+            nuevas_tipos      = f.getlist('nueva_tipo')
+            nuevas_ml         = f.getlist('nueva_cant_ml')
+            nuevas_areas      = f.getlist('nueva_area')
+            nuevas_edades     = f.getlist('nueva_edad_dias',      type=int)
+            nuevas_intervalos = f.getlist('nueva_intervalo_dias', type=int)
+            nuevas_limites    = f.getlist('nueva_limite_dias')
+
             nuevo    = repo.crear_esquema({'esquema_nombre': nombre,
                                            'esquema_fecha_vigencia': fecha_vigencia,
                                            'vigente_desde': date.today()})
@@ -1048,14 +1475,23 @@ def esquemas():
                 if not vacuna_id:
                     continue
                 limite_raw = nuevas_limites[i] if i < len(nuevas_limites) else ''
+                ml_raw = nuevas_ml[i] if i < len(nuevas_ml) else ''
+                try:
+                    ml_val = float(str(ml_raw).replace(',', '.')) if ml_raw else 0.5
+                except (ValueError, TypeError):
+                    raise FormError(f'La cantidad en ml de la fila {i+1} no es un número válido.')
+                try:
+                    limite_val = int(limite_raw) if limite_raw else None
+                except (ValueError, TypeError):
+                    raise FormError(f'El límite de edad de la fila {i+1} no es un número válido.')
                 d = repo.crear_dosis({
                     'vacuna_id':                vacuna_id,
                     'dosis_tipo':               nuevas_tipos[i] if i < len(nuevas_tipos) else 'UNICA',
-                    'dosis_cant_ml':            float(nuevas_ml[i]) if i < len(nuevas_ml) and nuevas_ml[i] else 0.5,
+                    'dosis_cant_ml':            ml_val,
                     'dosis_area_aplicacion':    nuevas_areas[i] if i < len(nuevas_areas) else '',
                     'dosis_edad_oportuna_dias': nuevas_edades[i] if i < len(nuevas_edades) else 0,
                     'dosis_intervalo_min_dias': nuevas_intervalos[i] if i < len(nuevas_intervalos) else 0,
-                    'dosis_limite_edad_dias':   int(limite_raw) if limite_raw else None,
+                    'dosis_limite_edad_dias':   limite_val,
                 })
                 repo.agregar_dosis_a_esquema(nuevo_id, d['dosis_id'])
 
@@ -1068,13 +1504,14 @@ def esquemas():
                     if d['dosis_id'] not in dosis_seleccionadas:
                         repo.desactivar_dosis(d['dosis_id'])
                 repo.cerrar_esquema(esquema_anterior_id)
-                r = repo.asignar_esquema_auto(esquema_anterior_id, nuevo_id)
-                flash(f'Esquema publicado. {r.get("p_msg", "")}', 'success')
+                r = repo.asignar_esquema_auto(esquema_anterior_id, nuevo_id) or {}
+                msg = r.get('p_msg') if isinstance(r, dict) else ''
+                flash(f'Esquema publicado. {msg}', 'success')
             else:
                 flash('Esquema creado correctamente.', 'success')
 
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
 
         return redirect(url_for('esquemas'))
 
@@ -1131,8 +1568,8 @@ def eliminar_esquema(eid):
     try:
         repo.eliminar_esquema(eid)
         flash('Esquema eliminado.', 'success')
-    except ValueError as e:
-        flash(str(e), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('esquemas'))
 
 
@@ -1141,14 +1578,19 @@ def resolver_conflicto_esquema():
     redir = _require_admin()
     if redir:
         return redir
-    paciente_id      = request.form.get('paciente_id', type=int)
-    esquema_nuevo_id = request.form.get('esquema_nuevo_id', type=int)
-    accion           = request.form.get('accion')
-    r = repo.resolver_conflicto_esquema(paciente_id, esquema_nuevo_id, accion)
-    if r.get('p_ok') == 1:
-        flash(r.get('p_msg', 'Resuelto.'), 'success')
-    else:
-        flash(r.get('p_msg', 'Error al resolver conflicto.'), 'error')
+    try:
+        paciente_id      = _get_int(request.form, 'paciente_id',      'paciente',      required=True)
+        esquema_nuevo_id = _get_int(request.form, 'esquema_nuevo_id', 'esquema nuevo', required=True)
+        accion           = _get_str(request.form, 'accion', 'acción', required=True)
+        if accion not in ('actualizar', 'mantener'):
+            raise FormError('La acción seleccionada no es válida.')
+        r = repo.resolver_conflicto_esquema(paciente_id, esquema_nuevo_id, accion) or {}
+        if r.get('p_ok') == 1:
+            flash(r.get('p_msg', 'Conflicto resuelto.'), 'success')
+        else:
+            flash(r.get('p_msg', 'No se pudo resolver el conflicto.'), 'error')
+    except Exception as e:
+        _flash_error(e)
     return redirect(url_for('esquemas') + '#tab-conflictos')
 
 
@@ -1159,10 +1601,11 @@ def vacunas():
         return redir
     if request.method == 'POST':
         try:
-            repo.crear_vacuna({'vacuna_nombre': request.form['nombre']})
+            nombre = _get_str(request.form, 'nombre', 'nombre de la vacuna', required=True, max_len=100)
+            repo.crear_vacuna({'vacuna_nombre': nombre})
             flash('Vacuna registrada.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('vacunas'))
 
     todas_dosis  = repo.listar_dosis()
@@ -1175,6 +1618,33 @@ def vacunas():
                            vacunas=vacunas_list,
                            dosis_tipos=DOSIS_TIPOS,
                            days_to_human=days_to_human)
+
+
+@app.route('/admin/vacunas/<int:vid>/editar', methods=['POST'])
+def editar_vacuna(vid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        nombre = _get_str(request.form, 'nombre', 'nombre de la vacuna', required=True, max_len=100)
+        repo.actualizar_vacuna(vid, {'vacuna_nombre': nombre})
+        flash('Vacuna actualizada.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('vacunas'))
+
+
+@app.route('/admin/vacunas/<int:vid>/eliminar', methods=['POST'])
+def eliminar_vacuna(vid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_vacuna(vid)
+        flash('Vacuna eliminada.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('vacunas'))
 
 
 @app.route('/admin/api/vacuna/<int:vid>/dosis')
@@ -1191,18 +1661,59 @@ def padecimientos():
         f = request.form
         try:
             nuevo = repo.crear_padecimiento({
-                'padecimiento_nombre':      f['nombre'],
-                'padecimiento_descripcion': f.get('descripcion') or None,
+                'padecimiento_nombre':      _get_str(f, 'nombre', 'nombre del padecimiento', required=True, max_len=100),
+                'padecimiento_descripcion': _get_str(f, 'descripcion', 'descripción'),
             })
             for vid in f.getlist('vacuna_ids'):
-                repo.vincular_vacuna_padecimiento(int(vid), nuevo['padecimiento_id'])
+                try:
+                    repo.vincular_vacuna_padecimiento(int(vid), nuevo['padecimiento_id'])
+                except (ValueError, TypeError):
+                    continue
             flash('Padecimiento registrado.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('padecimientos'))
+    pads = repo.listar_padecimientos()
+    vacunas_por_padecimiento = {
+        p['padecimiento_id']: set(repo.vacunas_de_padecimiento(p['padecimiento_id']))
+        for p in pads
+    }
     return render_template('admin/padecimientos.html',
-                           padecimientos=repo.listar_padecimientos(),
-                           vacunas=repo.listar_vacunas())
+                           padecimientos=pads,
+                           vacunas=repo.listar_vacunas(),
+                           vacunas_por_padecimiento=vacunas_por_padecimiento)
+
+
+@app.route('/admin/padecimientos/<int:pid>/editar', methods=['POST'])
+def editar_padecimiento(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        campos = {
+            'padecimiento_nombre':      _get_str(f, 'nombre', 'nombre del padecimiento', required=True, max_len=100),
+            'padecimiento_descripcion': _get_str(f, 'descripcion', 'descripción'),
+        }
+        repo.actualizar_padecimiento(pid, campos)
+        repo.sincronizar_vacunas_padecimiento(pid, [int(v) for v in f.getlist('vacuna_ids') if v.isdigit()])
+        flash('Padecimiento actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('padecimientos'))
+
+
+@app.route('/admin/padecimientos/<int:pid>/eliminar', methods=['POST'])
+def eliminar_padecimiento(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_padecimiento(pid)
+        flash('Padecimiento eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('padecimientos'))
 
 
 @app.route('/admin/fabricantes', methods=['GET', 'POST'])
@@ -1216,30 +1727,101 @@ def fabricantes():
         try:
             if accion == 'proveedor':
                 repo.crear_proveedor({
-                    'proveedor_prim_nombre':  f['prim_nombre'],
-                    'proveedor_seg_nombre':   f.get('seg_nombre') or None,
-                    'proveedor_apellido_pat': f['apellido_pat'],
-                    'proveedor_apellido_mat': f.get('apellido_mat') or None,
-                    'proveedor_email':        f.get('email') or None,
-                    'proveedor_telefono':     f.get('telefono') or None,
-                    'proveedor_empresa':      f.get('empresa') or None,
-                    'fabricante_id':          int(f['fabricante_id']),
+                    'proveedor_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+                    'proveedor_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+                    'proveedor_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+                    'proveedor_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+                    'proveedor_email':        _get_str(f, 'email',     'correo electrónico', lower=True),
+                    'proveedor_telefono':     _get_str(f, 'telefono',  'teléfono'),
+                    'proveedor_empresa':      _get_str(f, 'empresa',   'empresa'),
+                    'fabricante_id':          _get_int(f, 'fabricante_id', 'fabricante', required=True),
                 })
                 flash('Proveedor registrado correctamente.', 'success')
-            else:
+            elif accion == 'fabricante':
                 repo.crear_fabricante({
-                    'fabricante_nombre':   f['nombre'],
-                    'pais_id':             int(f['pais_id']),
-                    'fabricante_telefono': f.get('telefono') or None,
+                    'fabricante_nombre':   _get_str(f, 'nombre', 'nombre del fabricante', required=True),
+                    'pais_id':             _get_int(f, 'pais_id', 'país', required=True),
+                    'fabricante_telefono': _get_str(f, 'telefono', 'teléfono'),
                 })
                 flash('Fabricante registrado.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+            else:
+                raise FormError('Acción inválida.')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('fabricantes'))
     return render_template('admin/fabricantes.html',
                            fabricantes=repo.listar_fabricantes(),
                            proveedores=repo.listar_proveedores(),
                            paises=repo.listar_paises())
+
+
+@app.route('/admin/fabricantes/<int:fid>/editar', methods=['POST'])
+def editar_fabricante(fid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        campos = {
+            'fabricante_nombre':   _get_str(f, 'nombre', 'nombre del fabricante', required=True),
+            'pais_id':             _get_int(f, 'pais_id', 'país', required=True),
+            'fabricante_telefono': _get_str(f, 'telefono', 'teléfono'),
+        }
+        repo.actualizar_fabricante(fid, campos)
+        flash('Fabricante actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('fabricantes'))
+
+
+@app.route('/admin/fabricantes/<int:fid>/eliminar', methods=['POST'])
+def eliminar_fabricante(fid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_fabricante(fid)
+        flash('Fabricante eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('fabricantes'))
+
+
+@app.route('/admin/proveedores/<int:pid>/editar', methods=['POST'])
+def editar_proveedor(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        campos = {
+            'proveedor_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+            'proveedor_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+            'proveedor_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+            'proveedor_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+            'proveedor_email':        _get_str(f, 'email',     'correo electrónico', lower=True),
+            'proveedor_telefono':     _get_str(f, 'telefono',  'teléfono'),
+            'proveedor_empresa':      _get_str(f, 'empresa',   'empresa'),
+            'fabricante_id':          _get_int(f, 'fabricante_id', 'fabricante', required=True),
+        }
+        repo.actualizar_proveedor(pid, campos)
+        flash('Proveedor actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('fabricantes'))
+
+
+@app.route('/admin/proveedores/<int:pid>/eliminar', methods=['POST'])
+def eliminar_proveedor(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_proveedor(pid)
+        flash('Proveedor eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('fabricantes'))
 
 
 @app.route('/admin/lotes', methods=['GET', 'POST'])
@@ -1253,24 +1835,29 @@ def lotes():
 
         if accion == 'nuevo_lote':
             try:
+                fecha_fab = _get_date(f, 'fecha_fab', 'fecha de fabricación', required=True)
+                fecha_cad = _get_date(f, 'fecha_cad', 'fecha de caducidad',  required=True)
+                if fecha_cad <= fecha_fab:
+                    raise FormError('La fecha de caducidad debe ser posterior a la fecha de fabricación.')
+                cantidad = _get_int(f, 'cantidad', 'cantidad', required=True, min_value=1)
                 repo.crear_lote({
-                    'lote_codigo':            f['codigo'],
-                    'lote_fecha_fabricacion': date.fromisoformat(f['fecha_fab']),
-                    'lote_fecha_caducidad':   date.fromisoformat(f['fecha_cad']),
-                    'lote_cant_inicial':      int(f['cantidad']),
-                    'vacuna_id':              int(f['vacuna_id']),
-                    'fabricante_id':          int(f['fabricante_id']),
-                    'proveedor_id':           int(f['proveedor_id']),
+                    'lote_codigo':            _get_str(f, 'codigo', 'código del lote', required=True, max_len=50),
+                    'lote_fecha_fabricacion': fecha_fab,
+                    'lote_fecha_caducidad':   fecha_cad,
+                    'lote_cant_inicial':      cantidad,
+                    'vacuna_id':              _get_int(f, 'vacuna_id', 'vacuna', required=True),
+                    'fabricante_id':          _get_int(f, 'fabricante_id', 'fabricante', required=True),
+                    'proveedor_id':           _get_int(f, 'proveedor_id', 'proveedor', required=True),
                 })
                 flash('Lote registrado.', 'success')
-            except ValueError as e:
-                flash(str(e), 'error')
+            except Exception as e:
+                _flash_error(e)
 
         elif accion == 'asignar_inventario':
             try:
-                centro_id_inv = int(f['centro_id'])
-                lote_id_inv   = int(f['lote_id'])
-                stock_inv     = int(f['stock'])
+                centro_id_inv = _get_int(f, 'centro_id', 'centro de salud', required=True)
+                lote_id_inv   = _get_int(f, 'lote_id',   'lote',            required=True)
+                stock_inv     = _get_int(f, 'stock',     'stock',           required=True, min_value=1)
                 result_inv = repo.asignar_inventario({
                     'centro_id':               centro_id_inv,
                     'lote_id':                 lote_id_inv,
@@ -1281,19 +1868,24 @@ def lotes():
                 centros_map = {c['centro_id']: c['centro_nombre'] for c in repo.listar_centros()}
                 vacunas_map = {v['vacuna_id']: v['vacuna_nombre'] for v in repo.listar_vacunas()}
                 lote_obj    = repo.obtener_lote(lote_id_inv)
-                mdb.log_inventario(
-                    evento='asignacion',
-                    pg_inventario_id=result_inv.get('p_id') if result_inv else None,
-                    pg_centro_id=centro_id_inv,
-                    pg_lote_id=lote_id_inv,
-                    pg_usuario_id=session['user_id'],
-                    vacuna_nombre=vacunas_map.get(lote_obj['vacuna_id'], '—') if lote_obj else '—',
-                    centro_nombre=centros_map.get(centro_id_inv, '—'),
-                    stock=stock_inv,
-                )
+                try:
+                    mdb.log_inventario(
+                        evento='asignacion',
+                        pg_inventario_id=result_inv.get('p_id') if result_inv else None,
+                        pg_centro_id=centro_id_inv,
+                        pg_lote_id=lote_id_inv,
+                        pg_usuario_id=session.get('user_id'),
+                        vacuna_nombre=vacunas_map.get(lote_obj['vacuna_id'], '—') if lote_obj else '—',
+                        centro_nombre=centros_map.get(centro_id_inv, '—'),
+                        stock=stock_inv,
+                    )
+                except Exception:
+                    pass
                 flash('Inventario asignado. El responsable del centro debe confirmar su recepción.', 'success')
-            except ValueError as e:
-                flash(str(e), 'error')
+            except Exception as e:
+                _flash_error(e)
+        else:
+            flash('Acción no reconocida.', 'error')
 
         return redirect(url_for('lotes'))
 
@@ -1306,6 +1898,46 @@ def lotes():
                            centros=repo.listar_centros())
 
 
+@app.route('/admin/lotes/<int:lid>/editar', methods=['POST'])
+def editar_lote(lid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        fecha_fab = _get_date(f, 'fecha_fab', 'fecha de fabricación', required=True)
+        fecha_cad = _get_date(f, 'fecha_cad', 'fecha de caducidad',  required=True)
+        if fecha_cad <= fecha_fab:
+            raise FormError('La fecha de caducidad debe ser posterior a la fecha de fabricación.')
+        campos = {
+            'lote_codigo':            _get_str(f, 'codigo', 'código del lote', required=True, max_len=50),
+            'lote_fecha_fabricacion': fecha_fab,
+            'lote_fecha_caducidad':   fecha_cad,
+            'lote_cant_inicial':      _get_int(f, 'cantidad', 'cantidad', required=True, min_value=1),
+            'vacuna_id':              _get_int(f, 'vacuna_id', 'vacuna', required=True),
+            'fabricante_id':          _get_int(f, 'fabricante_id', 'fabricante', required=True),
+            'proveedor_id':           _get_int(f, 'proveedor_id', 'proveedor', required=True),
+        }
+        repo.actualizar_lote(lid, campos)
+        flash('Lote actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('lotes'))
+
+
+@app.route('/admin/lotes/<int:lid>/eliminar', methods=['POST'])
+def eliminar_lote(lid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_lote(lid)
+        flash('Lote eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('lotes'))
+
+
 @app.route('/admin/inventario', methods=['GET', 'POST'])
 def inventario():
     redir = _require_admin()
@@ -1314,18 +1946,25 @@ def inventario():
     if request.method == 'POST':
         f = request.form
         try:
-            r = repo.transferir_inventario(
-                int(f['inv_origen_id']),
-                int(f['centro_destino_id']),
-                int(f['cantidad']),
-            )
+            inv_origen_id    = _get_int(f, 'inv_origen_id',    'inventario de origen', required=True)
+            centro_destino_id = _get_int(f, 'centro_destino_id', 'centro destino',     required=True)
+            cantidad         = _get_int(f, 'cantidad',         'cantidad a transferir', required=True, min_value=1)
+            inv_origen = repo.obtener_inventario(inv_origen_id)
+            if not inv_origen:
+                raise FormError('El inventario de origen no existe.')
+            if inv_origen.get('centro_id') == centro_destino_id:
+                raise FormError('El centro de origen y destino no pueden ser el mismo.')
+            r = repo.transferir_inventario(inv_origen_id, centro_destino_id, cantidad) or {}
             if r.get('p_ok') == 1:
-                flash(r.get('p_msg'), 'success')
+                flash(r.get('p_msg', 'Transferencia realizada.'), 'success')
             else:
-                flash(r.get('p_msg', 'Error al transferir.'), 'error')
-        except (ValueError, KeyError) as e:
-            flash(str(e), 'error')
+                flash(r.get('p_msg', 'No se pudo realizar la transferencia.'), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('inventario'))
+
+    # Riesgo 2: recalcular alertas antes de mostrar la página
+    repo.recalcular_alertas_inventario()
     return render_template('admin/inventario.html',
                            inventarios=repo.listar_inventarios(),
                            transferencias=repo.listar_transferencias(),
@@ -1333,6 +1972,39 @@ def inventario():
                            alertas_inv=repo.listar_alertas_inventario(),
                            alertas_dosis=repo.listar_alertas_dosis(),
                            today=date.today())
+
+
+@app.route('/admin/inventario/<int:iid>/editar', methods=['POST'])
+def editar_inventario(iid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        stock_actual = _get_int(f, 'stock_actual', 'stock actual', required=True, min_value=0)
+        activo       = 1 if (f.get('activo') in ('1', 'on', 'true', 'yes')) else 0
+        campos = {
+            'inventario_stock_actual': stock_actual,
+            'inventario_activo':       activo,
+        }
+        repo.actualizar_inventario(iid, campos)
+        flash('Inventario actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('inventario'))
+
+
+@app.route('/admin/inventario/<int:iid>/eliminar', methods=['POST'])
+def eliminar_inventario(iid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_inventario(iid)
+        flash('Registro de inventario eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('inventario'))
 
 
 @app.route('/admin/api/inventarios-activos-centro/<int:centro_id>')
@@ -1359,61 +2031,73 @@ def aplicaciones():
         return redir
     if request.method == 'POST':
         f = request.form
-        if not f.get('paciente_id') or not f.get('dosis_id') or not f.get('inventario_id') or not f.get('responsable_id'):
-            flash('Todos los campos son obligatorios.', 'error')
-            return redirect(url_for('aplicaciones'))
+        try:
+            inventario_id = _get_int(f, 'inventario_id', 'inventario',  required=True)
+            pid           = _get_int(f, 'paciente_id',   'paciente',    required=True)
+            did           = _get_int(f, 'dosis_id',      'dosis',       required=True)
+            resp_id       = _get_int(f, 'responsable_id', 'responsable', required=True)
 
-        inventario_id = int(f['inventario_id'])
-        inv = repo.obtener_inventario(inventario_id)
-        if not inv or not inv.get('inventario_activo') or inv['inventario_stock_actual'] <= 0:
-            flash('No hay stock disponible en el inventario seleccionado.', 'error')
-            return redirect(url_for('aplicaciones'))
+            inv = repo.obtener_inventario(inventario_id)
+            if not inv:
+                raise FormError('El inventario seleccionado no existe.')
+            if not inv.get('inventario_activo') or (inv.get('inventario_stock_actual') or 0) <= 0:
+                raise FormError('No hay stock disponible en el inventario seleccionado.')
 
-        pid = int(f['paciente_id'])
-        did = int(f['dosis_id'])
-        if repo.dosis_ya_aplicada(pid, did):
-            flash('Esta dosis ya fue aplicada a este paciente.', 'error')
-            return redirect(url_for('aplicaciones'))
+            # Riesgo 1: bloquear lote caducado antes de aplicar
+            cad = inv.get('lote_fecha_caducidad')
+            if cad and isinstance(cad, date) and cad < date.today():
+                raise FormError(
+                    f'El lote caducó el {cad.strftime("%d/%m/%Y")}. No se puede aplicar una vacuna caducada.'
+                )
 
-        pac = repo.obtener_paciente(pid)
-        dos = repo.obtener_dosis(did)
+            if repo.dosis_ya_aplicada(pid, did):
+                # Riesgo 3: registrar alerta clínica
+                repo.registrar_alerta_dosis(pid, did, 'FALTANTE')
+                raise FormError('Esta dosis ya fue aplicada anteriormente a este paciente.')
 
-        if pac and dos:
+            pac = repo.obtener_paciente(pid)
+            dos = repo.obtener_dosis(did)
+            if not pac:
+                raise FormError('El paciente seleccionado no existe.')
+            if not dos:
+                raise FormError('La dosis seleccionada no existe.')
+
             aplicaciones_previas = repo.aplicaciones_de_paciente(pid)
             ok, error_msg = validar_aplicacion(pac, dos, aplicaciones_previas)
             if not ok:
-                flash(error_msg, 'error')
-                return redirect(url_for('aplicaciones'))
+                # Riesgo 3: registrar alerta de regla clínica violada
+                tipo_alerta = 'ATRASADA' if 'límite' in (error_msg or '').lower() else 'FALTANTE'
+                repo.registrar_alerta_dosis(pid, did, tipo_alerta)
+                raise FormError(error_msg)
 
-        resp_id = int(f['responsable_id'])
-
-        datos = {
-            'paciente_id':              pid,
-            'usuario_id':               resp_id,
-            'centro_id':                inv['centro_id'],
-            'lote_id':                  inv['lote_id'],
-            'dosis_id':                 did,
-            'aplicacion_observaciones': f.get('observaciones', ''),
-        }
-        try:
+            datos = {
+                'paciente_id':              pid,
+                'usuario_id':               resp_id,
+                'centro_id':                inv['centro_id'],
+                'lote_id':                  inv['lote_id'],
+                'dosis_id':                 did,
+                'aplicacion_observaciones': _get_str(f, 'observaciones', 'observaciones') or '',
+            }
             result = repo.registrar_aplicacion(datos)
-            mdb.log_aplicacion(
-                pg_aplicacion_id=result.get('p_id') if result else None,
-                pg_paciente_id=pid,
-                pg_usuario_id=resp_id,
-                pg_centro_id=inv['centro_id'],
-                pg_lote_id=inv['lote_id'],
-                pg_dosis_id=did,
-                vacuna_nombre=dos['vacuna_nombre'] if dos and 'vacuna_nombre' in dos else '—',
-                paciente_nombre=(f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}"
-                                 if pac else '—'),
-                responsable_nombre=session.get('user_name', '—'),
-                centro_nombre=inv.get('centro_nombre', '—'),
-                observaciones=f.get('observaciones') or None,
-            )
+            try:
+                mdb.log_aplicacion(
+                    pg_aplicacion_id=result.get('p_id') if result else None,
+                    pg_paciente_id=pid,
+                    pg_usuario_id=resp_id,
+                    pg_centro_id=inv['centro_id'],
+                    pg_lote_id=inv['lote_id'],
+                    pg_dosis_id=did,
+                    vacuna_nombre=dos.get('vacuna_nombre', '—'),
+                    paciente_nombre=f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}",
+                    responsable_nombre=session.get('user_name', '—'),
+                    centro_nombre=inv.get('centro_nombre', '—'),
+                    observaciones=datos['aplicacion_observaciones'] or None,
+                )
+            except Exception:
+                pass
             flash('Aplicación registrada.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('aplicaciones'))
 
     todas_dosis = repo.listar_dosis()
@@ -1434,6 +2118,37 @@ def aplicaciones():
                            dosis_list=dosis_list)
 
 
+@app.route('/admin/aplicaciones/<int:aid>/editar', methods=['POST'])
+def editar_aplicacion(aid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    f = request.form
+    try:
+        campos = {
+            'aplicacion_observaciones': _get_str(f, 'observaciones', 'observaciones') or '',
+        }
+        repo.actualizar_aplicacion(aid, campos)
+        flash('Aplicación actualizada.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('aplicaciones'))
+
+
+@app.route('/admin/aplicaciones/<int:aid>/anular', methods=['POST'])
+def anular_aplicacion(aid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        motivo = _get_str(request.form, 'motivo', 'motivo de anulación') or 'Anulada por administrador'
+        repo.anular_aplicacion(aid, motivo)
+        flash('Aplicación anulada. El stock fue restaurado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('aplicaciones'))
+
+
 @app.route('/admin/geografia', methods=['GET', 'POST'])
 def geografia():
     redir = _require_admin()
@@ -1444,21 +2159,117 @@ def geografia():
         f      = request.form
         try:
             if accion == 'pais':
-                repo.crear_pais(f['nombre'])
+                nombre = _get_str(f, 'nombre', 'nombre del país', required=True, max_len=80)
+                repo.crear_pais(nombre)
                 flash('País registrado.', 'success')
             elif accion == 'estado':
-                repo.crear_estado({'estado_nombre': f['nombre'], 'pais_id': int(f['pais_id'])})
+                repo.crear_estado({
+                    'estado_nombre': _get_str(f, 'nombre', 'nombre del estado', required=True, max_len=80),
+                    'pais_id':       _get_int(f, 'pais_id', 'país', required=True),
+                })
                 flash('Estado registrado.', 'success')
             elif accion == 'ciudad':
-                repo.crear_ciudad({'ciudad_nombre': f['nombre'], 'estado_id': int(f['estado_id'])})
+                repo.crear_ciudad({
+                    'ciudad_nombre': _get_str(f, 'nombre', 'nombre de la ciudad', required=True, max_len=80),
+                    'estado_id':     _get_int(f, 'estado_id', 'estado', required=True),
+                })
                 flash('Ciudad registrada.', 'success')
-        except ValueError as e:
-            flash(str(e), 'error')
+            else:
+                raise FormError('Acción no reconocida.')
+        except Exception as e:
+            _flash_error(e)
         return redirect(url_for('geografia'))
     return render_template('admin/geografia.html',
                            paises=repo.listar_paises(),
                            estados=repo.listar_estados(),
                            ciudades=repo.listar_ciudades())
+
+
+@app.route('/admin/geografia/pais/<int:pid>/editar', methods=['POST'])
+def editar_pais(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        nombre = _get_str(request.form, 'nombre', 'nombre del país', required=True, max_len=80)
+        repo.actualizar_pais(pid, nombre)
+        flash('País actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('geografia'))
+
+
+@app.route('/admin/geografia/pais/<int:pid>/eliminar', methods=['POST'])
+def eliminar_pais(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_pais(pid)
+        flash('País eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('geografia'))
+
+
+@app.route('/admin/geografia/estado/<int:eid>/editar', methods=['POST'])
+def editar_estado(eid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        campos = {
+            'estado_nombre': _get_str(request.form, 'nombre',  'nombre del estado', required=True, max_len=80),
+            'pais_id':       _get_int(request.form, 'pais_id', 'país',              required=True),
+        }
+        repo.actualizar_estado(eid, campos)
+        flash('Estado actualizado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('geografia'))
+
+
+@app.route('/admin/geografia/estado/<int:eid>/eliminar', methods=['POST'])
+def eliminar_estado(eid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_estado(eid)
+        flash('Estado eliminado.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('geografia'))
+
+
+@app.route('/admin/geografia/ciudad/<int:cid>/editar', methods=['POST'])
+def editar_ciudad(cid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        campos = {
+            'ciudad_nombre': _get_str(request.form, 'nombre',    'nombre de la ciudad', required=True, max_len=80),
+            'estado_id':     _get_int(request.form, 'estado_id', 'estado',              required=True),
+        }
+        repo.actualizar_ciudad(cid, campos)
+        flash('Ciudad actualizada.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('geografia'))
+
+
+@app.route('/admin/geografia/ciudad/<int:cid>/eliminar', methods=['POST'])
+def eliminar_ciudad(cid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        repo.eliminar_ciudad(cid)
+        flash('Ciudad eliminada.', 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('geografia'))
 
 
 @app.route('/admin/api/estados/<int:pais_id>')

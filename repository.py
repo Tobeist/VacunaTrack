@@ -65,6 +65,16 @@ def eliminar_admin(admin_id: int, session_id: int = 0) -> None:
     _sp('sp_eliminar_admin', [admin_id, session_id], out_count=2)
 
 
+def actualizar_admin(admin_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_admin', [
+        admin_id,
+        campos.get('admin_prim_nombre'), campos.get('admin_seg_nombre'),
+        campos.get('admin_apellido_pat'), campos.get('admin_apellido_mat'),
+        campos.get('admin_telefono'), campos.get('admin_curp'),
+        campos.get('admin_rfc'), campos.get('admin_email'),
+    ], out_count=2)
+
+
 # ─────────────────────────────────────────────
 # PACIENTES
 # ─────────────────────────────────────────────
@@ -102,6 +112,17 @@ def crear_paciente(datos: dict) -> dict:
 
 def eliminar_paciente(paciente_id: int) -> None:
     _sp('sp_eliminar_paciente', [paciente_id], out_count=2)
+
+
+def actualizar_paciente(paciente_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_paciente', [
+        paciente_id,
+        campos.get('paciente_prim_nombre'), campos.get('paciente_seg_nombre'),
+        campos.get('paciente_apellido_pat'), campos.get('paciente_apellido_mat'),
+        campos.get('paciente_curp'), campos.get('paciente_num_cert_nac'),
+        campos.get('paciente_fecha_nac'), campos.get('paciente_sexo'),
+        campos.get('paciente_nfc'), campos.get('esquema_id'),
+    ], out_count=2)
 
 
 # ─────────────────────────────────────────────
@@ -177,6 +198,17 @@ def eliminar_responsable(responsable_id: int) -> None:
     _sp('sp_eliminar_responsable', [responsable_id], out_count=2)
 
 
+def actualizar_responsable(responsable_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_responsable', [
+        responsable_id,
+        campos.get('responsable_prim_nombre'), campos.get('responsable_seg_nombre'),
+        campos.get('responsable_apellido_pat'), campos.get('responsable_apellido_mat'),
+        campos.get('responsable_telefono'), campos.get('responsable_curp'),
+        campos.get('responsable_rfc'), campos.get('responsable_email'),
+        campos.get('centro_id'),
+    ], out_count=2)
+
+
 def cedulas_de_responsable(usuario_id: int) -> list[dict]:
     return db.call_read_sp('sp_cedulas_de_responsable', [usuario_id])
 
@@ -241,6 +273,21 @@ def registrar_aplicacion(datos: dict) -> dict:
     return db.call_read_sp_one('sp_obtener_aplicacion', [r['p_id']]) or {}
 
 
+def obtener_aplicacion(aplicacion_id: int) -> dict | None:
+    return db.call_read_sp_one('sp_obtener_aplicacion', [aplicacion_id])
+
+
+def actualizar_aplicacion(aplicacion_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_aplicacion', [
+        aplicacion_id,
+        campos.get('aplicacion_observaciones'),
+    ], out_count=2)
+
+
+def anular_aplicacion(aplicacion_id: int, motivo: str) -> None:
+    _sp('sp_anular_aplicacion', [aplicacion_id, motivo], out_count=2)
+
+
 def historial_vacunacion_paciente(paciente_id: int, esquema_id: int) -> list[dict]:
     """Dosis del esquema del paciente con info de aplicación (LEFT JOIN sobre vistas)."""
     return db.call_read_sp('sp_historial_vacunacion_paciente', [paciente_id, esquema_id])
@@ -297,6 +344,42 @@ def centros_con_vacuna_disponible(vacuna_id: int) -> list[dict]:
     return db.call_read_sp('sp_centros_con_vacuna_disponible', [vacuna_id])
 
 
+def inventarios_disponibles_para_vacuna(vacuna_id: int, centro_id: int | None = None) -> list[dict]:
+    """Inventarios activos, con stock, no caducados, para una vacuna específica.
+    Si centro_id está dado, solo del centro indicado (uso clínico).
+    """
+    todos = db.call_read_sp('sp_listar_inventarios')
+    from datetime import date as _d
+    hoy = _d.today()
+    result = []
+    for inv in todos:
+        if not inv.get('inventario_activo'):
+            continue
+        if (inv.get('inventario_stock_actual') or 0) <= 0:
+            continue
+        if inv.get('vacuna_id') != vacuna_id:
+            continue
+        cad = inv.get('lote_fecha_caducidad')
+        if cad and hasattr(cad, 'year') and cad < hoy:
+            continue
+        if centro_id is not None and inv.get('centro_id') != centro_id:
+            continue
+        result.append(inv)
+    return result
+
+
+def actualizar_inventario(inventario_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_inventario', [
+        inventario_id,
+        campos.get('inventario_stock_actual'),
+        campos.get('inventario_activo'),
+    ], out_count=2)
+
+
+def eliminar_inventario(inventario_id: int) -> None:
+    _sp('sp_eliminar_inventario', [inventario_id], out_count=2)
+
+
 # ─────────────────────────────────────────────
 # LOTES
 # ─────────────────────────────────────────────
@@ -318,6 +401,23 @@ def crear_lote(datos: dict) -> dict:
         datos['proveedor_id'],
     ])
     return obtener_lote(r['p_id']) or {}
+
+
+def actualizar_lote(lote_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_lote', [
+        lote_id,
+        campos.get('lote_codigo'),
+        campos.get('lote_fecha_fabricacion'),
+        campos.get('lote_fecha_caducidad'),
+        campos.get('lote_cant_inicial'),
+        campos.get('vacuna_id'),
+        campos.get('fabricante_id'),
+        campos.get('proveedor_id'),
+    ], out_count=2)
+
+
+def eliminar_lote(lote_id: int) -> None:
+    _sp('sp_eliminar_lote', [lote_id], out_count=2)
 
 
 # ─────────────────────────────────────────────
@@ -344,6 +444,20 @@ def crear_proveedor(datos: dict) -> dict:
     return obtener_proveedor(r['p_id']) or {}
 
 
+def actualizar_proveedor(proveedor_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_proveedor', [
+        proveedor_id,
+        campos.get('proveedor_prim_nombre'), campos.get('proveedor_seg_nombre'),
+        campos.get('proveedor_apellido_pat'), campos.get('proveedor_apellido_mat'),
+        campos.get('proveedor_email'), campos.get('proveedor_telefono'),
+        campos.get('proveedor_empresa'), campos.get('fabricante_id'),
+    ], out_count=2)
+
+
+def eliminar_proveedor(proveedor_id: int) -> None:
+    _sp('sp_eliminar_proveedor', [proveedor_id], out_count=2)
+
+
 # ─────────────────────────────────────────────
 # CATÁLOGOS CLÍNICOS
 # ─────────────────────────────────────────────
@@ -359,6 +473,14 @@ def obtener_vacuna(vacuna_id: int) -> dict | None:
 def crear_vacuna(datos: dict) -> dict:
     r = _sp('sp_crear_vacuna', [datos['vacuna_nombre']])
     return obtener_vacuna(r['p_id']) or {}
+
+
+def actualizar_vacuna(vacuna_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_vacuna', [vacuna_id, campos.get('vacuna_nombre')], out_count=2)
+
+
+def eliminar_vacuna(vacuna_id: int) -> None:
+    _sp('sp_eliminar_vacuna', [vacuna_id], out_count=2)
 
 
 def listar_dosis(vacuna_id: int | None = None) -> list[dict]:
@@ -457,6 +579,37 @@ def vincular_vacuna_padecimiento(vacuna_id: int, padecimiento_id: int) -> None:
     db.call_write_sp('sp_vincular_vacuna_padecimiento', [vacuna_id, padecimiento_id])
 
 
+def actualizar_padecimiento(padecimiento_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_padecimiento', [
+        padecimiento_id,
+        campos.get('padecimiento_nombre'),
+        campos.get('padecimiento_descripcion'),
+    ], out_count=2)
+
+
+def eliminar_padecimiento(padecimiento_id: int) -> None:
+    _sp('sp_eliminar_padecimiento', [padecimiento_id], out_count=2)
+
+
+def vacunas_de_padecimiento(padecimiento_id: int) -> list[int]:
+    """Devuelve los IDs de vacunas vinculadas a un padecimiento."""
+    try:
+        rows = db.call_read_sp('sp_vacunas_de_padecimiento', [padecimiento_id])
+        return [r['vacuna_id'] for r in rows]
+    except Exception:
+        return []
+
+
+def sincronizar_vacunas_padecimiento(padecimiento_id: int, vacuna_ids: list[int]) -> None:
+    """Reemplaza el conjunto de vacunas vinculadas al padecimiento."""
+    db.call_write_sp('sp_limpiar_vacunas_padecimiento', [padecimiento_id], out_count=2)
+    for vid in vacuna_ids:
+        try:
+            db.call_write_sp('sp_vincular_vacuna_padecimiento', [vid, padecimiento_id])
+        except Exception:
+            continue
+
+
 # ─────────────────────────────────────────────
 # FABRICANTES
 # ─────────────────────────────────────────────
@@ -474,6 +627,19 @@ def crear_fabricante(datos: dict) -> dict:
         datos['fabricante_nombre'], datos['pais_id'], datos.get('fabricante_telefono'),
     ])
     return obtener_fabricante(r['p_id']) or {}
+
+
+def actualizar_fabricante(fabricante_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_fabricante', [
+        fabricante_id,
+        campos.get('fabricante_nombre'),
+        campos.get('pais_id'),
+        campos.get('fabricante_telefono'),
+    ], out_count=2)
+
+
+def eliminar_fabricante(fabricante_id: int) -> None:
+    _sp('sp_eliminar_fabricante', [fabricante_id], out_count=2)
 
 
 # ─────────────────────────────────────────────
@@ -528,6 +694,17 @@ def eliminar_centro(centro_id: int) -> None:
     _sp('sp_eliminar_centro', [centro_id], out_count=2)
 
 
+def actualizar_centro(centro_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_centro', [
+        centro_id,
+        campos.get('centro_nombre'), campos.get('centro_calle'), campos.get('centro_numero'),
+        campos.get('centro_codigo_postal'), campos.get('ciudad_id'),
+        campos.get('centro_horario_inicio'), campos.get('centro_horario_fin'),
+        campos.get('centro_latitud'), campos.get('centro_longitud'),
+        campos.get('centro_telefono'), campos.get('centro_beacon'),
+    ], out_count=2)
+
+
 # ─────────────────────────────────────────────
 # GEOGRAFÍA
 # ─────────────────────────────────────────────
@@ -545,6 +722,14 @@ def crear_pais(nombre: str) -> dict:
     return obtener_pais(r['p_id']) or {}
 
 
+def actualizar_pais(pais_id: int, nombre: str) -> None:
+    _sp('sp_actualizar_pais', [pais_id, nombre], out_count=2)
+
+
+def eliminar_pais(pais_id: int) -> None:
+    _sp('sp_eliminar_pais', [pais_id], out_count=2)
+
+
 def listar_estados(pais_id: int | None = None) -> list[dict]:
     if pais_id:
         return db.call_read_sp('sp_listar_estados_por_pais', [pais_id])
@@ -558,6 +743,16 @@ def obtener_estado(estado_id: int) -> dict | None:
 def crear_estado(datos: dict) -> dict:
     r = _sp('sp_crear_estado', [datos['estado_nombre'], datos['pais_id']])
     return obtener_estado(r['p_id']) or {}
+
+
+def actualizar_estado(estado_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_estado', [
+        estado_id, campos.get('estado_nombre'), campos.get('pais_id'),
+    ], out_count=2)
+
+
+def eliminar_estado(estado_id: int) -> None:
+    _sp('sp_eliminar_estado', [estado_id], out_count=2)
 
 
 def listar_ciudades(estado_id: int | None = None) -> list[dict]:
@@ -575,6 +770,16 @@ def crear_ciudad(datos: dict) -> dict:
     return obtener_ciudad(r['p_id']) or {}
 
 
+def actualizar_ciudad(ciudad_id: int, campos: dict) -> None:
+    _sp('sp_actualizar_ciudad', [
+        ciudad_id, campos.get('ciudad_nombre'), campos.get('estado_id'),
+    ], out_count=2)
+
+
+def eliminar_ciudad(ciudad_id: int) -> None:
+    _sp('sp_eliminar_ciudad', [ciudad_id], out_count=2)
+
+
 # ─────────────────────────────────────────────
 # ALERTAS
 # ─────────────────────────────────────────────
@@ -585,6 +790,22 @@ def listar_alertas_inventario() -> list[dict]:
 
 def listar_alertas_dosis() -> list[dict]:
     return db.call_read_sp('sp_listar_alertas_dosis')
+
+
+def recalcular_alertas_inventario(dias_caducidad: int = 30) -> None:
+    """Pobla la tabla alertas_inventario según el estado actual de los lotes y stocks."""
+    try:
+        db.call_write_sp('sp_recalcular_alertas_inventario', [dias_caducidad], out_count=2)
+    except Exception:
+        pass
+
+
+def registrar_alerta_dosis(paciente_id: int, dosis_id: int, tipo: str) -> None:
+    """Registra una alerta clínica para un paciente. tipo ∈ APLICABLE|ATRASADA|CERCA_LIMITE|FALTANTE."""
+    try:
+        db.call_write_sp('sp_registrar_alerta_dosis', [paciente_id, dosis_id, tipo], out_count=2)
+    except Exception:
+        pass
 
 
 # ─────────────────────────────────────────────

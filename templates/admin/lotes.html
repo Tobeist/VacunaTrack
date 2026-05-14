@@ -69,7 +69,7 @@
         <table class="table" id="tabla-lotes">
           <thead><tr>
             <th>Código</th><th>Vacuna</th><th>Fabricante</th>
-            <th>Fabricación</th><th>Caducidad</th><th>Cant. inicial</th>
+            <th>Fabricación</th><th>Caducidad</th><th>Cant. inicial</th><th>Acciones</th>
           </tr></thead>
           <tbody>
             {% for l in lotes %}
@@ -84,9 +84,71 @@
                 {% if is_expired %}<span class="badge badge-caducado" style="margin-left:4px">Caducado</span>{% endif %}
               </td>
               <td class="fw-600">{{ l.lote_cant_inicial }}</td>
+              <td>
+                <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-lote-{{ l.lote_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('eliminar_lote', lid=l.lote_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar el lote {{ l.lote_codigo }}? Esta acción no se puede deshacer.">🗑</button>
+                  </form>
+                </div>
+              </td>
             </tr>
+
+            <div class="modal-overlay" id="edit-lote-{{ l.lote_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar Lote</span>
+                  <button class="btn-close" data-close-modal="edit-lote-{{ l.lote_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('editar_lote', lid=l.lote_id) }}">
+                  <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Código de lote</label>
+                      <input type="text" name="codigo" class="form-control" value="{{ l.lote_codigo }}" required></div>
+                    <div class="form-group"><label class="form-label">Vacuna</label>
+                      <select name="vacuna_id" class="form-select" required>
+                        <option value="">— Selecciona vacuna —</option>
+                        {% for v in vacunas %}
+                        <option value="{{ v.vacuna_id }}" {% if v.vacuna_id == l.vacuna_id %}selected{% endif %}>{{ v.vacuna_nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Fabricante</label>
+                      <select name="fabricante_id" class="form-select" required>
+                        <option value="">— Selecciona fabricante —</option>
+                        {% for f in fabricantes %}
+                        <option value="{{ f.fabricante_id }}" {% if f.fabricante_id == l.fabricante_id %}selected{% endif %}>{{ f.fabricante_nombre }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Proveedor</label>
+                      <select name="proveedor_id" class="form-select" required>
+                        <option value="">— Selecciona proveedor —</option>
+                        {% for pv in proveedores %}
+                        <option value="{{ pv.proveedor_id }}" {% if pv.proveedor_id == l.proveedor_id %}selected{% endif %}>{{ pv.proveedor_prim_nombre|cap }} {{ pv.proveedor_apellido_pat|cap }}{% if pv.proveedor_empresa %} — {{ pv.proveedor_empresa }}{% endif %}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">Fecha de fabricación</label>
+                        <input type="date" name="fecha_fab" class="form-control" value="{{ l.lote_fecha_fabricacion }}" required></div>
+                      <div class="form-group"><label class="form-label">Fecha de caducidad</label>
+                        <input type="date" name="fecha_cad" class="form-control" value="{{ l.lote_fecha_caducidad }}" required></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">Cantidad inicial</label>
+                      <input type="number" name="cantidad" class="form-control" min="1" value="{{ l.lote_cant_inicial }}" required></div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-lote-{{ l.lote_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             {% else %}
-            <tr><td colspan="6" class="text-center text-muted" style="padding:40px">No lotes registrados.</td></tr>
+            <tr><td colspan="7" class="text-center text-muted" style="padding:40px">No lotes registrados.</td></tr>
             {% endfor %}
           </tbody>
         </table>

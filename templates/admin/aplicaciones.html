@@ -32,29 +32,21 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Inventario / Lote <span class="required">*</span></label>
-          <select name="inventario_id" class="form-select" required>
-            <option value="">— Selecciona lote disponible —</option>
-            {% for inv in inventarios %}
-            <option value="{{ inv.inventario_id }}">
-              {{ inv.vacuna_nombre }} · Lote {{ inv.lote_codigo }} · {{ inv.centro_nombre }}
-              ({{ inv.inventario_stock_actual }} dosis)
-            </option>
-            {% endfor %}
-          </select>
-          {% if not inventarios %}
-          <div class="form-error">⚠ No inventario activo con stock. Registra y asigna lotes primero.</div>
-          {% endif %}
-        </div>
-
-        <div class="form-group">
           <label class="form-label">Dosis <span class="required">*</span></label>
-          <select name="dosis_id" class="form-select" required>
-            <option value="">— Selecciona dosiss —</option>
+          <select name="dosis_id" id="sel-dosis-admin" class="form-select" required>
+            <option value="">— Selecciona dosis —</option>
             {% for d in dosis_list %}
             <option value="{{ d.dosis_id }}">{{ d.vacuna_nombre }} — {{ d.dosis_tipo }}</option>
             {% endfor %}
           </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Lote <span class="required">*</span></label>
+          <select name="inventario_id" id="sel-inv-admin" class="form-select" required disabled>
+            <option value="">— Selecciona dosis primero —</option>
+          </select>
+          <div id="inv-hint-admin" class="form-hint" style="display:none"></div>
         </div>
 
         <div class="form-group">
@@ -80,7 +72,7 @@
     <div class="table-wrapper">
       <table class="table" id="tabla-aplic">
         <thead><tr>
-          <th>Fecha</th><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Responsable</th><th>Centro</th>
+          <th>Fecha</th><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Responsable</th><th>Centro</th><th>Acciones</th>
         </tr></thead>
         <tbody>
           {% for a in aplicaciones %}
@@ -91,9 +83,58 @@
             <td><span class="badge badge-aplicada">{{ a.dosis_tipo }}</span></td>
             <td class="fs-sm">{{ a.responsable }}</td>
             <td class="fs-sm">{{ a.centro_nombre }}</td>
+            <td>
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm" data-open-modal="edit-aplic-{{ a.aplicacion_id }}"
+                        title="Editar observaciones">✏️</button>
+                <button class="btn btn-danger btn-sm" data-open-modal="anular-aplic-{{ a.aplicacion_id }}"
+                        title="Anular">🗑</button>
+              </div>
+            </td>
           </tr>
+
+          <div class="modal-overlay" id="edit-aplic-{{ a.aplicacion_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">✏️ Editar Observaciones</span>
+                <button class="btn-close" data-close-modal="edit-aplic-{{ a.aplicacion_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('editar_aplicacion', aid=a.aplicacion_id) }}">
+                <div class="modal-body">
+                  <p class="text-muted fs-sm mb-8">{{ a.paciente }} · {{ a.vacuna_nombre }} ({{ a.dosis_tipo }})</p>
+                  <div class="form-group"><label class="form-label">Observaciones</label>
+                    <textarea name="observaciones" class="form-textarea" rows="4">{{ a.aplicacion_observaciones or '' }}</textarea></div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="edit-aplic-{{ a.aplicacion_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <div class="modal-overlay" id="anular-aplic-{{ a.aplicacion_id }}">
+            <div class="modal">
+              <div class="modal-header">
+                <span class="modal-title">🗑 Anular Aplicación</span>
+                <button class="btn-close" data-close-modal="anular-aplic-{{ a.aplicacion_id }}">✕</button>
+              </div>
+              <form method="POST" action="{{ url_for('anular_aplicacion', aid=a.aplicacion_id) }}">
+                <div class="modal-body">
+                  <p class="text-muted fs-sm mb-8">Se anulará la aplicación de <strong>{{ a.vacuna_nombre }}</strong> al paciente <strong>{{ a.paciente }}</strong> y el stock será restaurado.</p>
+                  <div class="form-group"><label class="form-label">Motivo de anulación <span class="required">*</span></label>
+                    <textarea name="motivo" class="form-textarea" rows="3" required placeholder="Describe el motivo de la anulación…"></textarea></div>
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-close-modal="anular-aplic-{{ a.aplicacion_id }}">Cancelar</button>
+                  <button type="submit" class="btn btn-danger">Anular aplicación</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
           {% else %}
-          <tr><td colspan="6" class="text-center text-muted" style="padding:40px">Sin aplicaciones registradas.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted" style="padding:40px">Sin aplicaciones registradas.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -101,4 +142,47 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const SEL_DOSIS_A = document.getElementById('sel-dosis-admin');
+const SEL_INV_A   = document.getElementById('sel-inv-admin');
+const INV_HINT_A  = document.getElementById('inv-hint-admin');
+
+async function cargarLotesAdmin(dosisId) {
+  if (!dosisId) {
+    SEL_INV_A.innerHTML = '<option value="">— Selecciona dosis primero —</option>';
+    SEL_INV_A.disabled = true;
+    INV_HINT_A.style.display = 'none';
+    return;
+  }
+  SEL_INV_A.innerHTML = '<option value="">Cargando…</option>';
+  SEL_INV_A.disabled = true;
+  INV_HINT_A.style.display = 'none';
+  try {
+    const res  = await fetch(`/admin/api/inventarios-para-dosis/${dosisId}`);
+    const data = await res.json();
+    if (data.length === 0) {
+      SEL_INV_A.innerHTML = '<option value="">Sin lotes disponibles</option>';
+      INV_HINT_A.textContent = 'No hay lotes activos con stock para esta vacuna. Registra un lote nuevo.';
+      INV_HINT_A.style.display = 'block';
+      INV_HINT_A.classList.add('text-danger');
+      return;
+    }
+    SEL_INV_A.innerHTML = '<option value="">— Selecciona lote —</option>';
+    data.forEach(inv => {
+      const opt = document.createElement('option');
+      opt.value = inv.inventario_id;
+      opt.textContent = `Lote ${inv.lote_codigo} — ${inv.centro_nombre} (${inv.stock} dosis · cad. ${inv.lote_caducidad || 's/f'})`;
+      SEL_INV_A.appendChild(opt);
+    });
+    SEL_INV_A.disabled = false;
+  } catch (e) {
+    SEL_INV_A.innerHTML = '<option value="">Error al cargar lotes</option>';
+  }
+}
+
+SEL_DOSIS_A.addEventListener('change', () => cargarLotesAdmin(SEL_DOSIS_A.value));
+</script>
 {% endblock %}

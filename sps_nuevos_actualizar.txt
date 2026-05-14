@@ -1,0 +1,870 @@
+-- ═════════════════════════════════════════════════════════════════
+-- VacunaTrack — Stored Procedures de actualización/eliminación
+-- ═════════════════════════════════════════════════════════════════
+-- Estos SPs complementan vacunatrack_diaitc.sql para habilitar la
+-- edición y eliminación segura de todos los recursos administrativos.
+-- Cada SP devuelve p_ok (1/0) y p_msg en español listo para mostrar
+-- al usuario. Las validaciones internas evitan exponer errores
+-- técnicos de PostgreSQL (foreign key, unique, check, etc.).
+--
+-- Ejecutar este archivo COMPLETO sobre la base de datos VacunaTrack
+-- DESPUÉS de aplicar vacunatrack_diaitc.sql.
+-- ═════════════════════════════════════════════════════════════════
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- ADMINISTRADORES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_admin(
+    IN  p_admin_id     INTEGER,
+    IN  p_prim_nombre  VARCHAR(100), IN  p_seg_nombre   VARCHAR(100),
+    IN  p_apellido_pat VARCHAR(100), IN  p_apellido_mat VARCHAR(100),
+    IN  p_telefono     VARCHAR(20),  IN  p_curp         VARCHAR(18),
+    IN  p_rfc          VARCHAR(13),  IN  p_email        VARCHAR(150),
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM usuarios WHERE usuario_id = p_admin_id) THEN
+        p_ok := 0; p_msg := 'Administrador no encontrado.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND p_telefono !~ '^[0-9]{10}$' THEN
+        p_ok := 0; p_msg := 'El teléfono debe tener exactamente 10 dígitos.'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND LENGTH(TRIM(p_curp)) != 18 THEN
+        p_ok := 0; p_msg := 'La CURP debe tener 18 caracteres.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_telefono = TRIM(p_telefono) AND usuario_id != p_admin_id) THEN
+        p_ok := 0; p_msg := 'El teléfono ya está registrado en otro usuario.'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_curp = UPPER(TRIM(p_curp)) AND usuario_id != p_admin_id) THEN
+        p_ok := 0; p_msg := 'La CURP ya está registrada en otro usuario.'; RETURN;
+    END IF;
+    IF p_rfc IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_rfc = UPPER(TRIM(p_rfc)) AND usuario_id != p_admin_id) THEN
+        p_ok := 0; p_msg := 'El RFC ya está registrado en otro usuario.'; RETURN;
+    END IF;
+
+    UPDATE usuarios SET
+        usuario_prim_nombre  = COALESCE(p_prim_nombre,  usuario_prim_nombre),
+        usuario_seg_nombre   = COALESCE(p_seg_nombre,   usuario_seg_nombre),
+        usuario_apellido_pat = COALESCE(p_apellido_pat, usuario_apellido_pat),
+        usuario_apellido_mat = COALESCE(p_apellido_mat, usuario_apellido_mat),
+        usuario_telefono     = COALESCE(TRIM(p_telefono), usuario_telefono),
+        usuario_curp         = COALESCE(UPPER(TRIM(p_curp)), usuario_curp),
+        usuario_rfc          = COALESCE(UPPER(TRIM(p_rfc)),  usuario_rfc)
+    WHERE usuario_id = p_admin_id;
+
+    IF p_email IS NOT NULL AND TRIM(p_email) != '' THEN
+        IF EXISTS(SELECT 1 FROM login WHERE login_correo = LOWER(TRIM(p_email)) AND usuario_id != p_admin_id) THEN
+            p_ok := 0; p_msg := 'El correo electrónico ya está registrado en otro usuario.'; RETURN;
+        END IF;
+        UPDATE login SET login_correo = LOWER(TRIM(p_email)) WHERE usuario_id = p_admin_id;
+    END IF;
+
+    p_ok := 1; p_msg := 'Administrador actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro administrador con esos datos (correo, teléfono, CURP o RFC).';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el administrador.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- RESPONSABLES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_responsable(
+    IN  p_responsable_id INTEGER,
+    IN  p_prim_nombre  VARCHAR(100), IN  p_seg_nombre   VARCHAR(100),
+    IN  p_apellido_pat VARCHAR(100), IN  p_apellido_mat VARCHAR(100),
+    IN  p_telefono     VARCHAR(20),  IN  p_curp         VARCHAR(18),
+    IN  p_rfc          VARCHAR(13),  IN  p_email        VARCHAR(150),
+    IN  p_centro_id    INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM usuarios WHERE usuario_id = p_responsable_id) THEN
+        p_ok := 0; p_msg := 'Responsable no encontrado.'; RETURN;
+    END IF;
+    IF p_centro_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM centros_salud WHERE centro_id = p_centro_id) THEN
+        p_ok := 0; p_msg := 'El centro de salud seleccionado no existe.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND p_telefono !~ '^[0-9]{10}$' THEN
+        p_ok := 0; p_msg := 'El teléfono debe tener exactamente 10 dígitos.'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND LENGTH(TRIM(p_curp)) != 18 THEN
+        p_ok := 0; p_msg := 'La CURP debe tener 18 caracteres.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_telefono = TRIM(p_telefono) AND usuario_id != p_responsable_id) THEN
+        p_ok := 0; p_msg := 'El teléfono ya está registrado en otro usuario.'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_curp = UPPER(TRIM(p_curp)) AND usuario_id != p_responsable_id) THEN
+        p_ok := 0; p_msg := 'La CURP ya está registrada en otro usuario.'; RETURN;
+    END IF;
+    IF p_rfc IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_rfc = UPPER(TRIM(p_rfc)) AND usuario_id != p_responsable_id) THEN
+        p_ok := 0; p_msg := 'El RFC ya está registrado en otro usuario.'; RETURN;
+    END IF;
+
+    UPDATE usuarios SET
+        usuario_prim_nombre  = COALESCE(p_prim_nombre,  usuario_prim_nombre),
+        usuario_seg_nombre   = COALESCE(p_seg_nombre,   usuario_seg_nombre),
+        usuario_apellido_pat = COALESCE(p_apellido_pat, usuario_apellido_pat),
+        usuario_apellido_mat = COALESCE(p_apellido_mat, usuario_apellido_mat),
+        usuario_telefono     = COALESCE(TRIM(p_telefono), usuario_telefono),
+        usuario_curp         = COALESCE(UPPER(TRIM(p_curp)), usuario_curp),
+        usuario_rfc          = COALESCE(UPPER(TRIM(p_rfc)),  usuario_rfc),
+        centro_id            = COALESCE(p_centro_id, centro_id)
+    WHERE usuario_id = p_responsable_id;
+
+    IF p_email IS NOT NULL AND TRIM(p_email) != '' THEN
+        IF EXISTS(SELECT 1 FROM login WHERE login_correo = LOWER(TRIM(p_email)) AND usuario_id != p_responsable_id) THEN
+            p_ok := 0; p_msg := 'El correo electrónico ya está registrado en otro usuario.'; RETURN;
+        END IF;
+        UPDATE login SET login_correo = LOWER(TRIM(p_email)) WHERE usuario_id = p_responsable_id;
+    END IF;
+
+    p_ok := 1; p_msg := 'Responsable actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro responsable con esos datos (correo, teléfono, CURP o RFC).';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el responsable.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- PACIENTES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_paciente(
+    IN  p_paciente_id    INTEGER,
+    IN  p_prim_nombre    VARCHAR(100), IN  p_seg_nombre   VARCHAR(100),
+    IN  p_apellido_pat   VARCHAR(100), IN  p_apellido_mat VARCHAR(100),
+    IN  p_curp           VARCHAR(18),  IN  p_num_cert_nac VARCHAR(50),
+    IN  p_fecha_nac      DATE,         IN  p_sexo         tipo_sexo,
+    IN  p_nfc            VARCHAR(100), IN  p_esquema_id   INTEGER,
+    OUT p_ok SMALLINT,   OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM pacientes WHERE paciente_id = p_paciente_id) THEN
+        p_ok := 0; p_msg := 'Paciente no encontrado.'; RETURN;
+    END IF;
+    IF p_curp IS NULL AND p_num_cert_nac IS NULL THEN
+        p_ok := 0; p_msg := 'Debes proporcionar al menos CURP o número de certificado de nacimiento.'; RETURN;
+    END IF;
+    IF p_fecha_nac IS NOT NULL AND p_fecha_nac > CURRENT_DATE THEN
+        p_ok := 0; p_msg := 'La fecha de nacimiento no puede ser futura.'; RETURN;
+    END IF;
+    IF p_esquema_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM esquemas WHERE esquema_id = p_esquema_id) THEN
+        p_ok := 0; p_msg := 'El esquema de vacunación seleccionado no existe.'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND
+       EXISTS(SELECT 1 FROM pacientes WHERE paciente_curp = UPPER(TRIM(p_curp)) AND paciente_id != p_paciente_id) THEN
+        p_ok := 0; p_msg := 'La CURP ya está registrada en otro paciente.'; RETURN;
+    END IF;
+    IF p_num_cert_nac IS NOT NULL AND
+       EXISTS(SELECT 1 FROM pacientes WHERE paciente_num_cert_nac = TRIM(p_num_cert_nac) AND paciente_id != p_paciente_id) THEN
+        p_ok := 0; p_msg := 'El número de certificado de nacimiento ya está registrado en otro paciente.'; RETURN;
+    END IF;
+    IF p_nfc IS NOT NULL AND
+       EXISTS(SELECT 1 FROM pacientes WHERE paciente_nfc = TRIM(p_nfc) AND paciente_id != p_paciente_id) THEN
+        p_ok := 0; p_msg := 'El UID NFC ya está registrado en otro paciente.'; RETURN;
+    END IF;
+
+    UPDATE pacientes SET
+        paciente_prim_nombre  = COALESCE(p_prim_nombre,  paciente_prim_nombre),
+        paciente_seg_nombre   = p_seg_nombre,
+        paciente_apellido_pat = COALESCE(p_apellido_pat, paciente_apellido_pat),
+        paciente_apellido_mat = p_apellido_mat,
+        paciente_curp         = CASE WHEN p_curp IS NULL THEN paciente_curp ELSE UPPER(TRIM(p_curp)) END,
+        paciente_num_cert_nac = CASE WHEN p_num_cert_nac IS NULL THEN paciente_num_cert_nac ELSE TRIM(p_num_cert_nac) END,
+        paciente_fecha_nac    = COALESCE(p_fecha_nac, paciente_fecha_nac),
+        paciente_sexo         = COALESCE(p_sexo, paciente_sexo),
+        paciente_nfc          = p_nfc,
+        esquema_id            = COALESCE(p_esquema_id, esquema_id)
+    WHERE paciente_id = p_paciente_id;
+
+    p_ok := 1; p_msg := 'Paciente actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro paciente con esos datos (CURP, certificado o NFC).';
+    WHEN check_violation THEN p_ok := 0; p_msg := 'Algunos datos no cumplen las validaciones (fecha futura o campos vacíos).';
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'El esquema seleccionado no existe.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el paciente.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- CENTROS DE SALUD
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_centro(
+    IN  p_centro_id      INTEGER,
+    IN  p_nombre         VARCHAR(150),
+    IN  p_calle          VARCHAR(150), IN  p_numero       VARCHAR(10),
+    IN  p_codigo_postal  VARCHAR(10),  IN  p_ciudad_id    INTEGER,
+    IN  p_horario_inicio TIME,         IN  p_horario_fin  TIME,
+    IN  p_latitud        NUMERIC(11,8),IN  p_longitud     NUMERIC(11,8),
+    IN  p_telefono       VARCHAR(20),  IN  p_beacon       VARCHAR(100),
+    OUT p_ok SMALLINT,   OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM centros_salud WHERE centro_id = p_centro_id) THEN
+        p_ok := 0; p_msg := 'Centro de salud no encontrado.'; RETURN;
+    END IF;
+    IF p_ciudad_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM ciudades WHERE ciudad_id = p_ciudad_id) THEN
+        p_ok := 0; p_msg := 'La ciudad seleccionada no existe.'; RETURN;
+    END IF;
+    IF p_horario_inicio IS NOT NULL AND p_horario_fin IS NOT NULL AND p_horario_fin <= p_horario_inicio THEN
+        p_ok := 0; p_msg := 'El horario de fin debe ser posterior al horario de inicio.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND
+       EXISTS(SELECT 1 FROM centros_salud WHERE centro_telefono = p_telefono AND centro_id != p_centro_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro centro con ese teléfono.'; RETURN;
+    END IF;
+    IF p_beacon IS NOT NULL AND
+       EXISTS(SELECT 1 FROM centros_salud WHERE centro_beacon = p_beacon AND centro_id != p_centro_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro centro con ese beacon.'; RETURN;
+    END IF;
+
+    UPDATE centros_salud SET
+        centro_nombre         = COALESCE(p_nombre,         centro_nombre),
+        centro_calle          = COALESCE(p_calle,          centro_calle),
+        centro_numero         = COALESCE(p_numero,         centro_numero),
+        centro_codigo_postal  = COALESCE(p_codigo_postal,  centro_codigo_postal),
+        ciudad_id             = COALESCE(p_ciudad_id,      ciudad_id),
+        centro_horario_inicio = COALESCE(p_horario_inicio, centro_horario_inicio),
+        centro_horario_fin    = COALESCE(p_horario_fin,    centro_horario_fin),
+        centro_latitud        = p_latitud,
+        centro_longitud       = p_longitud,
+        centro_telefono       = p_telefono,
+        centro_beacon         = p_beacon
+    WHERE centro_id = p_centro_id;
+
+    p_ok := 1; p_msg := 'Centro de salud actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro centro con ese teléfono o beacon.';
+    WHEN check_violation THEN p_ok := 0; p_msg := 'Algunos datos están fuera del rango permitido (latitud, longitud u horarios).';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el centro de salud.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- VACUNAS
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_vacuna(
+    IN  p_vacuna_id INTEGER, IN  p_nombre VARCHAR(150),
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM vacunas WHERE vacuna_id = p_vacuna_id) THEN
+        p_ok := 0; p_msg := 'Vacuna no encontrada.'; RETURN;
+    END IF;
+    IF p_nombre IS NULL OR LENGTH(TRIM(p_nombre)) = 0 THEN
+        p_ok := 0; p_msg := 'El nombre de la vacuna no puede estar vacío.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM vacunas WHERE LOWER(vacuna_nombre) = LOWER(TRIM(p_nombre)) AND vacuna_id != p_vacuna_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otra vacuna con ese nombre.'; RETURN;
+    END IF;
+    UPDATE vacunas SET vacuna_nombre = TRIM(p_nombre) WHERE vacuna_id = p_vacuna_id;
+    p_ok := 1; p_msg := 'Vacuna actualizada correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otra vacuna con ese nombre.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar la vacuna.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_vacuna(
+    IN  p_vacuna_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM vacunas WHERE vacuna_id = p_vacuna_id) THEN
+        p_ok := 0; p_msg := 'Vacuna no encontrada.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM dosis WHERE vacuna_id = p_vacuna_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: la vacuna tiene dosis configuradas. Desactívala en su lugar.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM lotes WHERE vacuna_id = p_vacuna_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: la vacuna tiene lotes registrados.'; RETURN;
+    END IF;
+    DELETE FROM vacunas_padecimientos WHERE vacuna_id = p_vacuna_id;
+    DELETE FROM vacunas WHERE vacuna_id = p_vacuna_id;
+    p_ok := 1; p_msg := 'Vacuna eliminada correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de esta vacuna.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar la vacuna.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- PADECIMIENTOS
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_padecimiento(
+    IN  p_padecimiento_id INTEGER,
+    IN  p_nombre          VARCHAR(150),
+    IN  p_descripcion     TEXT,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM padecimientos WHERE padecimiento_id = p_padecimiento_id) THEN
+        p_ok := 0; p_msg := 'Padecimiento no encontrado.'; RETURN;
+    END IF;
+    IF p_nombre IS NULL OR LENGTH(TRIM(p_nombre)) = 0 THEN
+        p_ok := 0; p_msg := 'El nombre del padecimiento no puede estar vacío.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM padecimientos WHERE LOWER(padecimiento_nombre) = LOWER(TRIM(p_nombre)) AND padecimiento_id != p_padecimiento_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro padecimiento con ese nombre.'; RETURN;
+    END IF;
+    UPDATE padecimientos SET
+        padecimiento_nombre      = TRIM(p_nombre),
+        padecimiento_descripcion = p_descripcion
+    WHERE padecimiento_id = p_padecimiento_id;
+    p_ok := 1; p_msg := 'Padecimiento actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro padecimiento con ese nombre.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el padecimiento.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_padecimiento(
+    IN  p_padecimiento_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM padecimientos WHERE padecimiento_id = p_padecimiento_id) THEN
+        p_ok := 0; p_msg := 'Padecimiento no encontrado.'; RETURN;
+    END IF;
+    DELETE FROM vacunas_padecimientos WHERE padecimiento_id = p_padecimiento_id;
+    DELETE FROM padecimientos WHERE padecimiento_id = p_padecimiento_id;
+    p_ok := 1; p_msg := 'Padecimiento eliminado correctamente.';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el padecimiento.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_limpiar_vacunas_padecimiento(
+    IN  p_padecimiento_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    DELETE FROM vacunas_padecimientos WHERE padecimiento_id = p_padecimiento_id;
+    p_ok := 1; p_msg := 'Vacunas vinculadas reiniciadas.';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo limpiar las vacunas vinculadas.';
+END; $$;
+
+-- Devuelve los ids de las vacunas vinculadas al padecimiento (para precargar checkboxes en edición).
+CREATE OR REPLACE PROCEDURE sp_vacunas_de_padecimiento(
+    IN  p_padecimiento_id INTEGER,
+    INOUT p_resultados REFCURSOR
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+        SELECT vp.vacuna_id
+        FROM vacunas_padecimientos vp
+        WHERE vp.padecimiento_id = p_padecimiento_id;
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- FABRICANTES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_fabricante(
+    IN  p_fabricante_id INTEGER,
+    IN  p_nombre        VARCHAR(150),
+    IN  p_pais_id       INTEGER,
+    IN  p_telefono      VARCHAR(20),
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM fabricantes WHERE fabricante_id = p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'Fabricante no encontrado.'; RETURN;
+    END IF;
+    IF p_pais_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM paises WHERE pais_id = p_pais_id) THEN
+        p_ok := 0; p_msg := 'El país seleccionado no existe.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND
+       EXISTS(SELECT 1 FROM fabricantes WHERE fabricante_telefono = p_telefono AND fabricante_id != p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro fabricante con ese teléfono.'; RETURN;
+    END IF;
+    UPDATE fabricantes SET
+        fabricante_nombre   = COALESCE(p_nombre, fabricante_nombre),
+        pais_id             = COALESCE(p_pais_id, pais_id),
+        fabricante_telefono = p_telefono
+    WHERE fabricante_id = p_fabricante_id;
+    p_ok := 1; p_msg := 'Fabricante actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro fabricante con ese teléfono.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el fabricante.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_fabricante(
+    IN  p_fabricante_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM fabricantes WHERE fabricante_id = p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'Fabricante no encontrado.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM proveedores WHERE fabricante_id = p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el fabricante tiene proveedores asociados.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM lotes WHERE fabricante_id = p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el fabricante tiene lotes registrados.'; RETURN;
+    END IF;
+    DELETE FROM fabricantes WHERE fabricante_id = p_fabricante_id;
+    p_ok := 1; p_msg := 'Fabricante eliminado correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de este fabricante.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el fabricante.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- PROVEEDORES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_proveedor(
+    IN  p_proveedor_id INTEGER,
+    IN  p_prim_nombre  VARCHAR(100), IN  p_seg_nombre   VARCHAR(100),
+    IN  p_apellido_pat VARCHAR(100), IN  p_apellido_mat VARCHAR(100),
+    IN  p_email        VARCHAR(150), IN  p_telefono     VARCHAR(20),
+    IN  p_empresa      VARCHAR(150), IN  p_fabricante_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM proveedores WHERE proveedor_id = p_proveedor_id) THEN
+        p_ok := 0; p_msg := 'Proveedor no encontrado.'; RETURN;
+    END IF;
+    IF p_fabricante_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM fabricantes WHERE fabricante_id = p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'El fabricante seleccionado no existe.'; RETURN;
+    END IF;
+    IF p_email IS NOT NULL AND
+       EXISTS(SELECT 1 FROM proveedores WHERE proveedor_email = LOWER(TRIM(p_email)) AND proveedor_id != p_proveedor_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro proveedor con ese correo electrónico.'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND
+       EXISTS(SELECT 1 FROM proveedores WHERE proveedor_telefono = TRIM(p_telefono) AND proveedor_id != p_proveedor_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro proveedor con ese teléfono.'; RETURN;
+    END IF;
+    UPDATE proveedores SET
+        proveedor_prim_nombre  = COALESCE(p_prim_nombre, proveedor_prim_nombre),
+        proveedor_seg_nombre   = p_seg_nombre,
+        proveedor_apellido_pat = COALESCE(p_apellido_pat, proveedor_apellido_pat),
+        proveedor_apellido_mat = p_apellido_mat,
+        proveedor_email        = LOWER(TRIM(p_email)),
+        proveedor_telefono     = TRIM(p_telefono),
+        proveedor_empresa      = p_empresa,
+        fabricante_id          = COALESCE(p_fabricante_id, fabricante_id)
+    WHERE proveedor_id = p_proveedor_id;
+    p_ok := 1; p_msg := 'Proveedor actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro proveedor con ese correo o teléfono.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el proveedor.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_proveedor(
+    IN  p_proveedor_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM proveedores WHERE proveedor_id = p_proveedor_id) THEN
+        p_ok := 0; p_msg := 'Proveedor no encontrado.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM lotes WHERE proveedor_id = p_proveedor_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el proveedor tiene lotes registrados.'; RETURN;
+    END IF;
+    DELETE FROM proveedores WHERE proveedor_id = p_proveedor_id;
+    p_ok := 1; p_msg := 'Proveedor eliminado correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de este proveedor.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el proveedor.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- LOTES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_lote(
+    IN  p_lote_id           INTEGER,
+    IN  p_codigo            VARCHAR(50),
+    IN  p_fecha_fabricacion DATE,
+    IN  p_fecha_caducidad   DATE,
+    IN  p_cant_inicial      INTEGER,
+    IN  p_vacuna_id         INTEGER,
+    IN  p_fabricante_id     INTEGER,
+    IN  p_proveedor_id      INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_stock_minimo INTEGER;
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM lotes WHERE lote_id = p_lote_id) THEN
+        p_ok := 0; p_msg := 'Lote no encontrado.'; RETURN;
+    END IF;
+    IF p_fecha_fabricacion IS NOT NULL AND p_fecha_caducidad IS NOT NULL
+       AND p_fecha_caducidad <= p_fecha_fabricacion THEN
+        p_ok := 0; p_msg := 'La fecha de caducidad debe ser posterior a la fecha de fabricación.'; RETURN;
+    END IF;
+    IF p_codigo IS NOT NULL AND
+       EXISTS(SELECT 1 FROM lotes WHERE lote_codigo = TRIM(p_codigo) AND lote_id != p_lote_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro lote con ese código.'; RETURN;
+    END IF;
+    IF p_vacuna_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM vacunas WHERE vacuna_id = p_vacuna_id) THEN
+        p_ok := 0; p_msg := 'La vacuna seleccionada no existe.'; RETURN;
+    END IF;
+    IF p_fabricante_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM fabricantes WHERE fabricante_id = p_fabricante_id) THEN
+        p_ok := 0; p_msg := 'El fabricante seleccionado no existe.'; RETURN;
+    END IF;
+    IF p_proveedor_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM proveedores WHERE proveedor_id = p_proveedor_id) THEN
+        p_ok := 0; p_msg := 'El proveedor seleccionado no existe.'; RETURN;
+    END IF;
+    IF p_cant_inicial IS NOT NULL THEN
+        SELECT COALESCE(SUM(inventario_stock_inicial), 0) INTO v_stock_minimo
+        FROM inventarios WHERE lote_id = p_lote_id;
+        IF p_cant_inicial < v_stock_minimo THEN
+            p_ok := 0; p_msg := 'La cantidad inicial no puede ser menor al inventario ya asignado (' || v_stock_minimo || ').'; RETURN;
+        END IF;
+    END IF;
+
+    UPDATE lotes SET
+        lote_codigo            = COALESCE(TRIM(p_codigo), lote_codigo),
+        lote_fecha_fabricacion = COALESCE(p_fecha_fabricacion, lote_fecha_fabricacion),
+        lote_fecha_caducidad   = COALESCE(p_fecha_caducidad,   lote_fecha_caducidad),
+        lote_cant_inicial      = COALESCE(p_cant_inicial,      lote_cant_inicial),
+        vacuna_id              = COALESCE(p_vacuna_id,         vacuna_id),
+        fabricante_id          = COALESCE(p_fabricante_id,     fabricante_id),
+        proveedor_id           = COALESCE(p_proveedor_id,      proveedor_id)
+    WHERE lote_id = p_lote_id;
+
+    p_ok := 1; p_msg := 'Lote actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro lote con ese código.';
+    WHEN check_violation THEN p_ok := 0; p_msg := 'Las fechas o cantidades del lote no cumplen las validaciones.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el lote.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_lote(
+    IN  p_lote_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM lotes WHERE lote_id = p_lote_id) THEN
+        p_ok := 0; p_msg := 'Lote no encontrado.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM inventarios WHERE lote_id = p_lote_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el lote tiene inventario asignado en uno o más centros.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM aplicaciones WHERE lote_id = p_lote_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el lote tiene aplicaciones registradas.'; RETURN;
+    END IF;
+    DELETE FROM lotes WHERE lote_id = p_lote_id;
+    p_ok := 1; p_msg := 'Lote eliminado correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de este lote.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el lote.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- INVENTARIO
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_inventario(
+    IN  p_inventario_id INTEGER,
+    IN  p_stock_actual  INTEGER,
+    IN  p_activo        INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_stock_inicial INTEGER;
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM inventarios WHERE inventario_id = p_inventario_id) THEN
+        p_ok := 0; p_msg := 'Registro de inventario no encontrado.'; RETURN;
+    END IF;
+    SELECT inventario_stock_inicial INTO v_stock_inicial FROM inventarios WHERE inventario_id = p_inventario_id;
+    IF p_stock_actual IS NOT NULL AND p_stock_actual < 0 THEN
+        p_ok := 0; p_msg := 'El stock actual no puede ser negativo.'; RETURN;
+    END IF;
+    IF p_stock_actual IS NOT NULL AND p_stock_actual > v_stock_inicial THEN
+        p_ok := 0; p_msg := 'El stock actual no puede exceder el stock inicial (' || v_stock_inicial || ').'; RETURN;
+    END IF;
+
+    UPDATE inventarios SET
+        inventario_stock_actual = COALESCE(p_stock_actual, inventario_stock_actual),
+        inventario_activo_desde = CASE
+            WHEN p_activo IS NULL THEN inventario_activo_desde
+            WHEN p_activo = 0 THEN NULL
+            WHEN p_activo = 1 AND inventario_activo_desde IS NULL THEN CURRENT_TIMESTAMP
+            ELSE inventario_activo_desde
+        END
+    WHERE inventario_id = p_inventario_id;
+
+    p_ok := 1; p_msg := 'Inventario actualizado correctamente.';
+EXCEPTION
+    WHEN check_violation THEN p_ok := 0; p_msg := 'El stock no cumple las validaciones.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el inventario.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_inventario(
+    IN  p_inventario_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_centro_id INTEGER;
+    v_lote_id   INTEGER;
+BEGIN
+    SELECT centro_id, lote_id INTO v_centro_id, v_lote_id
+    FROM inventarios WHERE inventario_id = p_inventario_id;
+    IF v_centro_id IS NULL THEN
+        p_ok := 0; p_msg := 'Registro de inventario no encontrado.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM aplicaciones a
+              WHERE a.centro_id = v_centro_id AND a.lote_id = v_lote_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: ya hay aplicaciones registradas con este inventario.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM transferencias_inventario
+              WHERE inv_origen_id = p_inventario_id OR inv_destino_id = p_inventario_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el inventario participó en transferencias.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM inventarios WHERE inventario_origen_id = p_inventario_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: otros inventarios provienen de este.'; RETURN;
+    END IF;
+    DELETE FROM alertas_inventario WHERE inventario_id = p_inventario_id;
+    DELETE FROM inventarios WHERE inventario_id = p_inventario_id;
+    p_ok := 1; p_msg := 'Inventario eliminado correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de este inventario.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el inventario.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- APLICACIONES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_aplicacion(
+    IN  p_aplicacion_id INTEGER,
+    IN  p_observaciones TEXT,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM aplicaciones WHERE aplicacion_id = p_aplicacion_id) THEN
+        p_ok := 0; p_msg := 'Aplicación no encontrada.'; RETURN;
+    END IF;
+    UPDATE aplicaciones SET aplicacion_observaciones = p_observaciones
+    WHERE aplicacion_id = p_aplicacion_id;
+    p_ok := 1; p_msg := 'Aplicación actualizada correctamente.';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar la aplicación.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_anular_aplicacion(
+    IN  p_aplicacion_id INTEGER,
+    IN  p_motivo        TEXT,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_centro_id INTEGER;
+    v_lote_id   INTEGER;
+    v_inv_id    INTEGER;
+BEGIN
+    SELECT centro_id, lote_id INTO v_centro_id, v_lote_id
+    FROM aplicaciones WHERE aplicacion_id = p_aplicacion_id;
+    IF v_centro_id IS NULL THEN
+        p_ok := 0; p_msg := 'Aplicación no encontrada.'; RETURN;
+    END IF;
+    -- Restaurar stock al inventario más reciente del mismo centro+lote
+    SELECT inventario_id INTO v_inv_id
+    FROM inventarios
+    WHERE centro_id = v_centro_id AND lote_id = v_lote_id
+    ORDER BY inventario_id DESC LIMIT 1;
+    IF v_inv_id IS NOT NULL THEN
+        UPDATE inventarios
+        SET inventario_stock_actual = inventario_stock_actual + 1
+        WHERE inventario_id = v_inv_id;
+    END IF;
+    DELETE FROM aplicaciones WHERE aplicacion_id = p_aplicacion_id;
+    p_ok := 1; p_msg := 'Aplicación anulada. Motivo registrado: ' || COALESCE(p_motivo, 'sin motivo');
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo anular la aplicación.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- GEOGRAFÍA: PAÍSES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_pais(
+    IN  p_pais_id INTEGER,
+    IN  p_nombre  VARCHAR(100),
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM paises WHERE pais_id = p_pais_id) THEN
+        p_ok := 0; p_msg := 'País no encontrado.'; RETURN;
+    END IF;
+    IF p_nombre IS NULL OR LENGTH(TRIM(p_nombre)) = 0 THEN
+        p_ok := 0; p_msg := 'El nombre del país no puede estar vacío.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM paises WHERE LOWER(pais_nombre) = LOWER(TRIM(p_nombre)) AND pais_id != p_pais_id) THEN
+        p_ok := 0; p_msg := 'Ya existe otro país con ese nombre.'; RETURN;
+    END IF;
+    UPDATE paises SET pais_nombre = TRIM(p_nombre) WHERE pais_id = p_pais_id;
+    p_ok := 1; p_msg := 'País actualizado correctamente.';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe otro país con ese nombre.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el país.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_pais(
+    IN  p_pais_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM paises WHERE pais_id = p_pais_id) THEN
+        p_ok := 0; p_msg := 'País no encontrado.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM estados WHERE pais_id = p_pais_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el país tiene estados registrados.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM fabricantes WHERE pais_id = p_pais_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el país tiene fabricantes asociados.'; RETURN;
+    END IF;
+    DELETE FROM paises WHERE pais_id = p_pais_id;
+    p_ok := 1; p_msg := 'País eliminado correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de este país.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el país.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- GEOGRAFÍA: ESTADOS
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_estado(
+    IN  p_estado_id INTEGER,
+    IN  p_nombre    VARCHAR(100),
+    IN  p_pais_id   INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM estados WHERE estado_id = p_estado_id) THEN
+        p_ok := 0; p_msg := 'Estado no encontrado.'; RETURN;
+    END IF;
+    IF p_nombre IS NULL OR LENGTH(TRIM(p_nombre)) = 0 THEN
+        p_ok := 0; p_msg := 'El nombre del estado no puede estar vacío.'; RETURN;
+    END IF;
+    IF p_pais_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM paises WHERE pais_id = p_pais_id) THEN
+        p_ok := 0; p_msg := 'El país seleccionado no existe.'; RETURN;
+    END IF;
+    UPDATE estados SET
+        estado_nombre = TRIM(p_nombre),
+        pais_id       = COALESCE(p_pais_id, pais_id)
+    WHERE estado_id = p_estado_id;
+    p_ok := 1; p_msg := 'Estado actualizado correctamente.';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar el estado.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_estado(
+    IN  p_estado_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM estados WHERE estado_id = p_estado_id) THEN
+        p_ok := 0; p_msg := 'Estado no encontrado.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM ciudades WHERE estado_id = p_estado_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: el estado tiene ciudades registradas.'; RETURN;
+    END IF;
+    DELETE FROM estados WHERE estado_id = p_estado_id;
+    p_ok := 1; p_msg := 'Estado eliminado correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de este estado.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar el estado.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────
+-- GEOGRAFÍA: CIUDADES
+-- ─────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_ciudad(
+    IN  p_ciudad_id INTEGER,
+    IN  p_nombre    VARCHAR(100),
+    IN  p_estado_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ciudades WHERE ciudad_id = p_ciudad_id) THEN
+        p_ok := 0; p_msg := 'Ciudad no encontrada.'; RETURN;
+    END IF;
+    IF p_nombre IS NULL OR LENGTH(TRIM(p_nombre)) = 0 THEN
+        p_ok := 0; p_msg := 'El nombre de la ciudad no puede estar vacío.'; RETURN;
+    END IF;
+    IF p_estado_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM estados WHERE estado_id = p_estado_id) THEN
+        p_ok := 0; p_msg := 'El estado seleccionado no existe.'; RETURN;
+    END IF;
+    UPDATE ciudades SET
+        ciudad_nombre = TRIM(p_nombre),
+        estado_id     = COALESCE(p_estado_id, estado_id)
+    WHERE ciudad_id = p_ciudad_id;
+    p_ok := 1; p_msg := 'Ciudad actualizada correctamente.';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo actualizar la ciudad.';
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_ciudad(
+    IN  p_ciudad_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM ciudades WHERE ciudad_id = p_ciudad_id) THEN
+        p_ok := 0; p_msg := 'Ciudad no encontrada.'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM centros_salud WHERE ciudad_id = p_ciudad_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: la ciudad tiene centros de salud registrados.'; RETURN;
+    END IF;
+    DELETE FROM ciudades WHERE ciudad_id = p_ciudad_id;
+    p_ok := 1; p_msg := 'Ciudad eliminada correctamente.';
+EXCEPTION
+    WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de esta ciudad.';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar la ciudad.';
+END; $$;
+
+
+-- ═════════════════════════════════════════════════════════════════
+-- FIN DEL ARCHIVO
+-- ═════════════════════════════════════════════════════════════════
