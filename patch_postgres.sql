@@ -360,30 +360,42 @@ FOR EACH ROW
 EXECUTE FUNCTION trg_fn_prevenir_doble_aplicacion();
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TRIGGER: alerta automática cuando el stock de inventario baja a umbral crítico
--- Resuelve el bug de alertas_inventario vacía: trg_descontar_inventario
--- solo descuenta, nunca inserta alertas.
--- Umbral CERCA_AGOTAR: ≤5 unidades. Umbral AGOTADO: 0 unidades.
+-- TRIGGER: normalizar centro_beacon (trim + lowercase) al guardar un centro
+-- Evita que "ABC123" y " abc123 " sean beacons distintos y el matching falle.
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION trg_fn_alerta_stock_bajo()
+CREATE OR REPLACE FUNCTION trg_fn_normalizar_beacon()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.inventario_stock_actual = 0 AND OLD.inventario_stock_actual > 0 THEN
-        INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
-        VALUES(NEW.inventario_id, 'AGOTADO');
-    ELSIF NEW.inventario_stock_actual <= 5 AND OLD.inventario_stock_actual > 5 THEN
-        INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
-        VALUES(NEW.inventario_id, 'CERCA_AGOTAR');
+    IF NEW.centro_beacon IS NOT NULL THEN
+        NEW.centro_beacon := LOWER(TRIM(NEW.centro_beacon));
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_alerta_stock_bajo ON inventarios;
-CREATE TRIGGER trg_alerta_stock_bajo
-AFTER UPDATE OF inventario_stock_actual ON inventarios
+DROP TRIGGER IF EXISTS trg_normalizar_beacon ON centros_salud;
+CREATE TRIGGER trg_normalizar_beacon
+BEFORE INSERT OR UPDATE OF centro_beacon ON centros_salud
 FOR EACH ROW
-EXECUTE FUNCTION trg_fn_alerta_stock_bajo();
+EXECUTE FUNCTION trg_fn_normalizar_beacon();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TRIGGER: forzar lowercase en login_correo al guardar credenciales
+-- Evita que "Usuario@correo.mx" y "usuario@correo.mx" sean cuentas distintas.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION trg_fn_email_lower()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.login_correo := LOWER(TRIM(NEW.login_correo));
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_email_lower ON login;
+CREATE TRIGGER trg_email_lower
+BEFORE INSERT OR UPDATE OF login_correo ON login
+FOR EACH ROW
+EXECUTE FUNCTION trg_fn_email_lower();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SP: registrar evento GPS en PostgreSQL
