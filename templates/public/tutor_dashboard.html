@@ -300,9 +300,14 @@
     <div class="card" style="transition:var(--transition)" onmouseenter="this.style.boxShadow='var(--shadow-lg)'" onmouseleave="this.style.boxShadow='var(--shadow-sm)'">
       <div style="background:linear-gradient(135deg,var(--primary-bg),var(--secondary-bg));padding:20px 22px;border-radius:var(--radius-lg) var(--radius-lg) 0 0;border-bottom:1px solid rgba(124,58,237,0.15)">
         <div style="display:flex;align-items:center;gap:14px">
+          {% if hijo.paciente_imagen %}
+          <img src="{{ url_for('static', filename=hijo.paciente_imagen) }}" alt=""
+               style="width:52px;height:52px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(124,58,237,0.2)">
+          {% else %}
           <div style="width:52px;height:52px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0">
             {{ '👦' if hijo.paciente_sexo == 'M' else '👧' }}
           </div>
+          {% endif %}
           <div>
             <div style="font-weight:700;font-size:1.05rem;color:var(--primary-dark)">{{ nombre_completo.strip() }}</div>
             <div class="text-muted fs-sm">
