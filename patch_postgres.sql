@@ -1679,6 +1679,8 @@ END; $$;
 -- ─────────────────────────────────────────────
 -- MULTI-ROL: obtener todos los roles de un usuario
 -- ─────────────────────────────────────────────
+DROP FUNCTION IF EXISTS sp_roles_de_usuario(VARCHAR);
+
 CREATE OR REPLACE PROCEDURE sp_roles_de_usuario(
     IN p_email VARCHAR, INOUT p_resultados REFCURSOR)
 LANGUAGE plpgsql AS $$
