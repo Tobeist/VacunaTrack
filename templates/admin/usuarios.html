@@ -238,6 +238,23 @@
             <td>
               {% if uid != session.user_id %}
               <div style="display:flex;gap:4px;flex-wrap:nowrap;align-items:center">
+                <button class="btn btn-secondary btn-sm btn-detail-usuario" title="Ver detalle"
+                        data-det='{{ {
+                          "uid":          uid,
+                          "prim_nombre":  u.usuario_prim_nombre,
+                          "seg_nombre":   u.usuario_seg_nombre or "",
+                          "apellido_pat": u.usuario_apellido_pat,
+                          "apellido_mat": u.usuario_apellido_mat or "",
+                          "curp":         u.usuario_curp or "",
+                          "rfc":          u.usuario_rfc or "",
+                          "email":        u.email,
+                          "telefono":     u.usuario_telefono,
+                          "centro_nombre":u.centro_nombre or "",
+                          "roles":        u.roles,
+                          "cedulas":      u.cedulas,
+                          "imagen":       u.usuario_imagen or "",
+                          "activo":       u.usuario_activo
+                        } | tojson }}'>👁️</button>
                 <button class="btn btn-secondary btn-sm btn-edit-usuario" title="Editar"
                         data-user='{{ {
                           "uid":         uid,
@@ -392,6 +409,20 @@
   </div>
 </div>
 
+{# ── Modal Detalle ────────────────────────────────────────────────────────── #}
+<div class="modal-overlay" id="modal-detalle-usuario">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <span class="modal-title">👁️ Detalle de Usuario</span>
+      <button class="btn-close" onclick="document.getElementById('modal-detalle-usuario').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-usuario-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-usuario').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ── Estado de filtros ───────────────────────────────────────────────────── */
 const _filters = { role: 'todos', activo: 'activos' };
@@ -510,6 +541,63 @@ function closeEditModal() {
 /* ── Botones editar usuario ────────────────────────────────────────────── */
 document.querySelectorAll('.btn-edit-usuario').forEach(btn => {
   btn.addEventListener('click', () => openEditModal(JSON.parse(btn.dataset.user)));
+});
+
+/* ── Modal detalle usuario ─────────────────────────────────────────────── */
+function _cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
+function _field(label, value, mono, fullWidth) {
+  const gs = fullWidth ? 'grid-column:1/-1' : '';
+  const vs = mono ? 'font-family:monospace;font-size:0.875rem' : 'font-size:0.875rem';
+  return `<div style="${gs}">
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:3px">${label}</div>
+    <div style="${vs}">${value || '—'}</div>
+  </div>`;
+}
+
+function openDetailModalUsuario(d) {
+  const rolesHtml = (d.roles || []).map(r => ({
+    admin:       '<span class="badge" style="background:var(--primary-light);color:var(--primary)"><i class="fa-solid fa-user-shield"></i> Admin</span>',
+    responsable: '<span class="badge" style="background:var(--success-light);color:var(--success)"><i class="fa-solid fa-user-nurse"></i> Responsable</span>',
+    tutor:       '<span class="badge" style="background:var(--warning-light);color:var(--warning)"><i class="fa-solid fa-person-breastfeeding"></i> Tutor</span>'
+  })[r] || r).join(' ');
+
+  const avatarHtml = d.imagen
+    ? `<img src="/static/${d.imagen}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0">`
+    : `<div style="width:72px;height:72px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fa-solid fa-user" style="font-size:28px;color:var(--text-muted)"></i></div>`;
+
+  const fullName = [d.prim_nombre, d.seg_nombre, d.apellido_pat, d.apellido_mat]
+    .filter(Boolean).map(_cap).join(' ');
+
+  const estadoBadge = d.activo
+    ? '<span class="badge" style="background:var(--success-light);color:var(--success)"><i class="fa-solid fa-circle-check"></i> Activo</span>'
+    : '<span class="badge" style="background:var(--danger-light);color:var(--danger)"><i class="fa-solid fa-circle-xmark"></i> Inactivo</span>';
+
+  const cedulasHtml = d.cedulas && d.cedulas.length
+    ? d.cedulas.map(c => `<div style="font-size:0.875rem;padding:3px 0">${c.cedula_numero} — ${c.cedula_especialidad}</div>`).join('')
+    : '—';
+
+  document.getElementById('detalle-usuario-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px">
+      ${avatarHtml}
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">${fullName}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">${rolesHtml}</div>
+        ${estadoBadge}
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      ${_field('CURP', d.curp, true)}
+      ${_field('RFC', d.rfc, true)}
+      ${_field('Teléfono', d.telefono)}
+      ${_field('Correo', `<span style="word-break:break-all">${d.email || '—'}</span>`)}
+      ${_field('Centro de Salud', d.centro_nombre, false, true)}
+      ${d.cedulas && d.cedulas.length ? _field('Cédulas Profesionales', cedulasHtml, false, true) : ''}
+    </div>`;
+  document.getElementById('modal-detalle-usuario').classList.add('open');
+}
+
+document.querySelectorAll('.btn-detail-usuario').forEach(btn => {
+  btn.addEventListener('click', () => openDetailModalUsuario(JSON.parse(btn.dataset.det)));
 });
 
 /* Aplicar filtro activos por defecto al cargar */

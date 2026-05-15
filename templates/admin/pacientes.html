@@ -110,6 +110,21 @@
             <td><span class="badge badge-primary">{{ p.esquema_nombre }}</span></td>
             <td>
               <div style="display:flex;gap:6px;align-items:center">
+                <button class="btn btn-secondary btn-sm btn-detail-paciente" title="Ver detalle"
+                        data-det='{{ {
+                          "id":           p.paciente_id,
+                          "prim_nombre":  p.paciente_prim_nombre,
+                          "seg_nombre":   p.paciente_seg_nombre or "",
+                          "apellido_pat": p.paciente_apellido_pat,
+                          "apellido_mat": p.paciente_apellido_mat or "",
+                          "curp":         p.paciente_curp or "",
+                          "num_cert_nac": p.paciente_num_cert_nac or "",
+                          "fecha_nac":    p.paciente_fecha_nac|string,
+                          "sexo":         p.paciente_sexo,
+                          "nfc":          p.paciente_nfc or "",
+                          "esquema":      p.esquema_nombre,
+                          "imagen":       p.paciente_imagen or ""
+                        } | tojson }}'>👁️</button>
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-paciente-{{ p.paciente_id }}"
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
@@ -208,6 +223,19 @@
     </div>
   </div>
 
+  {# ── Modal Detalle Paciente ──────────────────────────────────────────────── #}
+  <div class="modal-overlay" id="modal-detalle-paciente">
+    <div class="modal" style="max-width:520px">
+      <div class="modal-header">
+        <span class="modal-title">👁️ Detalle de Paciente</span>
+        <button class="btn-close" onclick="document.getElementById('modal-detalle-paciente').classList.remove('open')">✕</button>
+      </div>
+      <div class="modal-body" id="detalle-paciente-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-paciente').classList.remove('open')">Cerrar</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -225,5 +253,64 @@ function previewPacAvatar(input, previewId) {
   };
   reader.readAsDataURL(input.files[0]);
 }
+
+function _capP(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : ''; }
+function _fieldP(label, value, mono, fullWidth) {
+  const gs = fullWidth ? 'grid-column:1/-1' : '';
+  const vs = mono ? 'font-family:monospace;font-size:0.875rem' : 'font-size:0.875rem';
+  return `<div style="${gs}">
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:3px">${label}</div>
+    <div style="${vs}">${value || '—'}</div>
+  </div>`;
+}
+
+function _calcAge(fechaNac) {
+  const dob = new Date(fechaNac);
+  const now = new Date();
+  let y = now.getFullYear() - dob.getFullYear();
+  let m = now.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) { y--; m += 12; }
+  if (y === 0) return `${m} mes${m !== 1 ? 'es' : ''}`;
+  if (y < 2)  return `${y} año${y !== 1 ? 's' : ''} y ${m} mes${m !== 1 ? 'es' : ''}`;
+  return `${y} año${y !== 1 ? 's' : ''}`;
+}
+
+function openDetailModalPaciente(d) {
+  const avatarHtml = d.imagen
+    ? `<img src="/static/${d.imagen}" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:2px solid var(--border);flex-shrink:0">`
+    : `<div style="width:72px;height:72px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;flex-shrink:0">${d.sexo === 'M' ? '👦' : '👧'}</div>`;
+
+  const fullName = [d.prim_nombre, d.seg_nombre, d.apellido_pat, d.apellido_mat]
+    .filter(Boolean).map(_capP).join(' ');
+
+  const fechaFmt = d.fecha_nac
+    ? new Date(d.fecha_nac + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'})
+    : '—';
+  const edad = d.fecha_nac ? _calcAge(d.fecha_nac) : '—';
+
+  document.getElementById('detalle-paciente-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:16px;padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px">
+      ${avatarHtml}
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">${fullName}</div>
+        <div style="font-size:0.875rem;color:var(--text-secondary)">
+          ${d.sexo === 'M' ? '👦 Masculino' : '👧 Femenino'}
+          &nbsp;·&nbsp; <span class="badge badge-primary">${d.esquema || ''}</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      ${_fieldP('CURP', d.curp, true)}
+      ${_fieldP('Cert. Nacimiento', d.num_cert_nac, true)}
+      ${_fieldP('Fecha de Nacimiento', `${fechaFmt}`)}
+      ${_fieldP('Edad', edad)}
+      ${_fieldP('UID NFC', d.nfc || '—', true, false)}
+    </div>`;
+  document.getElementById('modal-detalle-paciente').classList.add('open');
+}
+
+document.querySelectorAll('.btn-detail-paciente').forEach(btn => {
+  btn.addEventListener('click', () => openDetailModalPaciente(JSON.parse(btn.dataset.det)));
+});
 </script>
 {% endblock %}

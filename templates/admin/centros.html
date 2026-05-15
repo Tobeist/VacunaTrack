@@ -74,6 +74,23 @@
             <td class="fs-sm" style="font-family:monospace">{{ c.centro_beacon or '—' }}</td>
             <td>
               <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm btn-detail-centro" title="Ver detalle"
+                        data-det='{{ {
+                          "id":       c.centro_id,
+                          "nombre":   c.centro_nombre,
+                          "calle":    c.centro_calle or "",
+                          "numero":   c.centro_numero or "",
+                          "cp":       c.centro_codigo_postal or "",
+                          "ciudad":   c.ciudad_nombre or "",
+                          "estado":   c.estado_nombre or "",
+                          "pais":     c.pais_nombre or "",
+                          "telefono": c.centro_telefono or "",
+                          "beacon":   c.centro_beacon or "",
+                          "lat":      c.centro_latitud|string if c.centro_latitud is not none else "",
+                          "lng":      c.centro_longitud|string if c.centro_longitud is not none else "",
+                          "h_inicio": c.centro_horario_inicio|format_time if c.centro_horario_inicio else "",
+                          "h_fin":    c.centro_horario_fin|format_time if c.centro_horario_fin else ""
+                        } | tojson }}'>👁️</button>
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-centro-{{ c.centro_id }}"
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_centro', cid=c.centro_id) }}" style="display:inline">
@@ -148,4 +165,59 @@
   </div>
 
 </div>
+
+{# ── Modal Detalle Centro ────────────────────────────────────────────────── #}
+<div class="modal-overlay" id="modal-detalle-centro">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">👁️ Detalle de Centro</span>
+      <button class="btn-close" onclick="document.getElementById('modal-detalle-centro').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-centro-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-centro').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function _fieldC(label, value, mono, fullWidth) {
+  const gs = fullWidth ? 'grid-column:1/-1' : '';
+  const vs = mono ? 'font-family:monospace;font-size:0.875rem' : 'font-size:0.875rem';
+  return `<div style="${gs}">
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:3px">${label}</div>
+    <div style="${vs}">${value || '—'}</div>
+  </div>`;
+}
+
+function openDetailModalCentro(d) {
+  const addrParts = [d.calle, d.numero].filter(Boolean).join(' ');
+  const locParts  = [d.ciudad, d.estado, d.pais].filter(Boolean).join(', ');
+  const horario   = d.h_inicio && d.h_fin ? `${d.h_inicio} – ${d.h_fin}` : '—';
+  const coords    = d.lat && d.lng ? `${d.lat}, ${d.lng}` : '—';
+
+  document.getElementById('detalle-centro-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--secondary-bg);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">🏥</div>
+      <div style="font-size:1.05rem;font-weight:700">${d.nombre}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      ${_fieldC('Calle y Número', addrParts, false, true)}
+      ${_fieldC('C.P.', d.cp, true)}
+      ${_fieldC('Ciudad / Estado / País', locParts || '—', false)}
+      ${_fieldC('Teléfono', d.telefono)}
+      ${_fieldC('Horario', horario, false, true)}
+      ${_fieldC('UID Beacon', d.beacon, true, true)}
+      ${_fieldC('Coordenadas (lat, lng)', coords, true, true)}
+    </div>`;
+  document.getElementById('modal-detalle-centro').classList.add('open');
+}
+
+document.querySelectorAll('.btn-detail-centro').forEach(btn => {
+  btn.addEventListener('click', () => openDetailModalCentro(JSON.parse(btn.dataset.det)));
+});
+</script>
 {% endblock %}

@@ -148,18 +148,28 @@
               {% endif %}
             </td>
             <td>
-              {% if e.esquema_vigente_hasta %}
-              <form method="POST"
-                    action="{{ url_for('admin.eliminar_esquema', eid=e.esquema_id) }}"
-                    style="display:inline">
-                <button type="submit" class="btn btn-danger btn-sm"
-                        data-confirm="¿Eliminar esquema {{ e.esquema_nombre }}?">
-                  <i class="fa-solid fa-trash"></i>
-                </button>
-              </form>
-              {% else %}
-              <span class="text-muted fs-sm">—</span>
-              {% endif %}
+              <div style="display:flex;gap:6px;align-items:center">
+                <button class="btn btn-secondary btn-sm btn-detail-esquema" title="Ver detalle"
+                        data-det='{{ {
+                          "id":             e.esquema_id,
+                          "nombre":         e.esquema_nombre,
+                          "vigencia":       e.esquema_fecha_vigencia|format_date,
+                          "vigente_hasta":  e.esquema_vigente_hasta|format_date if e.esquema_vigente_hasta else "",
+                          "total_dosis":    e.total_dosis,
+                          "total_vacunas":  e.total_vacunas,
+                          "total_pacientes":e.total_pacientes
+                        } | tojson }}'>👁️</button>
+                {% if e.esquema_vigente_hasta %}
+                <form method="POST"
+                      action="{{ url_for('admin.eliminar_esquema', eid=e.esquema_id) }}"
+                      style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm"
+                          data-confirm="¿Eliminar esquema {{ e.esquema_nombre }}?">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% else %}
@@ -329,6 +339,20 @@
   </div>
 </template>
 
+{# ── Modal Detalle Esquema ───────────────────────────────────────────────── #}
+<div class="modal-overlay" id="modal-detalle-esquema">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <span class="modal-title">👁️ Detalle de Esquema</span>
+      <button class="btn-close" onclick="document.getElementById('modal-detalle-esquema').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-esquema-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-esquema').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -347,6 +371,42 @@ document.querySelectorAll('#esq-tabs .tab-btn').forEach(btn => {
 if (window.location.hash === '#tab-conflictos') {
   document.querySelector('[data-tab="tab-conflictos"]').click();
 }
+
+// ── Modal detalle esquema ────────────────────────────────
+function openDetailModalEsquema(d) {
+  const estadoBadge = d.vigente_hasta
+    ? `<span class="badge" style="background:var(--bg-secondary);color:var(--text-secondary)">Archivado ${d.vigente_hasta}</span>`
+    : `<span class="badge badge-success">Activo</span>`;
+
+  function statCard(val, label) {
+    return `<div style="text-align:center;background:var(--primary-bg);border-radius:var(--radius);padding:14px 10px">
+      <div style="font-size:1.5rem;font-weight:700;color:var(--primary)">${val ?? '—'}</div>
+      <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">${label}</div>
+    </div>`;
+  }
+
+  document.getElementById('detalle-esquema-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px">
+      <div style="width:56px;height:56px;border-radius:50%;background:var(--primary-bg);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📋</div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:6px">${d.nombre}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${estadoBadge}
+          <span style="font-size:0.8rem;color:var(--text-muted)">Vigencia: ${d.vigencia}</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+      ${statCard(d.total_dosis, 'Dosis')}
+      ${statCard(d.total_vacunas, 'Vacunas')}
+      ${statCard(d.total_pacientes, 'Pacientes')}
+    </div>`;
+  document.getElementById('modal-detalle-esquema').classList.add('open');
+}
+
+document.querySelectorAll('.btn-detail-esquema').forEach(btn => {
+  btn.addEventListener('click', () => openDetailModalEsquema(JSON.parse(btn.dataset.det)));
+});
 
 // ── Inline nuevas dosis ─────────────────────────────────
 const tpl       = document.getElementById('tpl-nueva-dosis');
