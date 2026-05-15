@@ -238,22 +238,22 @@
             <td>
               {% if uid != session.user_id %}
               <div style="display:flex;gap:4px;flex-wrap:nowrap;align-items:center">
-                <button class="btn btn-secondary btn-sm" title="Editar"
-                        onclick="openEditModal({{ {
-                          'uid':         uid,
-                          'prim_nombre': u.usuario_prim_nombre,
-                          'seg_nombre':  u.usuario_seg_nombre or '',
-                          'apellido_pat':u.usuario_apellido_pat,
-                          'apellido_mat':u.usuario_apellido_mat or '',
-                          'curp':        u.usuario_curp,
-                          'rfc':         u.usuario_rfc or '',
-                          'email':       u.email,
-                          'telefono':    u.usuario_telefono,
-                          'centro_id':   u.centro_id or '',
-                          'roles':       u.roles,
-                          'cedulas':     u.cedulas,
-                          'imagen':      u.usuario_imagen or ''
-                        } | tojson }})">✏️</button>
+                <button class="btn btn-secondary btn-sm btn-edit-usuario" title="Editar"
+                        data-user='{{ {
+                          "uid":         uid,
+                          "prim_nombre": u.usuario_prim_nombre,
+                          "seg_nombre":  u.usuario_seg_nombre or "",
+                          "apellido_pat":u.usuario_apellido_pat,
+                          "apellido_mat":u.usuario_apellido_mat or "",
+                          "curp":        u.usuario_curp or "",
+                          "rfc":         u.usuario_rfc or "",
+                          "email":       u.email,
+                          "telefono":    u.usuario_telefono,
+                          "centro_id":   u.centro_id or "",
+                          "roles":       u.roles,
+                          "cedulas":     u.cedulas,
+                          "imagen":      u.usuario_imagen or ""
+                        } | tojson }}'>✏️</button>
                 <form method="POST"
                       action="{{ url_for('admin.toggle_usuario_activo', uid=uid) }}"
                       style="display:inline">
@@ -506,6 +506,11 @@ function openEditModal(data) {
 function closeEditModal() {
   document.getElementById('modal-editar-usuario').classList.remove('open');
 }
+
+/* ── Botones editar usuario ────────────────────────────────────────────── */
+document.querySelectorAll('.btn-edit-usuario').forEach(btn => {
+  btn.addEventListener('click', () => openEditModal(JSON.parse(btn.dataset.user)));
+});
 
 /* Aplicar filtro activos por defecto al cargar */
 filterUsuarios();
