@@ -585,7 +585,8 @@ SELECT u.usuario_id,
 FROM login          l
 JOIN usuarios       u  ON u.usuario_id  = l.usuario_id
 JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
-JOIN roles          r  ON r.rol_id      = ur.rol_id;
+JOIN roles          r  ON r.rol_id      = ur.rol_id
+WHERE u.usuario_activo = true;
 
 CREATE OR REPLACE VIEW vw_administradores AS
 SELECT u.usuario_id        AS admin_id,
