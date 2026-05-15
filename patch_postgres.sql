@@ -9,7 +9,7 @@
 
 CREATE OR REPLACE VIEW vw_cedulas AS
 SELECT c.*,
-    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS responsable_nombre,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS responsable_nombre,
     u.usuario_telefono  AS responsable_telefono,
     cs.centro_nombre
 FROM cedulas   c
@@ -82,7 +82,7 @@ SELECT
     e.esquema_nombre,
     pt.tutor_id,
     pt.pac_tut_id,
-    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS tutor_nombre,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS tutor_nombre,
     u.usuario_telefono  AS tutor_telefono,
     l.login_correo      AS tutor_email
 FROM pacientes          p
@@ -110,7 +110,7 @@ SELECT
     a.aplicacion_id,
     a.aplicacion_timestamp,
     a.aplicacion_observaciones,
-    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS responsable,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS responsable,
     cs.centro_nombre
 FROM vw_dosis_esquemas_detalle vde
 LEFT JOIN aplicaciones   a  ON a.dosis_id    = vde.dosis_id
@@ -427,7 +427,7 @@ BEGIN
     CREATE TEMP TABLE tmp_urgencias ON COMMIT DROP AS
     SELECT
         p.paciente_id,
-        INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente_nombre,
+        INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat)::VARCHAR(100) AS paciente_nombre,
         p.paciente_fecha_nac,
         EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER                    AS edad_dias,
         v.vacuna_nombre,
@@ -1374,8 +1374,8 @@ CREATE OR REPLACE VIEW vw_usuarios_auth AS
 SELECT u.usuario_id,
        l.login_correo                  AS email,
        l.login_contrasena              AS password,
-       INITCAP(u.usuario_prim_nombre)  AS first_name,
-       INITCAP(u.usuario_apellido_pat) AS last_name,
+       INITCAP(u.usuario_prim_nombre)::VARCHAR(100)  AS first_name,
+       INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS last_name,
        r.rol_nombre                    AS role,
        u.usuario_activo                AS activo
 FROM login          l
@@ -1386,10 +1386,10 @@ JOIN roles          r  ON r.rol_id      = ur.rol_id;
 
 CREATE OR REPLACE VIEW vw_administradores AS
 SELECT u.usuario_id                        AS admin_id,
-       INITCAP(u.usuario_prim_nombre)      AS admin_prim_nombre,
-       INITCAP(u.usuario_seg_nombre)       AS admin_seg_nombre,
-       INITCAP(u.usuario_apellido_pat)     AS admin_apellido_pat,
-       INITCAP(u.usuario_apellido_mat)     AS admin_apellido_mat,
+       INITCAP(u.usuario_prim_nombre)::VARCHAR(100)      AS admin_prim_nombre,
+       INITCAP(u.usuario_seg_nombre)::VARCHAR(100)       AS admin_seg_nombre,
+       INITCAP(u.usuario_apellido_pat)::VARCHAR(100)     AS admin_apellido_pat,
+       INITCAP(u.usuario_apellido_mat)::VARCHAR(100)     AS admin_apellido_mat,
        u.usuario_telefono                  AS admin_telefono,
        u.usuario_curp                      AS admin_curp,
        u.usuario_rfc                       AS admin_rfc,
@@ -1404,10 +1404,10 @@ JOIN login          l  ON l.usuario_id  = u.usuario_id;
 
 CREATE OR REPLACE VIEW vw_tutores AS
 SELECT u.usuario_id                        AS tutor_id,
-       INITCAP(u.usuario_prim_nombre)      AS tutor_prim_nombre,
-       INITCAP(u.usuario_seg_nombre)       AS tutor_seg_nombre,
-       INITCAP(u.usuario_apellido_pat)     AS tutor_apellido_pat,
-       INITCAP(u.usuario_apellido_mat)     AS tutor_apellido_mat,
+       INITCAP(u.usuario_prim_nombre)::VARCHAR(100)      AS tutor_prim_nombre,
+       INITCAP(u.usuario_seg_nombre)::VARCHAR(100)       AS tutor_seg_nombre,
+       INITCAP(u.usuario_apellido_pat)::VARCHAR(100)     AS tutor_apellido_pat,
+       INITCAP(u.usuario_apellido_mat)::VARCHAR(100)     AS tutor_apellido_mat,
        u.usuario_telefono                  AS tutor_telefono,
        u.usuario_curp                      AS tutor_curp,
        u.usuario_activo                    AS tutor_activo,
@@ -1421,10 +1421,10 @@ JOIN login          l  ON l.usuario_id  = u.usuario_id;
 
 CREATE OR REPLACE VIEW vw_responsables AS
 SELECT u.usuario_id                        AS responsable_id,
-       INITCAP(u.usuario_prim_nombre)      AS responsable_prim_nombre,
-       INITCAP(u.usuario_seg_nombre)       AS responsable_seg_nombre,
-       INITCAP(u.usuario_apellido_pat)     AS responsable_apellido_pat,
-       INITCAP(u.usuario_apellido_mat)     AS responsable_apellido_mat,
+       INITCAP(u.usuario_prim_nombre)::VARCHAR(100)      AS responsable_prim_nombre,
+       INITCAP(u.usuario_seg_nombre)::VARCHAR(100)       AS responsable_seg_nombre,
+       INITCAP(u.usuario_apellido_pat)::VARCHAR(100)     AS responsable_apellido_pat,
+       INITCAP(u.usuario_apellido_mat)::VARCHAR(100)     AS responsable_apellido_mat,
        u.usuario_telefono                  AS responsable_telefono,
        u.usuario_curp                      AS responsable_curp,
        u.usuario_rfc                       AS responsable_rfc,
@@ -1442,10 +1442,10 @@ LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
 
 CREATE OR REPLACE VIEW vw_pacientes AS
 SELECT p.paciente_id,
-       INITCAP(p.paciente_prim_nombre)  AS paciente_prim_nombre,
-       INITCAP(p.paciente_seg_nombre)   AS paciente_seg_nombre,
-       INITCAP(p.paciente_apellido_pat) AS paciente_apellido_pat,
-       INITCAP(p.paciente_apellido_mat) AS paciente_apellido_mat,
+       INITCAP(p.paciente_prim_nombre)::VARCHAR(100)  AS paciente_prim_nombre,
+       INITCAP(p.paciente_seg_nombre)::VARCHAR(100)   AS paciente_seg_nombre,
+       INITCAP(p.paciente_apellido_pat)::VARCHAR(100) AS paciente_apellido_pat,
+       INITCAP(p.paciente_apellido_mat)::VARCHAR(100) AS paciente_apellido_mat,
        p.paciente_num_cert_nac,
        p.paciente_curp,
        p.paciente_fecha_nac,
@@ -1460,10 +1460,10 @@ JOIN esquemas e ON e.esquema_id = p.esquema_id;
 
 CREATE OR REPLACE VIEW vw_pacientes_por_tutor AS
 SELECT p.paciente_id,
-       INITCAP(p.paciente_prim_nombre)  AS paciente_prim_nombre,
-       INITCAP(p.paciente_seg_nombre)   AS paciente_seg_nombre,
-       INITCAP(p.paciente_apellido_pat) AS paciente_apellido_pat,
-       INITCAP(p.paciente_apellido_mat) AS paciente_apellido_mat,
+       INITCAP(p.paciente_prim_nombre)::VARCHAR(100)  AS paciente_prim_nombre,
+       INITCAP(p.paciente_seg_nombre)::VARCHAR(100)   AS paciente_seg_nombre,
+       INITCAP(p.paciente_apellido_pat)::VARCHAR(100) AS paciente_apellido_pat,
+       INITCAP(p.paciente_apellido_mat)::VARCHAR(100) AS paciente_apellido_mat,
        p.paciente_curp,
        p.paciente_num_cert_nac,
        p.paciente_fecha_nac,
@@ -1474,7 +1474,7 @@ SELECT p.paciente_id,
        e.esquema_nombre,
        pt.tutor_id,
        pt.pac_tut_id,
-       INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS tutor_nombre,
+       INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS tutor_nombre,
        u.usuario_telefono  AS tutor_telefono,
        l.login_correo      AS tutor_email
 FROM pacientes          p
@@ -1490,7 +1490,7 @@ SELECT a.aplicacion_id,
        a.dosis_id,
        a.aplicacion_timestamp,
        a.aplicacion_observaciones,
-       INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS responsable,
+       INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS responsable,
        cs.centro_nombre
 FROM aplicaciones  a
 JOIN usuarios      u  ON u.usuario_id = a.usuario_id
@@ -1504,10 +1504,10 @@ JOIN centros_salud cs ON cs.centro_id = a.centro_id;
 CREATE OR REPLACE VIEW vw_usuarios_completo AS
 SELECT
     u.usuario_id,
-    INITCAP(u.usuario_prim_nombre)  AS usuario_prim_nombre,
-    INITCAP(u.usuario_seg_nombre)   AS usuario_seg_nombre,
-    INITCAP(u.usuario_apellido_pat) AS usuario_apellido_pat,
-    INITCAP(u.usuario_apellido_mat) AS usuario_apellido_mat,
+    INITCAP(u.usuario_prim_nombre)::VARCHAR(100)  AS usuario_prim_nombre,
+    INITCAP(u.usuario_seg_nombre)::VARCHAR(100)   AS usuario_seg_nombre,
+    INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS usuario_apellido_pat,
+    INITCAP(u.usuario_apellido_mat)::VARCHAR(100) AS usuario_apellido_mat,
     u.usuario_telefono,
     u.usuario_curp,
     u.usuario_rfc,
