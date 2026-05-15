@@ -1365,20 +1365,136 @@ EXCEPTION
 END; $$;
 
 -- ─────────────────────────────────────────────
--- vw_usuarios_auth: agrega usuario_activo para validación en login
+-- INITCAP en todas las vistas que proyectan nombres de personas
+-- Los triggers de normalización guardan los nombres en LOWER(),
+-- así que INITCAP() se aplica en la capa de lectura (vistas).
 -- ─────────────────────────────────────────────
+
 CREATE OR REPLACE VIEW vw_usuarios_auth AS
 SELECT u.usuario_id,
-       l.login_correo         AS email,
-       l.login_contrasena     AS password,
-       u.usuario_prim_nombre  AS first_name,
-       u.usuario_apellido_pat AS last_name,
-       r.rol_nombre           AS role,
-       u.usuario_activo       AS activo
+       l.login_correo                  AS email,
+       l.login_contrasena              AS password,
+       INITCAP(u.usuario_prim_nombre)  AS first_name,
+       INITCAP(u.usuario_apellido_pat) AS last_name,
+       r.rol_nombre                    AS role,
+       u.usuario_activo                AS activo
 FROM login          l
 JOIN usuarios       u  ON u.usuario_id  = l.usuario_id
 JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
 JOIN roles          r  ON r.rol_id      = ur.rol_id;
+
+
+CREATE OR REPLACE VIEW vw_administradores AS
+SELECT u.usuario_id                        AS admin_id,
+       INITCAP(u.usuario_prim_nombre)      AS admin_prim_nombre,
+       INITCAP(u.usuario_seg_nombre)       AS admin_seg_nombre,
+       INITCAP(u.usuario_apellido_pat)     AS admin_apellido_pat,
+       INITCAP(u.usuario_apellido_mat)     AS admin_apellido_mat,
+       u.usuario_telefono                  AS admin_telefono,
+       u.usuario_curp                      AS admin_curp,
+       u.usuario_rfc                       AS admin_rfc,
+       u.usuario_activo                    AS admin_activo,
+       u.usuario_imagen                    AS admin_imagen,
+       l.login_correo                      AS admin_email
+FROM usuarios       u
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'admin'
+JOIN login          l  ON l.usuario_id  = u.usuario_id;
+
+
+CREATE OR REPLACE VIEW vw_tutores AS
+SELECT u.usuario_id                        AS tutor_id,
+       INITCAP(u.usuario_prim_nombre)      AS tutor_prim_nombre,
+       INITCAP(u.usuario_seg_nombre)       AS tutor_seg_nombre,
+       INITCAP(u.usuario_apellido_pat)     AS tutor_apellido_pat,
+       INITCAP(u.usuario_apellido_mat)     AS tutor_apellido_mat,
+       u.usuario_telefono                  AS tutor_telefono,
+       u.usuario_curp                      AS tutor_curp,
+       u.usuario_activo                    AS tutor_activo,
+       u.usuario_imagen                    AS tutor_imagen,
+       l.login_correo                      AS tutor_email
+FROM usuarios       u
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'tutor'
+JOIN login          l  ON l.usuario_id  = u.usuario_id;
+
+
+CREATE OR REPLACE VIEW vw_responsables AS
+SELECT u.usuario_id                        AS responsable_id,
+       INITCAP(u.usuario_prim_nombre)      AS responsable_prim_nombre,
+       INITCAP(u.usuario_seg_nombre)       AS responsable_seg_nombre,
+       INITCAP(u.usuario_apellido_pat)     AS responsable_apellido_pat,
+       INITCAP(u.usuario_apellido_mat)     AS responsable_apellido_mat,
+       u.usuario_telefono                  AS responsable_telefono,
+       u.usuario_curp                      AS responsable_curp,
+       u.usuario_rfc                       AS responsable_rfc,
+       u.usuario_activo                    AS responsable_activo,
+       u.usuario_imagen                    AS responsable_imagen,
+       u.centro_id,
+       cs.centro_nombre,
+       l.login_correo                      AS responsable_email
+FROM usuarios       u
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'responsable'
+JOIN login          l  ON l.usuario_id  = u.usuario_id
+LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
+
+
+CREATE OR REPLACE VIEW vw_pacientes AS
+SELECT p.paciente_id,
+       INITCAP(p.paciente_prim_nombre)  AS paciente_prim_nombre,
+       INITCAP(p.paciente_seg_nombre)   AS paciente_seg_nombre,
+       INITCAP(p.paciente_apellido_pat) AS paciente_apellido_pat,
+       INITCAP(p.paciente_apellido_mat) AS paciente_apellido_mat,
+       p.paciente_num_cert_nac,
+       p.paciente_curp,
+       p.paciente_fecha_nac,
+       p.paciente_sexo,
+       p.paciente_nfc,
+       p.paciente_imagen,
+       p.esquema_id,
+       e.esquema_nombre
+FROM pacientes p
+JOIN esquemas e ON e.esquema_id = p.esquema_id;
+
+
+CREATE OR REPLACE VIEW vw_pacientes_por_tutor AS
+SELECT p.paciente_id,
+       INITCAP(p.paciente_prim_nombre)  AS paciente_prim_nombre,
+       INITCAP(p.paciente_seg_nombre)   AS paciente_seg_nombre,
+       INITCAP(p.paciente_apellido_pat) AS paciente_apellido_pat,
+       INITCAP(p.paciente_apellido_mat) AS paciente_apellido_mat,
+       p.paciente_curp,
+       p.paciente_num_cert_nac,
+       p.paciente_fecha_nac,
+       p.paciente_sexo,
+       p.paciente_nfc,
+       p.paciente_imagen,
+       p.esquema_id,
+       e.esquema_nombre,
+       pt.tutor_id,
+       pt.pac_tut_id,
+       INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS tutor_nombre,
+       u.usuario_telefono  AS tutor_telefono,
+       l.login_correo      AS tutor_email
+FROM pacientes          p
+JOIN esquemas           e  ON e.esquema_id  = p.esquema_id
+JOIN pacientes_tutores  pt ON pt.paciente_id = p.paciente_id
+JOIN usuarios           u  ON u.usuario_id  = pt.tutor_id
+JOIN login              l  ON l.usuario_id  = u.usuario_id;
+
+
+CREATE OR REPLACE VIEW vw_aplicaciones_responsable AS
+SELECT a.aplicacion_id,
+       a.paciente_id,
+       a.dosis_id,
+       a.aplicacion_timestamp,
+       a.aplicacion_observaciones,
+       INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat) AS responsable,
+       cs.centro_nombre
+FROM aplicaciones  a
+JOIN usuarios      u  ON u.usuario_id = a.usuario_id
+JOIN centros_salud cs ON cs.centro_id = a.centro_id;
 
 
 -- ─────────────────────────────────────────────
@@ -1388,10 +1504,10 @@ JOIN roles          r  ON r.rol_id      = ur.rol_id;
 CREATE OR REPLACE VIEW vw_usuarios_completo AS
 SELECT
     u.usuario_id,
-    u.usuario_prim_nombre,
-    u.usuario_seg_nombre,
-    u.usuario_apellido_pat,
-    u.usuario_apellido_mat,
+    INITCAP(u.usuario_prim_nombre)  AS usuario_prim_nombre,
+    INITCAP(u.usuario_seg_nombre)   AS usuario_seg_nombre,
+    INITCAP(u.usuario_apellido_pat) AS usuario_apellido_pat,
+    INITCAP(u.usuario_apellido_mat) AS usuario_apellido_mat,
     u.usuario_telefono,
     u.usuario_curp,
     u.usuario_rfc,
