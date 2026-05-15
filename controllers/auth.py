@@ -32,6 +32,11 @@ def login():
         password = request.form.get('password', '')
 
         user = repo.buscar_usuario_por_email(email)
+        if user and not user.get('activo', True):
+            mdb.log_acceso(evento='login_fallido', pg_usuario_id=user['id'],
+                           email=email, ip=request.remote_addr)
+            flash('Tu cuenta está desactivada. Contacta al administrador.', 'error')
+            return render_template('auth/login.html')
         if user and repo.verificar_password(user, password):
             roles = repo.roles_de_usuario(email)
 

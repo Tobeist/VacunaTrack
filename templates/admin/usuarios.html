@@ -13,7 +13,6 @@
     <div class="card-body">
       <form method="POST" action="{{ url_for('admin.usuarios') }}" id="form-crear">
 
-        {# Roles #}
         <div class="form-group">
           <label class="form-label">Rol(es) <span class="required">*</span></label>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -35,7 +34,6 @@
           </div>
         </div>
 
-        {# Nombres #}
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -48,8 +46,6 @@
           <div class="form-group"><label class="form-label">Apellido materno</label>
             <input type="text" name="apellido_mat" class="form-control"></div>
         </div>
-
-        {# Datos básicos #}
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">CURP <span class="required">*</span></label>
             <input type="text" name="curp" class="form-control" maxlength="18"
@@ -60,14 +56,12 @@
         <div class="form-group"><label class="form-label">Correo electrónico <span class="required">*</span></label>
           <input type="email" name="email" class="form-control" required></div>
 
-        {# RFC — solo admin/responsable #}
         <div class="form-group cond-rfc-crear" style="display:none">
           <label class="form-label">RFC <span class="required">*</span></label>
           <input type="text" name="rfc" class="form-control" maxlength="13"
                  style="text-transform:uppercase">
         </div>
 
-        {# Centro — solo responsable #}
         <div class="form-group cond-responsable-crear" style="display:none">
           <label class="form-label">Centro de Salud <span class="required">*</span></label>
           <select name="centro_id" class="form-control">
@@ -78,7 +72,6 @@
           </select>
         </div>
 
-        {# Cédulas — solo responsable #}
         <div class="cond-responsable-crear" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
             <label class="form-label" style="margin:0">Cédulas profesionales <span class="required">*</span></label>
@@ -93,8 +86,8 @@
                      placeholder="Número de cédula" style="flex:1">
               <input type="text" name="cedulas_specs[]" class="form-control"
                      placeholder="Especialidad" style="flex:1">
-              <button type="button" class="btn btn-danger btn-sm" onclick="removeCedulaRow(this)"
-                      title="Eliminar">✕</button>
+              <button type="button" class="btn btn-danger btn-sm"
+                      onclick="removeCedulaRow(this)" title="Eliminar">✕</button>
             </div>
           </div>
         </div>
@@ -118,22 +111,45 @@
       </span>
     </div>
 
-    {# Filtro por rol #}
-    <div class="card-body" style="padding:12px 22px 0">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-        <button class="btn btn-secondary btn-sm role-filter active" data-role="todos">Todos</button>
-        <button class="btn btn-secondary btn-sm role-filter" data-role="admin">
+    <div class="card-body" style="padding:12px 22px 4px">
+      {# Buscador #}
+      <input type="text" id="search-usuarios" class="form-control"
+             placeholder="🔍 Buscar por nombre, correo, RFC…" style="margin-bottom:10px"
+             oninput="filterUsuarios()">
+
+      {# Filtro por rol #}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;align-items:center">
+        <span style="font-size:12px;color:var(--text-muted);margin-right:2px">Rol:</span>
+        <button class="btn btn-secondary btn-sm role-filter active" data-role="todos"
+                onclick="setFilter('role','todos',this)">Todos</button>
+        <button class="btn btn-secondary btn-sm role-filter" data-role="admin"
+                onclick="setFilter('role','admin',this)">
           <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Admin
         </button>
-        <button class="btn btn-secondary btn-sm role-filter" data-role="responsable">
+        <button class="btn btn-secondary btn-sm role-filter" data-role="responsable"
+                onclick="setFilter('role','responsable',this)">
           <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
         </button>
-        <button class="btn btn-secondary btn-sm role-filter" data-role="tutor">
+        <button class="btn btn-secondary btn-sm role-filter" data-role="tutor"
+                onclick="setFilter('role','tutor',this)">
           <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
         </button>
       </div>
-      <input type="text" class="form-control" placeholder="🔍 Buscar…"
-             data-search-table="tabla-usuarios" style="margin-bottom:10px">
+
+      {# Filtro activo/inactivo #}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <span style="font-size:12px;color:var(--text-muted);margin-right:2px">Estado:</span>
+        <button class="btn btn-secondary btn-sm activo-filter active" data-activo="activos"
+                onclick="setFilter('activo','activos',this)">
+          <i class="fa-solid fa-circle-check" style="color:var(--success)"></i> Activos
+        </button>
+        <button class="btn btn-secondary btn-sm activo-filter" data-activo="inactivos"
+                onclick="setFilter('activo','inactivos',this)">
+          <i class="fa-solid fa-circle-xmark" style="color:var(--danger)"></i> Inactivos
+        </button>
+        <button class="btn btn-secondary btn-sm activo-filter" data-activo="todos"
+                onclick="setFilter('activo','todos',this)">Todos</button>
+      </div>
     </div>
 
     <div class="table-wrapper">
@@ -145,16 +161,21 @@
             <th>Roles</th>
             <th>RFC</th>
             <th>Centro</th>
+            <th>Estado</th>
             <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for u in usuarios %}
           {% set uid = u.usuario_id %}
-          <tr data-roles="{{ u.roles | join(',') }}">
+          <tr data-roles="{{ u.roles | join(',') }}"
+              data-activo="{{ 'activo' if u.usuario_activo else 'inactivo' }}">
             <td class="fw-600">
               {{ u.usuario_apellido_pat|cap }}, {{ u.usuario_prim_nombre|cap }}
               {% if u.usuario_seg_nombre %} {{ u.usuario_seg_nombre|cap }}{% endif %}
+              {% if not u.usuario_activo %}
+                <span class="badge badge-gray" style="font-size:10px;margin-left:4px">inactivo</span>
+              {% endif %}
             </td>
             <td>{{ u.email }}</td>
             <td>
@@ -177,10 +198,20 @@
             <td class="fs-sm" style="font-family:monospace">{{ u.usuario_rfc or '—' }}</td>
             <td class="fs-sm">{{ u.centro_nombre or '—' }}</td>
             <td>
+              {% if u.usuario_activo %}
+                <span class="badge" style="background:var(--success-light);color:var(--success)">
+                  <i class="fa-solid fa-circle-check"></i> Activo
+                </span>
+              {% else %}
+                <span class="badge" style="background:var(--danger-light);color:var(--danger)">
+                  <i class="fa-solid fa-circle-xmark"></i> Inactivo
+                </span>
+              {% endif %}
+            </td>
+            <td>
               {% if uid != session.user_id %}
-              <div style="display:flex;gap:6px">
-                <button class="btn btn-secondary btn-sm"
-                        title="Editar"
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                <button class="btn btn-secondary btn-sm" title="Editar"
                         onclick="openEditModal({{ {
                           'uid':         uid,
                           'prim_nombre': u.usuario_prim_nombre,
@@ -195,7 +226,19 @@
                           'roles':       u.roles,
                           'cedulas':     u.cedulas
                         } | tojson }})">✏️</button>
-                <form method="POST" action="{{ url_for('admin.eliminar_usuario', uid=uid) }}" style="display:inline">
+                <form method="POST"
+                      action="{{ url_for('admin.toggle_usuario_activo', uid=uid) }}"
+                      style="display:inline">
+                  <button type="submit" class="btn btn-sm
+                    {{ 'btn-warning' if u.usuario_activo else 'btn-success' }}"
+                    title="{{ 'Desactivar' if u.usuario_activo else 'Reactivar' }}"
+                    data-confirm="{{ 'Desactivar a ' if u.usuario_activo else 'Reactivar a ' }}{{ u.usuario_prim_nombre|cap }} {{ u.usuario_apellido_pat|cap }}?">
+                    {{ '🔒' if u.usuario_activo else '🔓' }}
+                  </button>
+                </form>
+                <form method="POST"
+                      action="{{ url_for('admin.eliminar_usuario', uid=uid) }}"
+                      style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                           data-confirm="¿Eliminar a {{ u.usuario_prim_nombre|cap }} {{ u.usuario_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
                 </form>
@@ -206,7 +249,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="text-center text-muted" style="padding:40px">Sin usuarios registrados.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted" style="padding:40px">Sin usuarios registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -215,7 +258,7 @@
 
 </div>
 
-{# ── Modal Editar (único, llenado por JS) ─────────────────────────────── #}
+{# ── Modal Editar ─────────────────────────────────────────────────────── #}
 <div class="modal-overlay" id="modal-editar-usuario" style="display:none">
   <div class="modal" style="max-width:580px">
     <div class="modal-header">
@@ -225,7 +268,6 @@
     <form method="POST" id="form-editar" action="">
       <div class="modal-body">
 
-        {# Roles #}
         <div class="form-group">
           <label class="form-label">Rol(es) <span class="required">*</span></label>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
@@ -306,13 +348,42 @@
 </div>
 
 <script>
-/* ── Lógica de campos condicionales ─────────────────────────────────────── */
+/* ── Estado de filtros ───────────────────────────────────────────────────── */
+const _filters = { role: 'todos', activo: 'activos' };
+
+function setFilter(type, value, btn) {
+  _filters[type] = value;
+  const cls = type === 'role' ? '.role-filter' : '.activo-filter';
+  document.querySelectorAll(cls).forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  filterUsuarios();
+}
+
+function filterUsuarios() {
+  const q      = (document.getElementById('search-usuarios')?.value || '').toLowerCase();
+  const role   = _filters.role;
+  const activo = _filters.activo;
+
+  document.querySelectorAll('#tabla-usuarios tbody tr[data-roles]').forEach(row => {
+    const roles    = row.dataset.roles.split(',');
+    const isActivo = row.dataset.activo === 'activo';
+
+    const matchRole   = role   === 'todos' || roles.includes(role);
+    const matchActivo = activo === 'todos'
+                        || (activo === 'activos'   && isActivo)
+                        || (activo === 'inactivos' && !isActivo);
+    const matchSearch = !q || row.textContent.toLowerCase().includes(q);
+
+    row.style.display = (matchRole && matchActivo && matchSearch) ? '' : 'none';
+  });
+}
+
+/* ── Campos condicionales ──────────────────────────────────────────────── */
 function syncConditionals(prefix) {
-  const checks  = document.querySelectorAll('.role-check-' + prefix);
-  const roles   = Array.from(checks).filter(c => c.checked).map(c => c.value);
+  const roles   = Array.from(document.querySelectorAll('.role-check-' + prefix))
+                       .filter(c => c.checked).map(c => c.value);
   const needRfc = roles.includes('admin') || roles.includes('responsable');
   const needRes = roles.includes('responsable');
-
   document.querySelectorAll('.cond-rfc-'        + prefix).forEach(el => el.style.display = needRfc ? '' : 'none');
   document.querySelectorAll('.cond-responsable-' + prefix).forEach(el => el.style.display = needRes ? '' : 'none');
 }
@@ -322,7 +393,7 @@ document.querySelectorAll('.role-check-crear').forEach(c =>
 document.querySelectorAll('.role-check-editar').forEach(c =>
   c.addEventListener('change', () => syncConditionals('editar')));
 
-/* ── Filas de cédulas ─────────────────────────────────────────────────── */
+/* ── Filas de cédulas ──────────────────────────────────────────────────── */
 function addCedulaRow(container, num, spec) {
   const row = document.createElement('div');
   row.className = 'cedula-row';
@@ -339,17 +410,13 @@ function addCedulaRow(container, num, spec) {
 
 function removeCedulaRow(btn) {
   const container = btn.closest('.cedulas-container, #edit-cedulas-container');
-  if (container && container.querySelectorAll('.cedula-row').length > 1) {
+  if (container && container.querySelectorAll('.cedula-row').length > 1)
     btn.closest('.cedula-row').remove();
-  }
 }
 
-/* ── Modal editar ─────────────────────────────────────────────────────── */
+/* ── Modal editar ──────────────────────────────────────────────────────── */
 function openEditModal(data) {
-  const modal = document.getElementById('modal-editar-usuario');
-  document.getElementById('form-editar').action =
-    '/admin/usuarios/' + data.uid + '/editar';
-
+  document.getElementById('form-editar').action = '/admin/usuarios/' + data.uid + '/editar';
   document.getElementById('edit-prim_nombre').value  = data.prim_nombre;
   document.getElementById('edit-seg_nombre').value   = data.seg_nombre;
   document.getElementById('edit-apellido_pat').value = data.apellido_pat;
@@ -358,9 +425,7 @@ function openEditModal(data) {
   document.getElementById('edit-rfc').value          = data.rfc;
   document.getElementById('edit-email').value        = data.email;
   document.getElementById('edit-telefono').value     = data.telefono;
-
-  const centroSel = document.getElementById('edit-centro_id');
-  centroSel.value = data.centro_id || '';
+  document.getElementById('edit-centro_id').value    = data.centro_id || '';
 
   document.querySelectorAll('.role-check-editar').forEach(c => {
     c.checked = data.roles.includes(c.value);
@@ -368,14 +433,11 @@ function openEditModal(data) {
 
   const container = document.getElementById('edit-cedulas-container');
   container.innerHTML = '';
-  if (data.cedulas && data.cedulas.length > 0) {
-    data.cedulas.forEach(cd => addCedulaRow(container, cd.cedula_numero, cd.cedula_especialidad || ''));
-  } else {
-    addCedulaRow(container, '', '');
-  }
+  (data.cedulas && data.cedulas.length ? data.cedulas : [{}]).forEach(cd =>
+    addCedulaRow(container, cd.cedula_numero || '', cd.cedula_especialidad || ''));
 
   syncConditionals('editar');
-  modal.style.display = 'flex';
+  document.getElementById('modal-editar-usuario').style.display = 'flex';
 }
 
 function closeEditModal() {
@@ -385,17 +447,7 @@ document.getElementById('modal-editar-usuario').addEventListener('click', functi
   if (e.target === this) closeEditModal();
 });
 
-/* ── Filtro por rol ───────────────────────────────────────────────────── */
-document.querySelectorAll('.role-filter').forEach(btn => {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.role-filter').forEach(b => b.classList.remove('active'));
-    this.classList.add('active');
-    const role = this.dataset.role;
-    document.querySelectorAll('#tabla-usuarios tbody tr[data-roles]').forEach(row => {
-      row.style.display = (role === 'todos' || row.dataset.roles.split(',').includes(role))
-        ? '' : 'none';
-    });
-  });
-});
+/* Aplicar filtro activos por defecto al cargar */
+filterUsuarios();
 </script>
 {% endblock %}

@@ -465,8 +465,9 @@ document.addEventListener('DOMContentLoaded', () => {
   initCascadingDropdowns();
   initPasswordStrength('new_password');
 
-  // Auto-init buesquedas de tablas
+  // Auto-init búsquedas de tablas
   document.querySelectorAll('[data-search-table]').forEach(input => {
+    if (!input.id) input.id = 'autosearch-' + input.dataset.searchTable;
     initTableSearch(input.id, input.dataset.searchTable);
   });
 

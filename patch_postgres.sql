@@ -1365,6 +1365,23 @@ EXCEPTION
 END; $$;
 
 -- ─────────────────────────────────────────────
+-- vw_usuarios_auth: agrega usuario_activo para validación en login
+-- ─────────────────────────────────────────────
+CREATE OR REPLACE VIEW vw_usuarios_auth AS
+SELECT u.usuario_id,
+       l.login_correo         AS email,
+       l.login_contrasena     AS password,
+       u.usuario_prim_nombre  AS first_name,
+       u.usuario_apellido_pat AS last_name,
+       r.rol_nombre           AS role,
+       u.usuario_activo       AS activo
+FROM login          l
+JOIN usuarios       u  ON u.usuario_id  = l.usuario_id
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id;
+
+
+-- ─────────────────────────────────────────────
 -- USUARIOS UNIFICADO: vista + 5 SPs
 -- ─────────────────────────────────────────────
 
@@ -1631,6 +1648,31 @@ BEGIN
     p_ok := 1; p_msg := 'Usuario eliminado correctamente';
 EXCEPTION
     WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al eliminar: ' || SQLERRM;
+END; $$;
+
+
+CREATE OR REPLACE PROCEDURE sp_toggle_usuario_activo(
+    IN  p_usuario_id INTEGER,
+    IN  p_session_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200), OUT p_activo BOOLEAN
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF p_usuario_id = p_session_id THEN
+        p_ok := 0; p_msg := 'No puedes desactivar tu propia cuenta'; RETURN;
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM usuarios WHERE usuario_id = p_usuario_id) THEN
+        p_ok := 0; p_msg := 'Usuario no encontrado'; RETURN;
+    END IF;
+    UPDATE usuarios
+    SET    usuario_activo = NOT usuario_activo
+    WHERE  usuario_id = p_usuario_id
+    RETURNING usuario_activo INTO p_activo;
+    p_ok  := 1;
+    p_msg := CASE WHEN p_activo THEN 'Usuario reactivado correctamente'
+                  ELSE 'Usuario desactivado correctamente' END;
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al cambiar estado: ' || SQLERRM;
 END; $$;
 
 

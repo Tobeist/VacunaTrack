@@ -376,6 +376,19 @@ def editar_usuario(uid):
     return redirect(url_for('admin.usuarios'))
 
 
+@admin_bp.route('/admin/usuarios/<int:uid>/toggle-activo', methods=['POST'])
+def toggle_usuario_activo(uid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    try:
+        r = repo.toggle_usuario_activo(uid, session.get('user_id', 0))
+        flash(r.get('p_msg', 'Estado actualizado.'), 'success')
+    except Exception as e:
+        _flash_error(e)
+    return redirect(url_for('admin.usuarios'))
+
+
 @admin_bp.route('/admin/usuarios/<int:uid>/eliminar', methods=['POST'])
 def eliminar_usuario(uid):
     redir = _require_admin()

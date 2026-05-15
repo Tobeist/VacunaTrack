@@ -67,6 +67,10 @@ def eliminar_usuario(usuario_id: int, session_user_id: int) -> None:
     _sp('sp_eliminar_usuario_unificado', [usuario_id, session_user_id], out_count=2)
 
 
+def toggle_usuario_activo(usuario_id: int, session_user_id: int) -> dict:
+    return _sp('sp_toggle_usuario_activo', [usuario_id, session_user_id], out_count=3)
+
+
 def roles_de_usuario(email: str) -> list[str]:
     rows = db.call_read_sp('sp_roles_de_usuario', [email.lower()])
     return [r['rol_nombre'] for r in rows] if rows else []
