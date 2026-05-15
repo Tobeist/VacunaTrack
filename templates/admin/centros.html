@@ -8,7 +8,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--secondary)"></i> Registrar Centro</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('centros') }}">
+      <form method="POST" action="{{ url_for('admin.centros') }}">
         <div class="form-group"><label class="form-label">Nombre del centro <span class="required">*</span></label>
           <input type="text" name="nombre" class="form-control" required></div>
         <div class="form-row form-row-2">
@@ -76,7 +76,7 @@
               <div style="display:flex;gap:6px">
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-centro-{{ c.centro_id }}"
                         title="Editar">✏️</button>
-                <form method="POST" action="{{ url_for('eliminar_centro', cid=c.centro_id) }}" style="display:inline">
+                <form method="POST" action="{{ url_for('admin.eliminar_centro', cid=c.centro_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                           data-confirm="¿Eliminar {{ c.centro_nombre }}? Esta acción no se puede deshacer.">🗑</button>
                 </form>
@@ -90,7 +90,7 @@
                 <span class="modal-title">✏️ Editar Centro</span>
                 <button class="btn-close" data-close-modal="edit-centro-{{ c.centro_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('editar_centro', cid=c.centro_id) }}">
+              <form method="POST" action="{{ url_for('admin.editar_centro', cid=c.centro_id) }}">
                 <div class="modal-body">
                   <div class="form-group"><label class="form-label">Nombre del centro</label>
                     <input type="text" name="nombre" class="form-control" value="{{ c.centro_nombre }}" required></div>

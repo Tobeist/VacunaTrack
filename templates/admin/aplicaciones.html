@@ -9,7 +9,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-syringe" style="color:var(--success)"></i> Nueva Aplicación</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('aplicaciones') }}">
+      <form method="POST" action="{{ url_for('admin.aplicaciones') }}">
 
         <div class="form-group">
           <label class="form-label">Paciente <span class="required">*</span></label>
@@ -99,7 +99,7 @@
                 <span class="modal-title">✏️ Editar Observaciones</span>
                 <button class="btn-close" data-close-modal="edit-aplic-{{ a.aplicacion_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('editar_aplicacion', aid=a.aplicacion_id) }}">
+              <form method="POST" action="{{ url_for('admin.editar_aplicacion', aid=a.aplicacion_id) }}">
                 <div class="modal-body">
                   <p class="text-muted fs-sm mb-8">{{ a.paciente }} · {{ a.vacuna_nombre }} ({{ a.dosis_tipo }})</p>
                   <div class="form-group"><label class="form-label">Observaciones</label>
@@ -119,7 +119,7 @@
                 <span class="modal-title">🗑 Anular Aplicación</span>
                 <button class="btn-close" data-close-modal="anular-aplic-{{ a.aplicacion_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('anular_aplicacion', aid=a.aplicacion_id) }}">
+              <form method="POST" action="{{ url_for('admin.anular_aplicacion', aid=a.aplicacion_id) }}">
                 <div class="modal-body">
                   <p class="text-muted fs-sm mb-8">Se anulará la aplicación de <strong>{{ a.vacuna_nombre }}</strong> al paciente <strong>{{ a.paciente }}</strong> y el stock será restaurado.</p>
                   <div class="form-group"><label class="form-label">Motivo de anulación <span class="required">*</span></label>

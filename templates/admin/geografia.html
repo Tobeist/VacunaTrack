@@ -15,7 +15,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-earth-americas" style="color:var(--secondary)"></i> Agregar País</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('geografia') }}">
+        <form method="POST" action="{{ url_for('admin.geografia') }}">
           <input type="hidden" name="accion" value="pais">
           <div class="form-group"><label class="form-label">Nombre del país <span class="required">*</span></label>
             <input type="text" name="nombre" class="form-control" required placeholder="Ej: México"></div>
@@ -39,7 +39,7 @@
                 <div style="display:flex;gap:6px">
                   <button class="btn btn-secondary btn-sm" data-open-modal="edit-pais-{{ p.pais_id }}"
                           title="Editar">✏️</button>
-                  <form method="POST" action="{{ url_for('eliminar_pais', pid=p.pais_id) }}" style="display:inline">
+                  <form method="POST" action="{{ url_for('admin.eliminar_pais', pid=p.pais_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                             data-confirm="¿Eliminar el país {{ p.pais_nombre }}? Esta acción no se puede deshacer.">🗑</button>
                   </form>
@@ -53,7 +53,7 @@
                   <span class="modal-title">✏️ Editar País</span>
                   <button class="btn-close" data-close-modal="edit-pais-{{ p.pais_id }}">✕</button>
                 </div>
-                <form method="POST" action="{{ url_for('editar_pais', pid=p.pais_id) }}">
+                <form method="POST" action="{{ url_for('admin.editar_pais', pid=p.pais_id) }}">
                   <div class="modal-body">
                     <div class="form-group"><label class="form-label">Nombre del país</label>
                       <input type="text" name="nombre" class="form-control" value="{{ p.pais_nombre }}" required></div>
@@ -81,7 +81,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-map" style="color:var(--warning)"></i> Agregar Estado</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('geografia') }}">
+        <form method="POST" action="{{ url_for('admin.geografia') }}">
           <input type="hidden" name="accion" value="estado">
           <div class="form-group"><label class="form-label">País <span class="required">*</span></label>
             <select name="pais_id" class="form-select" required>
@@ -116,7 +116,7 @@
                 <div style="display:flex;gap:6px">
                   <button class="btn btn-secondary btn-sm" data-open-modal="edit-estado-{{ e.estado_id }}"
                           title="Editar">✏️</button>
-                  <form method="POST" action="{{ url_for('eliminar_estado', eid=e.estado_id) }}" style="display:inline">
+                  <form method="POST" action="{{ url_for('admin.eliminar_estado', eid=e.estado_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                             data-confirm="¿Eliminar el estado {{ e.estado_nombre }}? Esta acción no se puede deshacer.">🗑</button>
                   </form>
@@ -130,7 +130,7 @@
                   <span class="modal-title">✏️ Editar Estado</span>
                   <button class="btn-close" data-close-modal="edit-estado-{{ e.estado_id }}">✕</button>
                 </div>
-                <form method="POST" action="{{ url_for('editar_estado', eid=e.estado_id) }}">
+                <form method="POST" action="{{ url_for('admin.editar_estado', eid=e.estado_id) }}">
                   <div class="modal-body">
                     <div class="form-group"><label class="form-label">Nombre del estado</label>
                       <input type="text" name="nombre" class="form-control" value="{{ e.estado_nombre }}" required></div>
@@ -166,7 +166,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-city" style="color:var(--orange)"></i> Agregar Ciudad</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('geografia') }}">
+        <form method="POST" action="{{ url_for('admin.geografia') }}">
           <input type="hidden" name="accion" value="ciudad">
           <div class="form-group"><label class="form-label">Estado <span class="required">*</span></label>
             <select name="estado_id" class="form-select" required>
@@ -201,7 +201,7 @@
                 <div style="display:flex;gap:6px">
                   <button class="btn btn-secondary btn-sm" data-open-modal="edit-ciudad-{{ c.ciudad_id }}"
                           title="Editar">✏️</button>
-                  <form method="POST" action="{{ url_for('eliminar_ciudad', cid=c.ciudad_id) }}" style="display:inline">
+                  <form method="POST" action="{{ url_for('admin.eliminar_ciudad', cid=c.ciudad_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                             data-confirm="¿Eliminar la ciudad {{ c.ciudad_nombre }}? Esta acción no se puede deshacer.">🗑</button>
                   </form>
@@ -215,7 +215,7 @@
                   <span class="modal-title">✏️ Editar Ciudad</span>
                   <button class="btn-close" data-close-modal="edit-ciudad-{{ c.ciudad_id }}">✕</button>
                 </div>
-                <form method="POST" action="{{ url_for('editar_ciudad', cid=c.ciudad_id) }}">
+                <form method="POST" action="{{ url_for('admin.editar_ciudad', cid=c.ciudad_id) }}">
                   <div class="modal-body">
                     <div class="form-group"><label class="form-label">Nombre de la ciudad</label>
                       <input type="text" name="nombre" class="form-control" value="{{ c.ciudad_nombre }}" required></div>

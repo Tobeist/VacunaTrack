@@ -22,7 +22,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-industry" style="color:var(--warning)"></i> Nuevo Fabricante</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('fabricantes') }}">
+        <form method="POST" action="{{ url_for('admin.fabricantes') }}">
           <input type="hidden" name="accion" value="fabricante">
           <div class="form-group">
             <label class="form-label">Nombre del fabricante <span class="required">*</span></label>
@@ -68,7 +68,7 @@
                 <div style="display:flex;gap:6px">
                   <button class="btn btn-secondary btn-sm" data-open-modal="edit-fab-{{ f.fabricante_id }}"
                           title="Editar">✏️</button>
-                  <form method="POST" action="{{ url_for('eliminar_fabricante', fid=f.fabricante_id) }}" style="display:inline">
+                  <form method="POST" action="{{ url_for('admin.eliminar_fabricante', fid=f.fabricante_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                             data-confirm="¿Eliminar el fabricante {{ f.fabricante_nombre }}? Esta acción no se puede deshacer.">🗑</button>
                   </form>
@@ -82,7 +82,7 @@
                   <span class="modal-title">✏️ Editar Fabricante</span>
                   <button class="btn-close" data-close-modal="edit-fab-{{ f.fabricante_id }}">✕</button>
                 </div>
-                <form method="POST" action="{{ url_for('editar_fabricante', fid=f.fabricante_id) }}">
+                <form method="POST" action="{{ url_for('admin.editar_fabricante', fid=f.fabricante_id) }}">
                   <div class="modal-body">
                     <div class="form-group"><label class="form-label">Nombre del fabricante</label>
                       <input type="text" name="nombre" class="form-control" value="{{ f.fabricante_nombre }}" required></div>
@@ -123,7 +123,7 @@
     <div class="card">
       <div class="card-header"><span class="card-title"><i class="fa-solid fa-handshake" style="color:var(--secondary)"></i> Nuevo Proveedor</span></div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('fabricantes') }}">
+        <form method="POST" action="{{ url_for('admin.fabricantes') }}">
           <input type="hidden" name="accion" value="proveedor">
           <div class="form-group">
             <label class="form-label">Primer nombre <span class="required">*</span></label>
@@ -192,7 +192,7 @@
                 <div style="display:flex;gap:6px">
                   <button class="btn btn-secondary btn-sm" data-open-modal="edit-prov-{{ p.proveedor_id }}"
                           title="Editar">✏️</button>
-                  <form method="POST" action="{{ url_for('eliminar_proveedor', pid=p.proveedor_id) }}" style="display:inline">
+                  <form method="POST" action="{{ url_for('admin.eliminar_proveedor', pid=p.proveedor_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                             data-confirm="¿Eliminar el proveedor {{ nombre }}? Esta acción no se puede deshacer.">🗑</button>
                   </form>
@@ -206,7 +206,7 @@
                   <span class="modal-title">✏️ Editar Proveedor</span>
                   <button class="btn-close" data-close-modal="edit-prov-{{ p.proveedor_id }}">✕</button>
                 </div>
-                <form method="POST" action="{{ url_for('editar_proveedor', pid=p.proveedor_id) }}">
+                <form method="POST" action="{{ url_for('admin.editar_proveedor', pid=p.proveedor_id) }}">
                   <div class="modal-body">
                     <div class="form-row form-row-2">
                       <div class="form-group"><label class="form-label">Primer nombre</label>

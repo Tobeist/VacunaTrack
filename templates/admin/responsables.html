@@ -9,7 +9,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-user-doctor" style="color:var(--secondary)"></i> Registrar Personal Clínico</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('responsables') }}">
+      <form method="POST" action="{{ url_for('admin.responsables') }}">
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -90,7 +90,7 @@
               <div style="display:flex;gap:6px">
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-resp-{{ r.responsable_id }}"
                         title="Editar">✏️</button>
-                <form method="POST" action="{{ url_for('eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
+                <form method="POST" action="{{ url_for('admin.eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                           data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
                 </form>
@@ -104,7 +104,7 @@
                 <span class="modal-title">✏️ Editar Responsable</span>
                 <button class="btn-close" data-close-modal="edit-resp-{{ r.responsable_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('editar_responsable', rid=r.responsable_id) }}">
+              <form method="POST" action="{{ url_for('admin.editar_responsable', rid=r.responsable_id) }}">
                 <div class="modal-body">
                   <div class="form-row form-row-2">
                     <div class="form-group"><label class="form-label">Primer nombre</label>

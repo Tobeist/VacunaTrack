@@ -8,7 +8,7 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Nuevo Administrador</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('administradores') }}">
+      <form method="POST" action="{{ url_for('admin.administradores') }}">
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -63,7 +63,7 @@
               <div style="display:flex;gap:6px">
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-admin-{{ a.admin_id }}"
                         title="Editar">✏️</button>
-                <form method="POST" action="{{ url_for('eliminar_admin', aid=a.admin_id) }}" style="display:inline">
+                <form method="POST" action="{{ url_for('admin.eliminar_admin', aid=a.admin_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                           data-confirm="¿Eliminar al administrador {{ a.admin_prim_nombre|cap }} {{ a.admin_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
                 </form>
@@ -81,7 +81,7 @@
                 <span class="modal-title">✏️ Editar Administrador</span>
                 <button class="btn-close" data-close-modal="edit-admin-{{ a.admin_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('editar_admin', aid=a.admin_id) }}">
+              <form method="POST" action="{{ url_for('admin.editar_admin', aid=a.admin_id) }}">
                 <div class="modal-body">
                   <div class="form-row form-row-2">
                     <div class="form-group"><label class="form-label">Primer nombre</label>

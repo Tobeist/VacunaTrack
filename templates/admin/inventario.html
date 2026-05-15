@@ -110,7 +110,7 @@
               <div style="display:flex;gap:6px">
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-inv-{{ inv.inventario_id }}"
                         title="Editar">✏️</button>
-                <form method="POST" action="{{ url_for('eliminar_inventario', iid=inv.inventario_id) }}" style="display:inline">
+                <form method="POST" action="{{ url_for('admin.eliminar_inventario', iid=inv.inventario_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
                           data-confirm="¿Eliminar este inventario ({{ inv.vacuna_nombre }} en {{ inv.centro_nombre }})? Esta acción no se puede deshacer.">🗑</button>
                 </form>
@@ -124,7 +124,7 @@
                 <span class="modal-title">✏️ Editar Inventario</span>
                 <button class="btn-close" data-close-modal="edit-inv-{{ inv.inventario_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('editar_inventario', iid=inv.inventario_id) }}">
+              <form method="POST" action="{{ url_for('admin.editar_inventario', iid=inv.inventario_id) }}">
                 <div class="modal-body">
                   <p class="text-muted fs-sm mb-8">{{ inv.vacuna_nombre }} · Lote {{ inv.lote_codigo }} · {{ inv.centro_nombre }}</p>
                   <div class="form-group"><label class="form-label">Stock actual</label>
@@ -162,7 +162,7 @@
         <span class="card-title"><i class="fa-solid fa-right-left" style="color:var(--primary)"></i> Nueva transferencia</span>
       </div>
       <div class="card-body">
-        <form method="POST" action="{{ url_for('inventario') }}" id="form-transferencia">
+        <form method="POST" action="{{ url_for('admin.inventario') }}" id="form-transferencia">
           <div class="form-group">
             <label class="form-label">Centro de origen <span class="required">*</span></label>
             <select id="sel-centro-origen" class="form-select" required>
