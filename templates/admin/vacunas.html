@@ -54,11 +54,7 @@
             </td>
             <td>
               {% if v.padecimientos %}
-                <div style="display:flex;flex-wrap:wrap;gap:4px">
-                  {% for p in v.padecimientos %}
-                  <span class="badge" style="background:var(--bg-secondary);color:var(--text-secondary);font-size:0.75rem">{{ p }}</span>
-                  {% endfor %}
-                </div>
+                <span class="fs-sm" style="color:var(--text-secondary)">{{ v.padecimientos | join(', ') }}</span>
               {% else %}
                 <span class="text-muted fs-sm">—</span>
               {% endif %}
