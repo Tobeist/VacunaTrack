@@ -31,10 +31,10 @@
     <div class="card-body">
 
       {% if esquema_actual %}
-      <div class="flash-msg info" style="margin-bottom:16px;font-size:0.85rem">
-        <i class="fa-solid fa-circle-info"></i>
-        Al publicar, el esquema <strong>{{ esquema_actual.esquema_nombre }}</strong> quedará archivado.
-        Los pacientes sin conflictos de dosis se actualizarán automáticamente.
+      <div class="flash-msg info" style="margin-bottom:16px;font-size:0.85rem;align-items:flex-start">
+        <i class="fa-solid fa-circle-info" style="margin-top:2px;flex-shrink:0"></i>
+        <span>Al publicar, el esquema <strong>{{ esquema_actual.esquema_nombre }}</strong> quedará archivado.
+        Los pacientes sin conflictos de dosis se actualizarán automáticamente.</span>
       </div>
       {% endif %}
 
