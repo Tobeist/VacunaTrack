@@ -196,7 +196,8 @@
               {% endfor %}
             </td>
             <td class="fs-sm" style="font-family:monospace">{{ u.usuario_rfc or '—' }}</td>
-            <td class="fs-sm">{{ u.centro_nombre or '—' }}</td>
+            <td class="fs-sm" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                title="{{ u.centro_nombre or '' }}">{{ u.centro_nombre or '—' }}</td>
             <td>
               {% if u.usuario_activo %}
                 <span class="badge" style="background:var(--success-light);color:var(--success)">
@@ -210,7 +211,7 @@
             </td>
             <td>
               {% if uid != session.user_id %}
-              <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <div style="display:flex;gap:4px;flex-wrap:nowrap;align-items:center">
                 <button class="btn btn-secondary btn-sm" title="Editar"
                         onclick="openEditModal({{ {
                           'uid':         uid,
