@@ -501,13 +501,15 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_inventario_id integer;
 BEGIN
-    SELECT inventario_id INTO v_inventario_id
-    FROM inventarios
-    WHERE centro_id                = NEW.centro_id
-      AND lote_id                  = NEW.lote_id
-      AND inventario_activo_desde IS NOT NULL
-      AND inventario_stock_actual  > 0
-    ORDER BY inventario_activo_desde DESC
+    SELECT i.inventario_id INTO v_inventario_id
+    FROM inventarios i
+    JOIN lotes l ON l.lote_id = i.lote_id
+    WHERE i.centro_id                = NEW.centro_id
+      AND i.lote_id                  = NEW.lote_id
+      AND i.inventario_activo_desde IS NOT NULL
+      AND i.inventario_stock_actual  > 0
+      AND (l.lote_fecha_caducidad IS NULL OR l.lote_fecha_caducidad > CURRENT_DATE)
+    ORDER BY i.inventario_activo_desde DESC
     LIMIT 1;
 
     IF v_inventario_id IS NULL THEN
@@ -769,6 +771,7 @@ JOIN lotes       l  ON l.lote_id    = i.lote_id
 JOIN ciudades    ci ON ci.ciudad_id  = cs.ciudad_id
 WHERE i.inventario_activo_desde IS NOT NULL
   AND i.inventario_stock_actual > 0
+  AND (l.lote_fecha_caducidad IS NULL OR l.lote_fecha_caducidad > CURRENT_DATE)
 GROUP BY cs.centro_id, ci.ciudad_nombre, l.vacuna_id;
 
 CREATE OR REPLACE VIEW vw_lotes AS
@@ -973,7 +976,8 @@ BEGIN
         FROM vw_inventarios
         WHERE centro_id              = p_centro_id
           AND lote_id                = p_lote_id
-          AND inventario_activo_desde IS NOT NULL;
+          AND inventario_activo_desde IS NOT NULL
+          AND (lote_fecha_caducidad IS NULL OR lote_fecha_caducidad > CURRENT_DATE);
 END;
 $$;
 
@@ -1142,6 +1146,7 @@ BEGIN
         WHERE centro_id = p_centro_id
           AND inventario_activo_desde IS NOT NULL
           AND inventario_stock_actual > 0
+          AND (lote_fecha_caducidad IS NULL OR lote_fecha_caducidad > CURRENT_DATE)
         ORDER BY vacuna_nombre;
 END; $$;
 
@@ -1746,6 +1751,7 @@ BEGIN
     IF NOT EXISTS(SELECT 1 FROM vw_inventarios
                   WHERE inventario_activo_desde IS NOT NULL
                     AND inventario_stock_actual > 0
+                    AND (lote_fecha_caducidad IS NULL OR lote_fecha_caducidad > CURRENT_DATE)
                     AND centro_id = p_centro_id AND lote_id = p_lote_id) THEN
         p_ok := 0; p_msg := 'No hay inventario activo con stock disponible'; RETURN;
     END IF;
