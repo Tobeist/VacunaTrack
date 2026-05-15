@@ -118,31 +118,33 @@
 
 <div class="card mb-20">
   <div class="card-body" style="padding:18px 22px">
+    {% if hijos %}
     <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
       <div class="form-group mb-0" style="flex:1;min-width:200px">
-        <label class="form-label">Vacuna a buscar</label>
-        <select id="vacuna-filter" class="form-select">
-          <option value="">— Selecciona una vacuna —</option>
-          {% for v in vacunas %}
-          <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% if hijos %}
-      <div class="form-group mb-0" style="flex:1;min-width:200px">
-        <label class="form-label">Filtrar por hijo (opcional)</label>
-        <select id="hijo-filter" class="form-select">
-          <option value="">Todos mis hijos</option>
+        <label class="form-label">Selecciona un hijo</label>
+        <select id="hijo-filter" class="form-select" onchange="onHijoChange()">
+          <option value="">— Selecciona un hijo —</option>
           {% for hijo in hijos %}
           <option value="{{ hijo.paciente_id }}">{{ hijo.paciente_prim_nombre|cap }} {{ hijo.paciente_apellido_pat|cap }}</option>
           {% endfor %}
         </select>
       </div>
-      {% endif %}
-      <button class="btn btn-primary" onclick="buscarCentros()">
+      <div class="form-group mb-0" style="flex:1;min-width:200px">
+        <label class="form-label">Vacuna pendiente</label>
+        <select id="vacuna-filter" class="form-select" disabled>
+          <option value="">— Primero selecciona un hijo —</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="btn-buscar" onclick="buscarCentros()" disabled>
         <i class="fa-solid fa-location-dot"></i> Buscar cerca de mí
       </button>
     </div>
+    {% else %}
+    <div style="text-align:center;padding:16px 0;color:var(--text-secondary);font-size:0.875rem">
+      <i class="fa-solid fa-circle-info" style="margin-right:6px"></i>
+      No tienes hijos registrados. Para usar esta función, primero debes tener un paciente vinculado a tu cuenta.
+    </div>
+    {% endif %}
   </div>
 </div>
 
@@ -183,16 +185,16 @@
   <div class="card">
     <div class="card-body text-center" style="padding:40px 20px">
       <div style="font-size:48px;margin-bottom:12px">🗺️</div>
-      <p style="font-weight:600;margin-bottom:6px">Selecciona una vacuna</p>
+      <p style="font-weight:600;margin-bottom:6px">Selecciona un hijo y una vacuna</p>
       <p class="text-muted fs-sm">Verás los centros con stock disponible ordenados por distancia.</p>
     </div>
   </div>
 </div>
 
-<div class="card mt-20">
+<div class="card mt-40">
   <div class="card-header"><span class="card-title"><i class="fa-solid fa-circle-info" style="color:var(--secondary)"></i> ¿Cómo llegar?</span></div>
   <div class="card-body" style="font-size:0.875rem;color:var(--text-secondary)">
-    <p>Los centros se ordenan automáticamente del más cercano al más lejano usando tu ubicación GPS. Haz clic en <strong>Cómo llegar</strong> para abrir Google Maps. Al acercarte al centro, recibirás una notificación automática por Bluetooth (Beacon).</p>
+    <p>Los centros se ordenan automáticamente del más cercano al más lejano usando tu ubicación GPS. Haz clic en <strong>Cómo llegar</strong> para abrir Google Maps.</p>
   </div>
 </div>
 {% endblock %}
@@ -206,6 +208,39 @@ function setGpsStatus(msg, type) {
   const el = document.getElementById('gps-status');
   el.textContent = msg;
   el.className = type;
+}
+
+function onHijoChange() {
+  const pid = document.getElementById('hijo-filter').value;
+  const selVacuna = document.getElementById('vacuna-filter');
+  const btnBuscar = document.getElementById('btn-buscar');
+
+  selVacuna.innerHTML = '<option value="">— Cargando… —</option>';
+  selVacuna.disabled = true;
+  btnBuscar.disabled = true;
+
+  if (!pid) {
+    selVacuna.innerHTML = '<option value="">— Primero selecciona un hijo —</option>';
+    return;
+  }
+
+  fetch(`/api/vacunas-pendientes/${pid}`)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.length) {
+        selVacuna.innerHTML = '<option value="">Sin vacunas pendientes</option>';
+        return;
+      }
+      selVacuna.innerHTML = '<option value="">— Selecciona una vacuna —</option>' +
+        data.map(v => `<option value="${v.vacuna_id}">${v.vacuna_nombre}</option>`).join('');
+      selVacuna.disabled = false;
+      selVacuna.onchange = () => {
+        btnBuscar.disabled = !selVacuna.value;
+      };
+    })
+    .catch(() => {
+      selVacuna.innerHTML = '<option value="">Error al cargar vacunas</option>';
+    });
 }
 
 function buscarCentros() {

@@ -160,7 +160,34 @@ def find_centers():
                'paciente_prim_nombre': p['paciente_prim_nombre'],
                'paciente_apellido_pat': p['paciente_apellido_pat']}
               for p in repo.pacientes_de_tutor(session['user_id'])]
-    return render_template('public/find_centers.html', vacunas=repo.listar_vacunas(), hijos=hijos)
+    return render_template('public/find_centers.html', hijos=hijos)
+
+
+@public_bp.route('/api/vacunas-pendientes/<int:paciente_id>')
+def api_vacunas_pendientes(paciente_id):
+    redir = _require_tutor()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    tutor_id = session['user_id']
+    if not repo.existe_relacion(paciente_id, tutor_id):
+        return jsonify({'error': 'No autorizado'}), 403
+    paciente = repo.obtener_paciente(paciente_id)
+    if not paciente:
+        return jsonify([])
+    rows     = repo.historial_vacunacion_paciente(paciente_id, paciente['esquema_id'])
+    enriched = enrich_history(rows, paciente['paciente_fecha_nac'])
+    pendientes = [
+        {'vacuna_id': r['vacuna_id'], 'vacuna_nombre': r['vacuna_nombre']}
+        for r in enriched
+        if r['status'] in ('aplicable', 'cerca_limite', 'atrasada')
+    ]
+    seen = set()
+    unique = []
+    for v in pendientes:
+        if v['vacuna_id'] not in seen:
+            seen.add(v['vacuna_id'])
+            unique.append(v)
+    return jsonify(unique)
 
 
 @public_bp.route('/api/centros-cercanos')
