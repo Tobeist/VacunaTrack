@@ -116,7 +116,7 @@ CREATE TABLE centros_salud (
     centro_horario_fin time not null,
     centro_latitud numeric(11,8) CHECK (centro_latitud BETWEEN -90 AND 90),
     centro_longitud numeric(11,8) CHECK (centro_longitud BETWEEN -180 AND 180),
-    centro_telefono varchar(20) unique,
+    centro_telefono varchar(20) unique not null,
     centro_beacon varchar(100) unique,
     CHECK (centro_horario_fin > centro_horario_inicio),
     FOREIGN KEY (ciudad_id) REFERENCES ciudades (ciudad_id) ON DELETE RESTRICT ON UPDATE CASCADE
@@ -669,13 +669,15 @@ SELECT a.*,
     cs.centro_nombre,
     d.vacuna_id,
     v.vacuna_nombre,
-    d.dosis_tipo
+    d.dosis_tipo,
+    l.lote_codigo
 FROM aplicaciones  a
 JOIN pacientes     p  ON p.paciente_id = a.paciente_id
 JOIN usuarios      u  ON u.usuario_id  = a.usuario_id
 JOIN centros_salud cs ON cs.centro_id  = a.centro_id
 JOIN dosis         d  ON d.dosis_id    = a.dosis_id
-JOIN vacunas       v  ON v.vacuna_id   = d.vacuna_id;
+JOIN vacunas       v  ON v.vacuna_id   = d.vacuna_id
+JOIN lotes         l  ON l.lote_id     = a.lote_id;
 
 CREATE OR REPLACE VIEW vw_dosis_esquemas_detalle AS
 SELECT d.dosis_id,
