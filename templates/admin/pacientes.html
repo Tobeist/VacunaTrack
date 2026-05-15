@@ -117,6 +117,27 @@
               </div>
               <form method="POST" action="{{ url_for('admin.editar_paciente', pid=p.paciente_id) }}">
                 <div class="modal-body">
+                  <div style="display:flex;align-items:center;gap:16px;padding:4px 0 12px;border-bottom:1px solid var(--border-light);margin-bottom:12px">
+                    {% if p.paciente_imagen %}
+                    <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt=""
+                         style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border)">
+                    {% else %}
+                    <div style="width:56px;height:56px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                      <i class="fa-solid fa-baby" style="font-size:22px;color:var(--text-muted)"></i>
+                    </div>
+                    {% endif %}
+                    <div>
+                      <div class="fw-600">{{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}</div>
+                      <form method="POST" action="{{ url_for('admin.subir_foto_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data" style="display:inline">
+                        <input type="file" name="foto" accept="image/*" style="display:none"
+                               id="foto-edit-pac-{{ p.paciente_id }}" onchange="this.form.submit()">
+                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px"
+                                onclick="document.getElementById('foto-edit-pac-{{ p.paciente_id }}').click()">
+                          <i class="fa-solid fa-camera"></i> Cambiar foto
+                        </button>
+                      </form>
+                    </div>
+                  </div>
                   <div class="form-row form-row-2">
                     <div class="form-group"><label class="form-label">Primer nombre</label>
                       <input type="text" name="prim_nombre" class="form-control" value="{{ p.paciente_prim_nombre|cap }}" required></div>

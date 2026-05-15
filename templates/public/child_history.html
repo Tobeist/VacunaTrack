@@ -17,11 +17,23 @@
 {% endif %}
 
 <div class="patient-card">
-  <div class="pc-name">
-    {{ paciente.paciente_prim_nombre|cap }}
-    {% if paciente.paciente_nombre %} {{ paciente.paciente_nombre|cap }}{% endif %}
-    {{ paciente.paciente_apellido_pat|cap }}
-    {% if paciente.paciente_apellido_mat %} {{ paciente.paciente_apellido_mat|cap }}{% endif %}
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px">
+    {% if paciente.paciente_imagen %}
+    <img src="{{ url_for('static', filename=paciente.paciente_imagen) }}" alt=""
+         style="width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.3);flex-shrink:0">
+    {% else %}
+    <div style="width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0">
+      {{ '👦' if paciente.paciente_sexo == 'M' else '👧' }}
+    </div>
+    {% endif %}
+    <div>
+      <div class="pc-name" style="margin-bottom:0">
+        {{ paciente.paciente_prim_nombre|cap }}
+        {% if paciente.paciente_nombre %} {{ paciente.paciente_nombre|cap }}{% endif %}
+        {{ paciente.paciente_apellido_pat|cap }}
+        {% if paciente.paciente_apellido_mat %} {{ paciente.paciente_apellido_mat|cap }}{% endif %}
+      </div>
+    </div>
   </div>
   <div class="pc-meta">
     <span><i class="fa-solid fa-calendar"></i> Nacimiento: {{ paciente.paciente_fecha_nac|format_date }}</span>

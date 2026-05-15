@@ -331,7 +331,14 @@ def usuarios():
                 datos['cedulas_specs'] = f.getlist('cedulas_specs[]')[:len(datos['cedulas_nums'])]
                 if not datos['cedulas_nums']:
                     raise FormError('Debes registrar al menos una cédula profesional.')
-            repo.crear_usuario(datos)
+            nuevo = repo.crear_usuario(datos)
+            file = request.files.get('foto')
+            if file and file.filename and _allowed_file(file.filename):
+                filename  = f"usuario_{nuevo['usuario_id']}_{int(_time_fn())}.{file.filename.rsplit('.',1)[1].lower()}"
+                upload_dir = os.path.join(current_app.static_folder, 'uploads', 'fotos')
+                os.makedirs(upload_dir, exist_ok=True)
+                file.save(os.path.join(upload_dir, filename))
+                repo.actualizar_imagen_usuario(nuevo['usuario_id'], f"uploads/fotos/{filename}")
             flash(f'Usuario registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
         except Exception as e:
             _flash_error(e)
@@ -370,6 +377,13 @@ def editar_usuario(uid):
             if not datos['cedulas_nums']:
                 raise FormError('Debes registrar al menos una cédula profesional.')
         repo.actualizar_usuario(uid, datos)
+        file = request.files.get('foto')
+        if file and file.filename and _allowed_file(file.filename):
+            filename  = f"usuario_{uid}_{int(_time_fn())}.{file.filename.rsplit('.',1)[1].lower()}"
+            upload_dir = os.path.join(current_app.static_folder, 'uploads', 'fotos')
+            os.makedirs(upload_dir, exist_ok=True)
+            file.save(os.path.join(upload_dir, filename))
+            repo.actualizar_imagen_usuario(uid, f"uploads/fotos/{filename}")
         flash('Usuario actualizado.', 'success')
     except Exception as e:
         _flash_error(e)
