@@ -3,7 +3,7 @@
 {% block page_title %}Gestión de Usuarios{% endblock %}
 
 {% block content %}
-<div class="crud-layout">
+<div style="display:flex;flex-direction:column;gap:20px">
 
   {# ── Formulario Crear ─────────────────────────────────────────────────── #}
   <div class="card">
@@ -30,17 +30,17 @@
         <div class="form-group">
           <label class="form-label">Rol(es) <span class="required">*</span></label>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem">
               <input type="checkbox" name="roles" value="admin" class="role-check-crear"
                      style="width:16px;height:16px;accent-color:var(--primary)">
               <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Administrador
             </label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem">
               <input type="checkbox" name="roles" value="responsable" class="role-check-crear"
                      style="width:16px;height:16px;accent-color:var(--success)">
               <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
             </label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem">
               <input type="checkbox" name="roles" value="tutor" class="role-check-crear"
                      style="width:16px;height:16px;accent-color:var(--warning)">
               <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
@@ -173,8 +173,6 @@
             <th>Nombre</th>
             <th>Correo</th>
             <th>Roles</th>
-            <th>RFC</th>
-            <th>Centro</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -221,9 +219,6 @@
                 {% endif %}
               {% endfor %}
             </td>
-            <td class="fs-sm" style="font-family:monospace">{{ u.usuario_rfc or '—' }}</td>
-            <td class="fs-sm" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-                title="{{ u.centro_nombre or '' }}">{{ u.centro_nombre or '—' }}</td>
             <td>
               {% if u.usuario_activo %}
                 <span class="badge" style="background:var(--success-light);color:var(--success)">
@@ -294,7 +289,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="text-center text-muted" style="padding:40px">Sin usuarios registrados.</td></tr>
+          <tr><td colspan="5" class="text-center text-muted" style="padding:40px">Sin usuarios registrados.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -333,17 +328,17 @@
         <div class="form-group">
           <label class="form-label">Rol(es) <span class="required">*</span></label>
           <div style="display:flex;gap:16px;flex-wrap:wrap">
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem">
               <input type="checkbox" name="roles" value="admin" id="edit-role-admin"
                      class="role-check-editar" style="width:16px;height:16px;accent-color:var(--primary)">
               <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Administrador
             </label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem">
               <input type="checkbox" name="roles" value="responsable" id="edit-role-responsable"
                      class="role-check-editar" style="width:16px;height:16px;accent-color:var(--success)">
               <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
             </label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem">
               <input type="checkbox" name="roles" value="tutor" id="edit-role-tutor"
                      class="role-check-editar" style="width:16px;height:16px;accent-color:var(--warning)">
               <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
