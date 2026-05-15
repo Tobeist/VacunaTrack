@@ -871,16 +871,29 @@ def vacunas():
             _flash_error(e)
         return redirect(url_for('admin.vacunas'))
 
-    todas_dosis  = repo.listar_dosis()
+    # vacunas en esquema actual
+    esquemas_list = repo.listar_esquemas()
+    esquema_actual = next((e for e in esquemas_list if not e.get('esquema_vigente_hasta')), None)
+    todas_dosis = repo.listar_dosis()
+    vacunas_en_esquema: set[int] = set()
+    if esquema_actual:
+        dosis_ids = {d['dosis_id'] for d in repo.dosis_de_esquema(esquema_actual['esquema_id'])}
+        vacunas_en_esquema = {d['vacuna_id'] for d in todas_dosis if d['dosis_id'] in dosis_ids}
+
+    # padecimientos por vacuna
+    pads_por_vacuna: dict[int, list[str]] = {}
+    for pad in repo.listar_padecimientos():
+        for vid in repo.vacunas_de_padecimiento(pad['padecimiento_id']):
+            pads_por_vacuna.setdefault(vid, []).append(pad['padecimiento_nombre'])
+
     vacunas_list = []
     for v in repo.listar_vacunas():
         v2 = dict(v)
-        v2['dosis'] = [d for d in todas_dosis if d['vacuna_id'] == v['vacuna_id']]
+        v2['en_esquema'] = v['vacuna_id'] in vacunas_en_esquema
+        v2['padecimientos'] = pads_por_vacuna.get(v['vacuna_id'], [])
         vacunas_list.append(v2)
     return render_template('admin/vacunas.html',
-                           vacunas=vacunas_list,
-                           dosis_tipos=DOSIS_TIPOS,
-                           days_to_human=days_to_human)
+                           vacunas=vacunas_list)
 
 
 @admin_bp.route('/admin/vacunas/<int:vid>/editar', methods=['POST'])
