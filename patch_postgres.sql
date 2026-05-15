@@ -1679,19 +1679,20 @@ END; $$;
 -- ─────────────────────────────────────────────
 -- MULTI-ROL: obtener todos los roles de un usuario
 -- ─────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION sp_roles_de_usuario(p_email VARCHAR)
-RETURNS TABLE(rol_nombre VARCHAR) AS $$
+CREATE OR REPLACE PROCEDURE sp_roles_de_usuario(
+    IN p_email VARCHAR, INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
 BEGIN
-    RETURN QUERY
-    SELECT r.rol_nombre::VARCHAR
-    FROM   login       l
-    JOIN   usuarios    u  ON u.usuario_id  = l.usuario_id
+    OPEN p_resultados FOR
+    SELECT r.rol_nombre
+    FROM   login          l
+    JOIN   usuarios       u  ON u.usuario_id  = l.usuario_id
     JOIN   usuarios_roles ur ON ur.usuario_id = u.usuario_id
-    JOIN   roles       r  ON r.rol_id      = ur.rol_id
-    WHERE  l.login_email = LOWER(TRIM(p_email))
+    JOIN   roles          r  ON r.rol_id      = ur.rol_id
+    WHERE  l.login_correo = LOWER(TRIM(p_email))
     ORDER  BY CASE r.rol_nombre
                   WHEN 'admin'       THEN 0
                   WHEN 'responsable' THEN 1
                   ELSE 2
               END;
-END; $$ LANGUAGE plpgsql;
+END; $$;
