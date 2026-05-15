@@ -59,7 +59,7 @@
             <td>
               <form method="POST" action="{{ url_for('admin.eliminar_relacion', rid=r.pac_tut_id) }}" style="display:inline">
                 <button type="submit" class="btn btn-danger btn-sm"
-                        data-confirm="¿Eliminar la relación entre {{ r.paciente }} y {{ r.tutor }}?">🗑</button>
+                        data-confirm="¿Eliminar la relación entre {{ r.paciente }} y {{ r.tutor }}?"><i class="fa-solid fa-trash"></i></button>
               </form>
             </td>
           </tr>

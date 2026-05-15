@@ -109,7 +109,7 @@
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-aplic-{{ a.aplicacion_id }}"
                         title="Editar observaciones">✏️</button>
                 <button class="btn btn-danger btn-sm" data-open-modal="anular-aplic-{{ a.aplicacion_id }}"
-                        title="Anular">🗑</button>
+                        title="Anular"><i class="fa-solid fa-trash"></i></button>
               </div>
             </td>
           </tr>
@@ -137,7 +137,7 @@
           <div class="modal-overlay" id="anular-aplic-{{ a.aplicacion_id }}">
             <div class="modal">
               <div class="modal-header">
-                <span class="modal-title">🗑 Anular Aplicación</span>
+                <span class="modal-title"><i class="fa-solid fa-trash"></i> Anular Aplicación</span>
                 <button class="btn-close" data-close-modal="anular-aplic-{{ a.aplicacion_id }}">✕</button>
               </div>
               <form method="POST" action="{{ url_for('admin.anular_aplicacion', aid=a.aplicacion_id) }}">

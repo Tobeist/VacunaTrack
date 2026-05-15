@@ -112,7 +112,7 @@
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_inventario', iid=inv.inventario_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                          data-confirm="¿Eliminar este inventario ({{ inv.vacuna_nombre }} en {{ inv.centro_nombre }})? Esta acción no se puede deshacer.">🗑</button>
+                          data-confirm="¿Eliminar este inventario ({{ inv.vacuna_nombre }} en {{ inv.centro_nombre }})? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                 </form>
               </div>
             </td>

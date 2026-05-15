@@ -55,7 +55,7 @@
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_padecimiento', pid=p.padecimiento_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                          data-confirm="¿Eliminar el padecimiento {{ p.padecimiento_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                          data-confirm="¿Eliminar el padecimiento {{ p.padecimiento_nombre }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                 </form>
               </div>
             </td>

@@ -41,7 +41,7 @@
                           title="Editar">✏️</button>
                   <form method="POST" action="{{ url_for('admin.eliminar_pais', pid=p.pais_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                            data-confirm="¿Eliminar el país {{ p.pais_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                            data-confirm="¿Eliminar el país {{ p.pais_nombre }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                   </form>
                 </div>
               </td>
@@ -118,7 +118,7 @@
                           title="Editar">✏️</button>
                   <form method="POST" action="{{ url_for('admin.eliminar_estado', eid=e.estado_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                            data-confirm="¿Eliminar el estado {{ e.estado_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                            data-confirm="¿Eliminar el estado {{ e.estado_nombre }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                   </form>
                 </div>
               </td>
@@ -203,7 +203,7 @@
                           title="Editar">✏️</button>
                   <form method="POST" action="{{ url_for('admin.eliminar_ciudad', cid=c.ciudad_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                            data-confirm="¿Eliminar la ciudad {{ c.ciudad_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                            data-confirm="¿Eliminar la ciudad {{ c.ciudad_nombre }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                   </form>
                 </div>
               </td>

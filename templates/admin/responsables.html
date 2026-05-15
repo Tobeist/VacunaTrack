@@ -92,7 +92,7 @@
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_responsable', rid=r.responsable_id) }}" style="display:inline">
                   <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                          data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
+                          data-confirm="¿Eliminar a {{ r.responsable_prim_nombre|cap }} {{ r.responsable_apellido_pat|cap }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                 </form>
               </div>
             </td>

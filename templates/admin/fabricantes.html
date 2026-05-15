@@ -70,7 +70,7 @@
                           title="Editar">✏️</button>
                   <form method="POST" action="{{ url_for('admin.eliminar_fabricante', fid=f.fabricante_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                            data-confirm="¿Eliminar el fabricante {{ f.fabricante_nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                            data-confirm="¿Eliminar el fabricante {{ f.fabricante_nombre }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                   </form>
                 </div>
               </td>
@@ -194,7 +194,7 @@
                           title="Editar">✏️</button>
                   <form method="POST" action="{{ url_for('admin.eliminar_proveedor', pid=p.proveedor_id) }}" style="display:inline">
                     <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                            data-confirm="¿Eliminar el proveedor {{ nombre }}? Esta acción no se puede deshacer.">🗑</button>
+                            data-confirm="¿Eliminar el proveedor {{ nombre }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
                   </form>
                 </div>
               </td>
