@@ -11,6 +11,19 @@ auth_bp = Blueprint('auth', __name__)
 
 generate_password_hash = partial(_gph, method='pbkdf2:sha256')
 
+_ROLE_REDIRECT = {
+    'admin':       'admin.dashboard',
+    'responsable': 'clinical.lookup',
+    'tutor':       'public.tutor_dashboard',
+}
+
+
+def _activate_role(user: dict, role: str) -> None:
+    session['user_id']    = user['id']
+    session['user_role']  = role
+    session['user_name']  = f"{user['first_name']} {user['last_name']}"
+    session['user_email'] = user['email']
+
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -20,25 +33,26 @@ def login():
 
         user = repo.buscar_usuario_por_email(email)
         if user and repo.verificar_password(user, password):
-            session['user_id']    = user['id']
-            session['user_role']  = user['role']
-            session['user_name']  = f"{user['first_name']} {user['last_name']}"
-            session['user_email'] = user['email']
+            roles = repo.roles_de_usuario(email)
 
             mdb.log_acceso(
                 evento='login',
                 pg_usuario_id=user['id'],
                 email=email,
-                rol=user['role'],
+                rol=roles[0] if roles else user['role'],
                 ip=request.remote_addr,
             )
 
-            if user['role'] == 'admin':
-                return redirect(url_for('admin.dashboard'))
-            elif user['role'] == 'responsable':
-                return redirect(url_for('clinical.lookup'))
-            else:
-                return redirect(url_for('public.tutor_dashboard'))
+            if len(roles) > 1:
+                session['user_id']      = user['id']
+                session['user_name']    = f"{user['first_name']} {user['last_name']}"
+                session['user_email']   = user['email']
+                session['user_roles']   = roles
+                session.pop('user_role', None)
+                return redirect(url_for('auth.select_role'))
+
+            _activate_role(user, roles[0] if roles else user['role'])
+            return redirect(url_for(_ROLE_REDIRECT.get(session['user_role'], 'auth.login')))
         else:
             mdb.log_acceso(
                 evento='login_fallido',
@@ -49,6 +63,40 @@ def login():
             flash('Correo o contraseña incorrectos.', 'error')
 
     return render_template('auth/login.html')
+
+
+@auth_bp.route('/seleccionar-rol', methods=['GET', 'POST'])
+def select_role():
+    roles = session.get('user_roles')
+    if not roles or 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    if request.method == 'POST':
+        chosen = request.form.get('rol', '')
+        if chosen not in roles:
+            flash('Rol no válido.', 'error')
+            return redirect(url_for('auth.select_role'))
+
+        session['user_role'] = chosen
+        return redirect(url_for(_ROLE_REDIRECT.get(chosen, 'auth.login')))
+
+    return render_template('auth/select_role.html', roles=roles,
+                           user_name=session.get('user_name', ''))
+
+
+@auth_bp.route('/cambiar-rol')
+def cambiar_rol():
+    if 'user_id' not in session:
+        return redirect(url_for('auth.login'))
+
+    email = session.get('user_email', '')
+    roles = repo.roles_de_usuario(email)
+    if len(roles) < 2:
+        return redirect(url_for(_ROLE_REDIRECT.get(session.get('user_role', ''), 'auth.login')))
+
+    session['user_roles'] = roles
+    session.pop('user_role', None)
+    return redirect(url_for('auth.select_role'))
 
 
 @auth_bp.route('/logout')
@@ -83,12 +131,7 @@ def change_password():
                 repo.cambiar_password(session['user_role'], session['user_id'], hashed)
                 flash('Contraseña actualizada correctamente.', 'success')
                 role = session['user_role']
-                if role == 'admin':
-                    return redirect(url_for('admin.dashboard'))
-                elif role == 'responsable':
-                    return redirect(url_for('clinical.lookup'))
-                else:
-                    return redirect(url_for('public.tutor_dashboard'))
+                return redirect(url_for(_ROLE_REDIRECT.get(role, 'auth.login')))
             except Exception as e:
                 from controllers.admin import _flash_error
                 _flash_error(e)

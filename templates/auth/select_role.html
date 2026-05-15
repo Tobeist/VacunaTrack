@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seleccionar Rol — VacunaTrack</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+<div class="login-wrapper">
+  <div class="login-card">
+
+    <div class="login-logo">
+      <div class="licon">💉</div>
+      <h1>VacunaTrack</h1>
+      <p>Hola, <strong>{{ user_name }}</strong>. Elige el rol con el que deseas ingresar.</p>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=True) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash-msg {{ category }}" style="margin-bottom:16px">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span>{{ message }}</span>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('auth.select_role') }}">
+      <div class="form-group" style="display:flex;flex-direction:column;gap:12px">
+        {% set role_meta = {
+            'admin':       ('fa-shield-halved',       'Administrador',   'var(--primary)'),
+            'responsable': ('fa-user-nurse',           'Responsable',     'var(--success)'),
+            'tutor':       ('fa-person-breastfeeding', 'Tutor / Padre',   'var(--warning)')
+        } %}
+        {% for rol in roles %}
+          {% set icon, label, color = role_meta.get(rol, ('fa-user', rol|capitalize, 'var(--text-muted)')) %}
+          <label style="display:flex;align-items:center;gap:14px;padding:14px 16px;border:2px solid var(--border);border-radius:10px;cursor:pointer;transition:border-color .2s"
+                 onmouseover="this.style.borderColor='{{ color }}'" onmouseout="this.style.borderColor='var(--border)'">
+            <input type="radio" name="rol" value="{{ rol }}" required style="accent-color:{{ color }};width:18px;height:18px">
+            <i class="fa-solid {{ icon }}" style="color:{{ color }};font-size:20px;width:24px;text-align:center"></i>
+            <span style="font-weight:600;font-size:15px">{{ label }}</span>
+          </label>
+        {% endfor %}
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full btn-lg" style="margin-top:20px">
+        <i class="fa-solid fa-right-to-bracket"></i> Ingresar
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:16px">
+      <a href="{{ url_for('auth.logout') }}" style="font-size:13px;color:var(--text-muted)">
+        <i class="fa-solid fa-arrow-left"></i> Volver al inicio de sesión
+      </a>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>

@@ -147,6 +147,12 @@
     <span class="topbar-title">{% block page_title %}VacunaTrack{% endblock %}</span>
   </div>
   <div class="topbar-right">
+    {% if session.user_roles and session.user_roles|length > 1 %}
+    <a href="{{ url_for('auth.cambiar_rol') }}" class="btn btn-secondary btn-sm" title="Cambiar rol activo">
+      <i class="fa-solid fa-repeat"></i>
+      <span class="btn-logout-text">Cambiar rol</span>
+    </a>
+    {% endif %}
     <a href="{{ url_for('auth.change_password') }}" class="btn-icon" title="Cambiar contraseña">
       <i class="fa-solid fa-key"></i>
     </a>

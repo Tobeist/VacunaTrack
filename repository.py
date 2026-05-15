@@ -17,6 +17,11 @@ def buscar_usuario_por_email(email: str) -> dict | None:
     return db.call_read_sp_one('sp_buscar_usuario_por_email', [email.lower()])
 
 
+def roles_de_usuario(email: str) -> list[str]:
+    rows = db.call_read_sp('sp_roles_de_usuario', [email.lower()])
+    return [r['rol_nombre'] for r in rows] if rows else []
+
+
 def verificar_password(usuario: dict, password: str) -> bool:
     return check_password_hash(usuario['password'], password)
 

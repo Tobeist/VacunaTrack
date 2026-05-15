@@ -1363,3 +1363,23 @@ EXCEPTION
     WHEN foreign_key_violation THEN p_ok := 0; p_msg := 'No se puede eliminar: hay registros que dependen de esta ciudad.';
     WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudo eliminar la ciudad.';
 END; $$;
+
+-- ─────────────────────────────────────────────
+-- MULTI-ROL: obtener todos los roles de un usuario
+-- ─────────────────────────────────────────────
+CREATE OR REPLACE FUNCTION sp_roles_de_usuario(p_email VARCHAR)
+RETURNS TABLE(rol_nombre VARCHAR) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT r.rol_nombre::VARCHAR
+    FROM   login       l
+    JOIN   usuarios    u  ON u.usuario_id  = l.usuario_id
+    JOIN   usuarios_roles ur ON ur.usuario_id = u.usuario_id
+    JOIN   roles       r  ON r.rol_id      = ur.rol_id
+    WHERE  l.login_email = LOWER(TRIM(p_email))
+    ORDER  BY CASE r.rol_nombre
+                  WHEN 'admin'       THEN 0
+                  WHEN 'responsable' THEN 1
+                  ELSE 2
+              END;
+END; $$ LANGUAGE plpgsql;
