@@ -1286,16 +1286,19 @@ def aplicaciones():
     if request.method == 'POST':
         f = request.form
         try:
-            inventario_id = _get_int(f, 'inventario_id', 'inventario',  required=True)
-            pid           = _get_int(f, 'paciente_id',   'paciente',    required=True)
-            did           = _get_int(f, 'dosis_id',      'dosis',       required=True)
-            resp_id       = _get_int(f, 'responsable_id', 'responsable', required=True)
+            pid         = _get_int(f, 'paciente_id',   'paciente',        required=True)
+            did         = _get_int(f, 'dosis_id',      'dosis',           required=True)
+            resp_id     = _get_int(f, 'responsable_id', 'responsable',    required=True)
+            centro_id   = _get_int(f, 'centro_id',     'centro de salud', required=True)
+            lote_codigo = _get_str(f, 'lote_codigo',   'código de lote',  required=True).upper()
 
-            inv = repo.obtener_inventario(inventario_id)
+            inventarios_centro = repo.inventarios_activos_de_centro(centro_id)
+            inv = next((i for i in inventarios_centro
+                        if i.get('lote_codigo', '').upper() == lote_codigo), None)
             if not inv:
-                raise FormError('El inventario seleccionado no existe.')
-            if not inv.get('inventario_activo') or (inv.get('inventario_stock_actual') or 0) <= 0:
-                raise FormError('No hay stock disponible en el inventario seleccionado.')
+                raise FormError(
+                    f'No se encontró el lote "{lote_codigo}" con stock disponible en el centro seleccionado.'
+                )
 
             cad = inv.get('lote_fecha_caducidad')
             if cad and isinstance(cad, date) and cad < date.today():
@@ -1364,8 +1367,7 @@ def aplicaciones():
                            aplicaciones=repo.listar_aplicaciones(),
                            pacientes=repo.listar_pacientes(),
                            responsables=repo.listar_responsables(),
-                           inventarios=[i for i in repo.listar_inventarios()
-                                        if i['inventario_activo'] and i['inventario_stock_actual'] > 0],
+                           centros=repo.listar_centros(),
                            dosis_list=dosis_list)
 
 
