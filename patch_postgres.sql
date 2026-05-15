@@ -1365,6 +1365,276 @@ EXCEPTION
 END; $$;
 
 -- ─────────────────────────────────────────────
+-- USUARIOS UNIFICADO: vista + 5 SPs
+-- ─────────────────────────────────────────────
+
+CREATE OR REPLACE VIEW vw_usuarios_completo AS
+SELECT
+    u.usuario_id,
+    u.usuario_prim_nombre,
+    u.usuario_seg_nombre,
+    u.usuario_apellido_pat,
+    u.usuario_apellido_mat,
+    u.usuario_telefono,
+    u.usuario_curp,
+    u.usuario_rfc,
+    u.usuario_activo,
+    u.usuario_imagen,
+    u.centro_id,
+    cs.centro_nombre,
+    l.login_correo AS email,
+    STRING_AGG(r.rol_nombre, ',' ORDER BY
+        CASE r.rol_nombre
+            WHEN 'admin'       THEN 0
+            WHEN 'responsable' THEN 1
+            ELSE 2
+        END
+    ) AS roles
+FROM usuarios u
+JOIN login          l  ON l.usuario_id  = u.usuario_id
+JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
+JOIN roles          r  ON r.rol_id      = ur.rol_id
+LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id
+GROUP BY u.usuario_id, u.usuario_prim_nombre, u.usuario_seg_nombre,
+         u.usuario_apellido_pat, u.usuario_apellido_mat,
+         u.usuario_telefono, u.usuario_curp, u.usuario_rfc,
+         u.usuario_activo, u.usuario_imagen, u.centro_id,
+         cs.centro_nombre, l.login_correo;
+
+
+CREATE OR REPLACE PROCEDURE sp_listar_usuarios(INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+        SELECT * FROM vw_usuarios_completo
+        ORDER BY usuario_apellido_pat, usuario_prim_nombre;
+END; $$;
+
+
+CREATE OR REPLACE PROCEDURE sp_obtener_usuario(
+    IN p_id INTEGER, INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR SELECT * FROM vw_usuarios_completo WHERE usuario_id = p_id;
+END; $$;
+
+
+CREATE OR REPLACE PROCEDURE sp_crear_usuario_unificado(
+    IN  p_prim_nombre   VARCHAR(100),
+    IN  p_seg_nombre    VARCHAR(100),
+    IN  p_apellido_pat  VARCHAR(100),
+    IN  p_apellido_mat  VARCHAR(100),
+    IN  p_telefono      VARCHAR(20),
+    IN  p_curp          VARCHAR(18),
+    IN  p_rfc           VARCHAR(13),
+    IN  p_email         VARCHAR(150),
+    IN  p_contrasena    VARCHAR(255),
+    IN  p_centro_id     INTEGER,
+    IN  p_roles         TEXT[],
+    IN  p_cedulas_nums  TEXT[],
+    IN  p_cedulas_specs TEXT[],
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200), OUT p_id INTEGER
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_rol_id INTEGER;
+    v_i      INTEGER;
+    v_ok     SMALLINT;
+    v_msg    VARCHAR(200);
+BEGIN
+    IF p_roles IS NULL OR array_length(p_roles, 1) IS NULL THEN
+        p_ok := 0; p_msg := 'Debes asignar al menos un rol'; RETURN;
+    END IF;
+    IF 'responsable' = ANY(p_roles) AND p_centro_id IS NULL THEN
+        p_ok := 0; p_msg := 'Debes asignar un centro de salud para el rol responsable'; RETURN;
+    END IF;
+    IF ('admin' = ANY(p_roles) OR 'responsable' = ANY(p_roles))
+       AND TRIM(COALESCE(p_rfc,'')) = '' THEN
+        p_ok := 0; p_msg := 'El RFC es requerido para administradores y responsables'; RETURN;
+    END IF;
+    IF 'responsable' = ANY(p_roles)
+       AND (p_cedulas_nums IS NULL OR array_length(p_cedulas_nums, 1) IS NULL) THEN
+        p_ok := 0; p_msg := 'Debes registrar al menos una cédula profesional para responsables'; RETURN;
+    END IF;
+
+    CALL sp_crear_usuario_base(
+        p_prim_nombre, p_seg_nombre, p_apellido_pat, p_apellido_mat,
+        p_telefono, p_curp, p_rfc, p_email, p_contrasena,
+        p_centro_id, p_roles[1],
+        v_ok, v_msg, p_id
+    );
+    IF v_ok = 0 THEN p_ok := 0; p_msg := v_msg; RETURN; END IF;
+
+    FOR v_i IN 2..array_length(p_roles, 1) LOOP
+        SELECT rol_id INTO v_rol_id FROM roles WHERE rol_nombre = p_roles[v_i];
+        IF v_rol_id IS NOT NULL THEN
+            INSERT INTO usuarios_roles(usuario_id, rol_id) VALUES(p_id, v_rol_id)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    END LOOP;
+
+    IF 'responsable' = ANY(p_roles) AND p_cedulas_nums IS NOT NULL THEN
+        FOR v_i IN 1..array_length(p_cedulas_nums, 1) LOOP
+            IF TRIM(COALESCE(p_cedulas_nums[v_i],'')) != '' THEN
+                INSERT INTO cedulas(cedula_numero, cedula_especialidad, usuario_id)
+                VALUES(TRIM(p_cedulas_nums[v_i]),
+                       NULLIF(TRIM(COALESCE(p_cedulas_specs[v_i],'')), ''),
+                       p_id)
+                ON CONFLICT (cedula_numero) DO NOTHING;
+            END IF;
+        END LOOP;
+    END IF;
+
+    p_ok := 1; p_msg := 'Usuario creado correctamente';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Ya existe un registro con esos datos (duplicado)';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al crear usuario: ' || SQLERRM;
+END; $$;
+
+
+CREATE OR REPLACE PROCEDURE sp_actualizar_usuario_unificado(
+    IN  p_usuario_id    INTEGER,
+    IN  p_prim_nombre   VARCHAR(100),
+    IN  p_seg_nombre    VARCHAR(100),
+    IN  p_apellido_pat  VARCHAR(100),
+    IN  p_apellido_mat  VARCHAR(100),
+    IN  p_telefono      VARCHAR(20),
+    IN  p_curp          VARCHAR(18),
+    IN  p_rfc           VARCHAR(13),
+    IN  p_email         VARCHAR(150),
+    IN  p_centro_id     INTEGER,
+    IN  p_roles         TEXT[],
+    IN  p_cedulas_nums  TEXT[],
+    IN  p_cedulas_specs TEXT[],
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_rol    TEXT;
+    v_rol_id INTEGER;
+    v_i      INTEGER;
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM usuarios WHERE usuario_id = p_usuario_id) THEN
+        p_ok := 0; p_msg := 'Usuario no encontrado'; RETURN;
+    END IF;
+    IF p_roles IS NULL OR array_length(p_roles, 1) IS NULL THEN
+        p_ok := 0; p_msg := 'Debes asignar al menos un rol'; RETURN;
+    END IF;
+    IF 'responsable' = ANY(p_roles) AND p_centro_id IS NULL THEN
+        p_ok := 0; p_msg := 'Debes asignar un centro de salud para el rol responsable'; RETURN;
+    END IF;
+    IF ('admin' = ANY(p_roles) OR 'responsable' = ANY(p_roles))
+       AND TRIM(COALESCE(p_rfc,'')) = '' THEN
+        p_ok := 0; p_msg := 'El RFC es requerido para administradores y responsables'; RETURN;
+    END IF;
+    IF 'responsable' = ANY(p_roles)
+       AND (p_cedulas_nums IS NULL OR array_length(p_cedulas_nums, 1) IS NULL) THEN
+        p_ok := 0; p_msg := 'Debes registrar al menos una cédula profesional para responsables'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND p_telefono !~ '^[0-9]{10}$' THEN
+        p_ok := 0; p_msg := 'El teléfono debe tener exactamente 10 dígitos'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND LENGTH(TRIM(p_curp)) != 18 THEN
+        p_ok := 0; p_msg := 'La CURP debe tener 18 caracteres'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND
+       UPPER(TRIM(p_curp)) !~ '^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[0-9A-Z][0-9]$' THEN
+        p_ok := 0; p_msg := 'El formato de la CURP no es válido'; RETURN;
+    END IF;
+    IF p_rfc IS NOT NULL AND TRIM(p_rfc) != '' AND
+       UPPER(TRIM(p_rfc)) !~ '^[A-Z0-9&]{3,4}[0-9]{6}[A-Z0-9]{3}$' THEN
+        p_ok := 0; p_msg := 'El formato del RFC no es válido'; RETURN;
+    END IF;
+    IF p_telefono IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_telefono = TRIM(p_telefono)
+              AND usuario_id != p_usuario_id) THEN
+        p_ok := 0; p_msg := 'El teléfono ya está registrado en otro usuario'; RETURN;
+    END IF;
+    IF p_curp IS NOT NULL AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_curp = UPPER(TRIM(p_curp))
+              AND usuario_id != p_usuario_id) THEN
+        p_ok := 0; p_msg := 'La CURP ya está registrada en otro usuario'; RETURN;
+    END IF;
+    IF p_rfc IS NOT NULL AND TRIM(p_rfc) != '' AND
+       EXISTS(SELECT 1 FROM usuarios WHERE usuario_rfc = UPPER(TRIM(p_rfc))
+              AND usuario_id != p_usuario_id) THEN
+        p_ok := 0; p_msg := 'El RFC ya está registrado en otro usuario'; RETURN;
+    END IF;
+
+    UPDATE usuarios SET
+        usuario_prim_nombre  = COALESCE(NULLIF(TRIM(p_prim_nombre),''),  usuario_prim_nombre),
+        usuario_seg_nombre   = p_seg_nombre,
+        usuario_apellido_pat = COALESCE(NULLIF(TRIM(p_apellido_pat),''), usuario_apellido_pat),
+        usuario_apellido_mat = p_apellido_mat,
+        usuario_telefono     = COALESCE(NULLIF(TRIM(p_telefono),''), usuario_telefono),
+        usuario_curp         = COALESCE(UPPER(NULLIF(TRIM(p_curp),'')), usuario_curp),
+        usuario_rfc          = CASE WHEN TRIM(COALESCE(p_rfc,''))='' THEN NULL
+                                    ELSE UPPER(TRIM(p_rfc)) END,
+        centro_id            = CASE WHEN 'responsable' = ANY(p_roles) THEN p_centro_id
+                                    ELSE NULL END
+    WHERE usuario_id = p_usuario_id;
+
+    IF p_email IS NOT NULL AND TRIM(p_email) != '' THEN
+        UPDATE login SET login_correo = LOWER(TRIM(p_email)) WHERE usuario_id = p_usuario_id;
+    END IF;
+
+    DELETE FROM usuarios_roles WHERE usuario_id = p_usuario_id;
+    FOREACH v_rol IN ARRAY p_roles LOOP
+        SELECT rol_id INTO v_rol_id FROM roles WHERE rol_nombre = v_rol;
+        IF v_rol_id IS NOT NULL THEN
+            INSERT INTO usuarios_roles(usuario_id, rol_id) VALUES(p_usuario_id, v_rol_id)
+            ON CONFLICT DO NOTHING;
+        END IF;
+    END LOOP;
+
+    DELETE FROM cedulas WHERE usuario_id = p_usuario_id;
+    IF 'responsable' = ANY(p_roles) AND p_cedulas_nums IS NOT NULL
+       AND array_length(p_cedulas_nums, 1) IS NOT NULL THEN
+        FOR v_i IN 1..array_length(p_cedulas_nums, 1) LOOP
+            IF TRIM(COALESCE(p_cedulas_nums[v_i],'')) != '' THEN
+                INSERT INTO cedulas(cedula_numero, cedula_especialidad, usuario_id)
+                VALUES(TRIM(p_cedulas_nums[v_i]),
+                       NULLIF(TRIM(COALESCE(p_cedulas_specs[v_i],'')), ''),
+                       p_usuario_id)
+                ON CONFLICT (cedula_numero) DO NOTHING;
+            END IF;
+        END LOOP;
+    END IF;
+
+    p_ok := 1; p_msg := 'Usuario actualizado correctamente';
+EXCEPTION
+    WHEN unique_violation THEN p_ok := 0; p_msg := 'Correo, teléfono, CURP o RFC ya registrado';
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al actualizar: ' || SQLERRM;
+END; $$;
+
+
+CREATE OR REPLACE PROCEDURE sp_eliminar_usuario_unificado(
+    IN  p_usuario_id INTEGER,
+    IN  p_session_id INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF p_usuario_id = p_session_id THEN
+        p_ok := 0; p_msg := 'No puedes eliminar tu propia cuenta'; RETURN;
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM usuarios WHERE usuario_id = p_usuario_id) THEN
+        p_ok := 0; p_msg := 'Usuario no encontrado'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM pacientes_tutores WHERE tutor_id = p_usuario_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: este usuario tiene pacientes vinculados como tutor'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM aplicaciones WHERE usuario_id = p_usuario_id) THEN
+        p_ok := 0; p_msg := 'No se puede eliminar: este usuario tiene aplicaciones de vacunas registradas'; RETURN;
+    END IF;
+    DELETE FROM usuarios WHERE usuario_id = p_usuario_id;
+    p_ok := 1; p_msg := 'Usuario eliminado correctamente';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al eliminar: ' || SQLERRM;
+END; $$;
+
+
+-- ─────────────────────────────────────────────
 -- MULTI-ROL: obtener todos los roles de un usuario
 -- ─────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION sp_roles_de_usuario(p_email VARCHAR)

@@ -24,14 +24,8 @@
       </a>
 
       <div class="sidebar-section-label">Personas</div>
-      <a href="{{ url_for('admin.tutores') }}" class="sidebar-item {% if request.endpoint == 'admin.tutores' %}active{% endif %}">
-        <span class="si-icon"><i class="fa-solid fa-users"></i></span> Tutores
-      </a>
-      <a href="{{ url_for('admin.responsables') }}" class="sidebar-item {% if request.endpoint == 'admin.responsables' %}active{% endif %}">
-        <span class="si-icon"><i class="fa-solid fa-user-doctor"></i></span> Responsables
-      </a>
-      <a href="{{ url_for('admin.administradores') }}" class="sidebar-item {% if request.endpoint == 'admin.administradores' %}active{% endif %}">
-        <span class="si-icon"><i class="fa-solid fa-user-shield"></i></span> Administradores
+      <a href="{{ url_for('admin.usuarios') }}" class="sidebar-item {% if request.endpoint in ('admin.usuarios', 'admin.editar_usuario', 'admin.eliminar_usuario') %}active{% endif %}">
+        <span class="si-icon"><i class="fa-solid fa-users"></i></span> Usuarios
       </a>
       <a href="{{ url_for('admin.pacientes') }}" class="sidebar-item {% if request.endpoint == 'admin.pacientes' %}active{% endif %}">
         <span class="si-icon"><i class="fa-solid fa-baby"></i></span> Pacientes

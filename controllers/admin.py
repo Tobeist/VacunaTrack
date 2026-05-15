@@ -300,209 +300,101 @@ def dashboard():
     return render_template('admin/dashboard.html', stats=stats, alertas=alertas[:10])
 
 
-@admin_bp.route('/admin/tutores', methods=['GET', 'POST'])
-def tutores():
+@admin_bp.route('/admin/usuarios', methods=['GET', 'POST'])
+def usuarios():
     redir = _require_admin()
     if redir:
         return redir
     if request.method == 'POST':
         f = request.form
         try:
-            temp = generate_temp_password()
+            roles = f.getlist('roles')
+            if not roles:
+                raise FormError('Debes seleccionar al menos un rol.')
+            temp  = generate_temp_password()
             datos = {
-                'tutor_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
-                'tutor_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
-                'tutor_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
-                'tutor_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-                'tutor_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-                'tutor_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-                'tutor_telefono':     _get_str(f, 'telefono', 'teléfono'),
-                'tutor_contrasena':   generate_password_hash(temp),
+                'prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+                'seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+                'apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+                'apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+                'curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+                'email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+                'telefono':     _get_str(f, 'telefono', 'teléfono'),
+                'roles':        roles,
+                'contrasena':   generate_password_hash(temp),
             }
-            repo.crear_tutor(datos)
-            flash(f'Tutor registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+            if any(r in roles for r in ('admin', 'responsable')):
+                datos['rfc'] = _get_str(f, 'rfc', 'RFC', upper=True, max_len=13)
+            if 'responsable' in roles:
+                datos['centro_id'] = _get_int(f, 'centro_id', 'centro de salud', required=True)
+                datos['cedulas_nums']  = [n.strip() for n in f.getlist('cedulas_nums[]') if n.strip()]
+                datos['cedulas_specs'] = f.getlist('cedulas_specs[]')[:len(datos['cedulas_nums'])]
+                if not datos['cedulas_nums']:
+                    raise FormError('Debes registrar al menos una cédula profesional.')
+            repo.crear_usuario(datos)
+            flash(f'Usuario registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
         except Exception as e:
             _flash_error(e)
-        return redirect(url_for('admin.tutores'))
-    return render_template('admin/tutores.html', tutores=repo.listar_tutores())
-
-
-@admin_bp.route('/admin/tutores/<int:tid>/editar', methods=['POST'])
-def editar_tutor(tid):
-    redir = _require_admin()
-    if redir:
-        return redir
-    f = request.form
-    try:
-        campos = {
-            'tutor_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
-            'tutor_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
-            'tutor_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
-            'tutor_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-            'tutor_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-            'tutor_telefono':     _get_str(f, 'telefono', 'teléfono'),
-            'tutor_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-        }
-        repo.actualizar_tutor(tid, campos)
-        flash('Tutor actualizado.', 'success')
-    except Exception as e:
-        _flash_error(e)
-    return redirect(url_for('admin.tutores'))
-
-
-@admin_bp.route('/admin/tutores/<int:tid>/eliminar', methods=['POST'])
-def eliminar_tutor(tid):
-    redir = _require_admin()
-    if redir:
-        return redir
-    try:
-        repo.eliminar_tutor(tid)
-        flash('Tutor eliminado.', 'success')
-    except Exception as e:
-        _flash_error(e)
-    return redirect(url_for('admin.tutores'))
-
-
-@admin_bp.route('/admin/responsables', methods=['GET', 'POST'])
-def responsables():
-    redir = _require_admin()
-    if redir:
-        return redir
-    if request.method == 'POST':
-        f = request.form
-        try:
-            temp = generate_temp_password()
-            datos = {
-                'responsable_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
-                'responsable_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
-                'responsable_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
-                'responsable_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-                'responsable_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-                'responsable_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
-                'responsable_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-                'responsable_telefono':     _get_str(f, 'telefono', 'teléfono'),
-                'responsable_contrasena':   generate_password_hash(temp),
-                'centro_id':                _get_int(f, 'centro_id', 'centro de salud', required=True),
-            }
-            nuevo = repo.crear_responsable(datos)
-            rid   = nuevo['responsable_id']
-            for num, spec in zip(request.form.getlist('cedula_numero'),
-                                 request.form.getlist('cedula_especialidad')):
-                if num.strip():
-                    repo.agregar_cedula(rid, num.strip(), spec.strip() or None)
-            flash(f'Responsable registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
-        except Exception as e:
-            _flash_error(e)
-        return redirect(url_for('admin.responsables'))
-    return render_template('admin/responsables.html',
-                           responsables=repo.listar_responsables(),
+        return redirect(url_for('admin.usuarios'))
+    return render_template('admin/usuarios.html',
+                           usuarios=repo.listar_usuarios(),
                            centros=repo.listar_centros())
 
 
-@admin_bp.route('/admin/responsables/<int:rid>/editar', methods=['POST'])
-def editar_responsable(rid):
+@admin_bp.route('/admin/usuarios/<int:uid>/editar', methods=['POST'])
+def editar_usuario(uid):
     redir = _require_admin()
     if redir:
         return redir
     f = request.form
     try:
-        campos = {
-            'responsable_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
-            'responsable_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
-            'responsable_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
-            'responsable_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-            'responsable_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-            'responsable_telefono':     _get_str(f, 'telefono', 'teléfono'),
-            'responsable_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-            'responsable_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
-            'centro_id':                _get_int(f, 'centro_id', 'centro de salud', required=True),
+        roles = f.getlist('roles')
+        if not roles:
+            raise FormError('Debes seleccionar al menos un rol.')
+        datos = {
+            'prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
+            'seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
+            'apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
+            'apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
+            'curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+            'email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
+            'telefono':     _get_str(f, 'telefono', 'teléfono'),
+            'roles':        roles,
         }
-        repo.actualizar_responsable(rid, campos)
-        flash('Responsable actualizado.', 'success')
+        if any(r in roles for r in ('admin', 'responsable')):
+            datos['rfc'] = _get_str(f, 'rfc', 'RFC', upper=True, max_len=13)
+        if 'responsable' in roles:
+            datos['centro_id'] = _get_int(f, 'centro_id', 'centro de salud', required=True)
+            datos['cedulas_nums']  = [n.strip() for n in f.getlist('cedulas_nums[]') if n.strip()]
+            datos['cedulas_specs'] = f.getlist('cedulas_specs[]')[:len(datos['cedulas_nums'])]
+            if not datos['cedulas_nums']:
+                raise FormError('Debes registrar al menos una cédula profesional.')
+        repo.actualizar_usuario(uid, datos)
+        flash('Usuario actualizado.', 'success')
     except Exception as e:
         _flash_error(e)
-    return redirect(url_for('admin.responsables'))
+    return redirect(url_for('admin.usuarios'))
 
 
-@admin_bp.route('/admin/responsables/<int:rid>/eliminar', methods=['POST'])
-def eliminar_responsable(rid):
+@admin_bp.route('/admin/usuarios/<int:uid>/eliminar', methods=['POST'])
+def eliminar_usuario(uid):
     redir = _require_admin()
     if redir:
         return redir
     try:
-        repo.eliminar_responsable(rid)
-        flash('Responsable eliminado.', 'success')
+        repo.eliminar_usuario(uid, session.get('user_id', 0))
+        flash('Usuario eliminado.', 'success')
     except Exception as e:
         _flash_error(e)
-    return redirect(url_for('admin.responsables'))
+    return redirect(url_for('admin.usuarios'))
 
 
-@admin_bp.route('/admin/administradores', methods=['GET', 'POST'])
-def administradores():
-    redir = _require_admin()
-    if redir:
-        return redir
-    if request.method == 'POST':
-        f = request.form
-        try:
-            temp = generate_temp_password()
-            datos = {
-                'admin_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
-                'admin_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
-                'admin_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
-                'admin_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-                'admin_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
-                'admin_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-                'admin_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-                'admin_telefono':     _get_str(f, 'telefono', 'teléfono'),
-                'admin_contrasena':   generate_password_hash(temp),
-            }
-            repo.crear_admin(datos)
-            flash(f'Administrador registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
-        except Exception as e:
-            _flash_error(e)
-        return redirect(url_for('admin.administradores'))
-    return render_template('admin/administradores.html', admins=repo.listar_administradores())
-
-
-@admin_bp.route('/admin/administradores/<int:aid>/editar', methods=['POST'])
-def editar_admin(aid):
-    redir = _require_admin()
-    if redir:
-        return redir
-    f = request.form
-    try:
-        campos = {
-            'admin_prim_nombre':  _get_str(f, 'prim_nombre',  'primer nombre',  required=True),
-            'admin_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
-            'admin_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
-            'admin_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-            'admin_email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-            'admin_telefono':     _get_str(f, 'telefono', 'teléfono'),
-            'admin_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-            'admin_rfc':          _get_str(f, 'rfc',  'RFC',  upper=True, max_len=13),
-        }
-        repo.actualizar_admin(aid, campos)
-        flash('Administrador actualizado.', 'success')
-    except Exception as e:
-        _flash_error(e)
-    return redirect(url_for('admin.administradores'))
-
-
-@admin_bp.route('/admin/administradores/<int:aid>/eliminar', methods=['POST'])
-def eliminar_admin(aid):
-    redir = _require_admin()
-    if redir:
-        return redir
-    try:
-        if aid == session.get('user_id'):
-            flash('No puedes eliminar tu propia cuenta de administrador.', 'error')
-            return redirect(url_for('admin.administradores'))
-        repo.eliminar_admin(aid, session.get('user_id', 0))
-        flash('Administrador eliminado.', 'success')
-    except Exception as e:
-        _flash_error(e)
-    return redirect(url_for('admin.administradores'))
+# Redirects para URLs legadas
+@admin_bp.route('/admin/tutores')
+@admin_bp.route('/admin/responsables')
+@admin_bp.route('/admin/administradores')
+def _usuarios_redirect():
+    return redirect(url_for('admin.usuarios'))
 
 
 @admin_bp.route('/admin/pacientes', methods=['GET', 'POST'])

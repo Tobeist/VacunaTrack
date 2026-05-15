@@ -17,6 +17,56 @@ def buscar_usuario_por_email(email: str) -> dict | None:
     return db.call_read_sp_one('sp_buscar_usuario_por_email', [email.lower()])
 
 
+def listar_usuarios() -> list[dict]:
+    rows = db.call_read_sp('sp_listar_usuarios')
+    for row in rows:
+        row['roles'] = row['roles'].split(',') if row.get('roles') else []
+        row['cedulas'] = cedulas_de_responsable(row['usuario_id']) if 'responsable' in row['roles'] else []
+    return rows
+
+
+def obtener_usuario(usuario_id: int) -> dict | None:
+    row = db.call_read_sp_one('sp_obtener_usuario', [usuario_id])
+    if row:
+        row['roles'] = row['roles'].split(',') if row.get('roles') else []
+        row['cedulas'] = cedulas_de_responsable(usuario_id) if 'responsable' in row['roles'] else []
+    return row
+
+
+def crear_usuario(datos: dict) -> dict:
+    roles      = datos.get('roles') or []
+    ced_nums   = datos.get('cedulas_nums') or []
+    ced_specs  = datos.get('cedulas_specs') or []
+    r = _sp('sp_crear_usuario_unificado', [
+        datos.get('prim_nombre'), datos.get('seg_nombre'),
+        datos.get('apellido_pat'), datos.get('apellido_mat'),
+        datos.get('telefono'), datos.get('curp'),
+        datos.get('rfc') or None, datos.get('email'), datos.get('contrasena'),
+        datos.get('centro_id') or None,
+        roles, ced_nums, ced_specs,
+    ])
+    return obtener_usuario(r['p_id']) or {}
+
+
+def actualizar_usuario(usuario_id: int, datos: dict) -> None:
+    roles      = datos.get('roles') or []
+    ced_nums   = datos.get('cedulas_nums') or []
+    ced_specs  = datos.get('cedulas_specs') or []
+    _sp('sp_actualizar_usuario_unificado', [
+        usuario_id,
+        datos.get('prim_nombre'), datos.get('seg_nombre'),
+        datos.get('apellido_pat'), datos.get('apellido_mat'),
+        datos.get('telefono'), datos.get('curp'),
+        datos.get('rfc') or None, datos.get('email'),
+        datos.get('centro_id') or None,
+        roles, ced_nums, ced_specs,
+    ], out_count=2)
+
+
+def eliminar_usuario(usuario_id: int, session_user_id: int) -> None:
+    _sp('sp_eliminar_usuario_unificado', [usuario_id, session_user_id], out_count=2)
+
+
 def roles_de_usuario(email: str) -> list[str]:
     rows = db.call_read_sp('sp_roles_de_usuario', [email.lower()])
     return [r['rol_nombre'] for r in rows] if rows else []

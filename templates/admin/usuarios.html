@@ -1,0 +1,401 @@
+{% extends 'base.html' %}
+{% block title %}Usuarios — VacunaTrack{% endblock %}
+{% block page_title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="crud-layout">
+
+  {# ── Formulario Crear ─────────────────────────────────────────────────── #}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-user-plus" style="color:var(--primary)"></i> Nuevo Usuario</span>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('admin.usuarios') }}" id="form-crear">
+
+        {# Roles #}
+        <div class="form-group">
+          <label class="form-label">Rol(es) <span class="required">*</span></label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" name="roles" value="admin" class="role-check-crear"
+                     style="width:16px;height:16px;accent-color:var(--primary)">
+              <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Administrador
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" name="roles" value="responsable" class="role-check-crear"
+                     style="width:16px;height:16px;accent-color:var(--success)">
+              <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" name="roles" value="tutor" class="role-check-crear"
+                     style="width:16px;height:16px;accent-color:var(--warning)">
+              <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
+            </label>
+          </div>
+        </div>
+
+        {# Nombres #}
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
+            <input type="text" name="prim_nombre" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Segundo nombre</label>
+            <input type="text" name="seg_nombre" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Apellido paterno <span class="required">*</span></label>
+            <input type="text" name="apellido_pat" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Apellido materno</label>
+            <input type="text" name="apellido_mat" class="form-control"></div>
+        </div>
+
+        {# Datos básicos #}
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">CURP <span class="required">*</span></label>
+            <input type="text" name="curp" class="form-control" maxlength="18"
+                   style="text-transform:uppercase" required></div>
+          <div class="form-group"><label class="form-label">Teléfono <span class="required">*</span></label>
+            <input type="tel" name="telefono" class="form-control" maxlength="10" required></div>
+        </div>
+        <div class="form-group"><label class="form-label">Correo electrónico <span class="required">*</span></label>
+          <input type="email" name="email" class="form-control" required></div>
+
+        {# RFC — solo admin/responsable #}
+        <div class="form-group cond-rfc-crear" style="display:none">
+          <label class="form-label">RFC <span class="required">*</span></label>
+          <input type="text" name="rfc" class="form-control" maxlength="13"
+                 style="text-transform:uppercase">
+        </div>
+
+        {# Centro — solo responsable #}
+        <div class="form-group cond-responsable-crear" style="display:none">
+          <label class="form-label">Centro de Salud <span class="required">*</span></label>
+          <select name="centro_id" class="form-control">
+            <option value="">— Selecciona —</option>
+            {% for c in centros %}
+            <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# Cédulas — solo responsable #}
+        <div class="cond-responsable-crear" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <label class="form-label" style="margin:0">Cédulas profesionales <span class="required">*</span></label>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="addCedulaRow(this.closest('.cond-responsable-crear').querySelector('.cedulas-container'))">
+              <i class="fa-solid fa-plus"></i> Agregar
+            </button>
+          </div>
+          <div class="cedulas-container">
+            <div class="cedula-row" style="display:flex;gap:8px;margin-bottom:6px">
+              <input type="text" name="cedulas_nums[]" class="form-control"
+                     placeholder="Número de cédula" style="flex:1">
+              <input type="text" name="cedulas_specs[]" class="form-control"
+                     placeholder="Especialidad" style="flex:1">
+              <button type="button" class="btn btn-danger btn-sm" onclick="removeCedulaRow(this)"
+                      title="Eliminar">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="flash-msg info mt-8" style="font-size:0.8rem;padding:10px 14px">
+          <i class="fa-solid fa-key"></i> Contraseña temporal generada automáticamente.
+        </div>
+        <button type="submit" class="btn btn-primary btn-full mt-12">
+          <i class="fa-solid fa-plus"></i> Crear Usuario
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {# ── Tabla Usuarios ───────────────────────────────────────────────────── #}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-users" style="color:var(--primary)"></i>
+        Usuarios ({{ usuarios|length }})
+      </span>
+    </div>
+
+    {# Filtro por rol #}
+    <div class="card-body" style="padding:12px 22px 0">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-secondary btn-sm role-filter active" data-role="todos">Todos</button>
+        <button class="btn btn-secondary btn-sm role-filter" data-role="admin">
+          <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Admin
+        </button>
+        <button class="btn btn-secondary btn-sm role-filter" data-role="responsable">
+          <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
+        </button>
+        <button class="btn btn-secondary btn-sm role-filter" data-role="tutor">
+          <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
+        </button>
+      </div>
+      <input type="text" class="form-control" placeholder="🔍 Buscar…"
+             data-search-table="tabla-usuarios" style="margin-bottom:10px">
+    </div>
+
+    <div class="table-wrapper">
+      <table class="table" id="tabla-usuarios">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Correo</th>
+            <th>Roles</th>
+            <th>RFC</th>
+            <th>Centro</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in usuarios %}
+          {% set uid = u.usuario_id %}
+          <tr data-roles="{{ u.roles | join(',') }}">
+            <td class="fw-600">
+              {{ u.usuario_apellido_pat|cap }}, {{ u.usuario_prim_nombre|cap }}
+              {% if u.usuario_seg_nombre %} {{ u.usuario_seg_nombre|cap }}{% endif %}
+            </td>
+            <td>{{ u.email }}</td>
+            <td>
+              {% for rol in u.roles %}
+                {% if rol == 'admin' %}
+                  <span class="badge" style="background:var(--primary-light);color:var(--primary)">
+                    <i class="fa-solid fa-user-shield"></i> Admin
+                  </span>
+                {% elif rol == 'responsable' %}
+                  <span class="badge" style="background:var(--success-light);color:var(--success)">
+                    <i class="fa-solid fa-user-nurse"></i> Responsable
+                  </span>
+                {% elif rol == 'tutor' %}
+                  <span class="badge" style="background:var(--warning-light);color:var(--warning)">
+                    <i class="fa-solid fa-person-breastfeeding"></i> Tutor
+                  </span>
+                {% endif %}
+              {% endfor %}
+            </td>
+            <td class="fs-sm" style="font-family:monospace">{{ u.usuario_rfc or '—' }}</td>
+            <td class="fs-sm">{{ u.centro_nombre or '—' }}</td>
+            <td>
+              {% if uid != session.user_id %}
+              <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm"
+                        title="Editar"
+                        onclick="openEditModal({{ {
+                          'uid':         uid,
+                          'prim_nombre': u.usuario_prim_nombre,
+                          'seg_nombre':  u.usuario_seg_nombre or '',
+                          'apellido_pat':u.usuario_apellido_pat,
+                          'apellido_mat':u.usuario_apellido_mat or '',
+                          'curp':        u.usuario_curp,
+                          'rfc':         u.usuario_rfc or '',
+                          'email':       u.email,
+                          'telefono':    u.usuario_telefono,
+                          'centro_id':   u.centro_id or '',
+                          'roles':       u.roles,
+                          'cedulas':     u.cedulas
+                        } | tojson }})">✏️</button>
+                <form method="POST" action="{{ url_for('admin.eliminar_usuario', uid=uid) }}" style="display:inline">
+                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                          data-confirm="¿Eliminar a {{ u.usuario_prim_nombre|cap }} {{ u.usuario_apellido_pat|cap }}? Esta acción no se puede deshacer.">🗑</button>
+                </form>
+              </div>
+              {% else %}
+              <span class="badge badge-gray">Tú</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="text-center text-muted" style="padding:40px">Sin usuarios registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{# ── Modal Editar (único, llenado por JS) ─────────────────────────────── #}
+<div class="modal-overlay" id="modal-editar-usuario" style="display:none">
+  <div class="modal" style="max-width:580px">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Usuario</span>
+      <button class="btn-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <form method="POST" id="form-editar" action="">
+      <div class="modal-body">
+
+        {# Roles #}
+        <div class="form-group">
+          <label class="form-label">Rol(es) <span class="required">*</span></label>
+          <div style="display:flex;gap:16px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" name="roles" value="admin" id="edit-role-admin"
+                     class="role-check-editar" style="width:16px;height:16px;accent-color:var(--primary)">
+              <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Administrador
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" name="roles" value="responsable" id="edit-role-responsable"
+                     class="role-check-editar" style="width:16px;height:16px;accent-color:var(--success)">
+              <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" name="roles" value="tutor" id="edit-role-tutor"
+                     class="role-check-editar" style="width:16px;height:16px;accent-color:var(--warning)">
+              <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
+            </label>
+          </div>
+        </div>
+
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
+            <input type="text" name="prim_nombre" id="edit-prim_nombre" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Segundo nombre</label>
+            <input type="text" name="seg_nombre" id="edit-seg_nombre" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">Apellido paterno <span class="required">*</span></label>
+            <input type="text" name="apellido_pat" id="edit-apellido_pat" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Apellido materno</label>
+            <input type="text" name="apellido_mat" id="edit-apellido_mat" class="form-control"></div>
+        </div>
+        <div class="form-row form-row-2">
+          <div class="form-group"><label class="form-label">CURP <span class="required">*</span></label>
+            <input type="text" name="curp" id="edit-curp" class="form-control" maxlength="18"
+                   style="text-transform:uppercase" required></div>
+          <div class="form-group"><label class="form-label">Teléfono <span class="required">*</span></label>
+            <input type="tel" name="telefono" id="edit-telefono" class="form-control" required></div>
+        </div>
+        <div class="form-group"><label class="form-label">Correo electrónico <span class="required">*</span></label>
+          <input type="email" name="email" id="edit-email" class="form-control" required></div>
+
+        <div class="form-group cond-rfc-editar" style="display:none">
+          <label class="form-label">RFC <span class="required">*</span></label>
+          <input type="text" name="rfc" id="edit-rfc" class="form-control" maxlength="13"
+                 style="text-transform:uppercase">
+        </div>
+
+        <div class="form-group cond-responsable-editar" style="display:none">
+          <label class="form-label">Centro de Salud <span class="required">*</span></label>
+          <select name="centro_id" id="edit-centro_id" class="form-control">
+            <option value="">— Selecciona —</option>
+            {% for c in centros %}
+            <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="cond-responsable-editar" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <label class="form-label" style="margin:0">Cédulas profesionales <span class="required">*</span></label>
+            <button type="button" class="btn btn-secondary btn-sm"
+                    onclick="addCedulaRow(document.getElementById('edit-cedulas-container'))">
+              <i class="fa-solid fa-plus"></i> Agregar
+            </button>
+          </div>
+          <div id="edit-cedulas-container"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ── Lógica de campos condicionales ─────────────────────────────────────── */
+function syncConditionals(prefix) {
+  const checks  = document.querySelectorAll('.role-check-' + prefix);
+  const roles   = Array.from(checks).filter(c => c.checked).map(c => c.value);
+  const needRfc = roles.includes('admin') || roles.includes('responsable');
+  const needRes = roles.includes('responsable');
+
+  document.querySelectorAll('.cond-rfc-'        + prefix).forEach(el => el.style.display = needRfc ? '' : 'none');
+  document.querySelectorAll('.cond-responsable-' + prefix).forEach(el => el.style.display = needRes ? '' : 'none');
+}
+
+document.querySelectorAll('.role-check-crear').forEach(c =>
+  c.addEventListener('change', () => syncConditionals('crear')));
+document.querySelectorAll('.role-check-editar').forEach(c =>
+  c.addEventListener('change', () => syncConditionals('editar')));
+
+/* ── Filas de cédulas ─────────────────────────────────────────────────── */
+function addCedulaRow(container, num, spec) {
+  const row = document.createElement('div');
+  row.className = 'cedula-row';
+  row.style.cssText = 'display:flex;gap:8px;margin-bottom:6px';
+  row.innerHTML = `
+    <input type="text" name="cedulas_nums[]" class="form-control"
+           placeholder="Número de cédula" style="flex:1" value="${num || ''}">
+    <input type="text" name="cedulas_specs[]" class="form-control"
+           placeholder="Especialidad" style="flex:1" value="${spec || ''}">
+    <button type="button" class="btn btn-danger btn-sm"
+            onclick="removeCedulaRow(this)" title="Eliminar">✕</button>`;
+  container.appendChild(row);
+}
+
+function removeCedulaRow(btn) {
+  const container = btn.closest('.cedulas-container, #edit-cedulas-container');
+  if (container && container.querySelectorAll('.cedula-row').length > 1) {
+    btn.closest('.cedula-row').remove();
+  }
+}
+
+/* ── Modal editar ─────────────────────────────────────────────────────── */
+function openEditModal(data) {
+  const modal = document.getElementById('modal-editar-usuario');
+  document.getElementById('form-editar').action =
+    '/admin/usuarios/' + data.uid + '/editar';
+
+  document.getElementById('edit-prim_nombre').value  = data.prim_nombre;
+  document.getElementById('edit-seg_nombre').value   = data.seg_nombre;
+  document.getElementById('edit-apellido_pat').value = data.apellido_pat;
+  document.getElementById('edit-apellido_mat').value = data.apellido_mat;
+  document.getElementById('edit-curp').value         = data.curp;
+  document.getElementById('edit-rfc').value          = data.rfc;
+  document.getElementById('edit-email').value        = data.email;
+  document.getElementById('edit-telefono').value     = data.telefono;
+
+  const centroSel = document.getElementById('edit-centro_id');
+  centroSel.value = data.centro_id || '';
+
+  document.querySelectorAll('.role-check-editar').forEach(c => {
+    c.checked = data.roles.includes(c.value);
+  });
+
+  const container = document.getElementById('edit-cedulas-container');
+  container.innerHTML = '';
+  if (data.cedulas && data.cedulas.length > 0) {
+    data.cedulas.forEach(cd => addCedulaRow(container, cd.cedula_numero, cd.cedula_especialidad || ''));
+  } else {
+    addCedulaRow(container, '', '');
+  }
+
+  syncConditionals('editar');
+  modal.style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('modal-editar-usuario').style.display = 'none';
+}
+document.getElementById('modal-editar-usuario').addEventListener('click', function(e) {
+  if (e.target === this) closeEditModal();
+});
+
+/* ── Filtro por rol ───────────────────────────────────────────────────── */
+document.querySelectorAll('.role-filter').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.role-filter').forEach(b => b.classList.remove('active'));
+    this.classList.add('active');
+    const role = this.dataset.role;
+    document.querySelectorAll('#tabla-usuarios tbody tr[data-roles]').forEach(row => {
+      row.style.display = (role === 'todos' || row.dataset.roles.split(',').includes(role))
+        ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}
