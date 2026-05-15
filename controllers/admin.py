@@ -404,9 +404,15 @@ def eliminar_usuario(uid):
 
 # Redirects para URLs legadas
 @admin_bp.route('/admin/tutores')
+def tutores():
+    return redirect(url_for('admin.usuarios'))
+
 @admin_bp.route('/admin/responsables')
+def responsables():
+    return redirect(url_for('admin.usuarios'))
+
 @admin_bp.route('/admin/administradores')
-def _usuarios_redirect():
+def administradores():
     return redirect(url_for('admin.usuarios'))
 
 
