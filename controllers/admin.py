@@ -187,7 +187,8 @@ def _flash_error(exc: Exception):
 # ── Parsers seguros para campos de formulario ────────────────────────────────
 
 def _get_str(f, key: str, label: str | None = None, *, required: bool = False,
-             max_len: int | None = None, upper: bool = False, lower: bool = False) -> str | None:
+             max_len: int | None = None, upper: bool = False, lower: bool = False,
+             pattern: str | None = None, pattern_msg: str | None = None) -> str | None:
     label = label or key.replace('_', ' ')
     raw = (f.get(key) or '').strip()
     if not raw:
@@ -200,7 +201,15 @@ def _get_str(f, key: str, label: str | None = None, *, required: bool = False,
         raw = raw.lower()
     if max_len and len(raw) > max_len:
         raise FormError(f'El campo "{label}" no puede tener más de {max_len} caracteres.')
+    if pattern and not _re.fullmatch(pattern, raw):
+        raise FormError(pattern_msg or f'El formato de "{label}" es inválido.')
     return raw
+
+
+_CURP_RE    = r'[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z\d]\d'
+_RFC_RE     = r'[A-Z]{3,4}\d{6}[A-Z\d]{3}'
+_TEL_RE     = r'\d{10}'
+_EMAIL_RE   = r'[^@\s]+@[^@\s]+\.[^@\s]+'
 
 
 def _get_int(f, key: str, label: str | None = None, *, required: bool = True,
@@ -317,14 +326,18 @@ def usuarios():
                 'seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
                 'apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
                 'apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-                'curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-                'email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-                'telefono':     _get_str(f, 'telefono', 'teléfono'),
+                'curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18,
+                                        pattern=_CURP_RE, pattern_msg='CURP inválido (formato: AAAA######HAAAAAX#).'),
+                'email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True,
+                                        pattern=_EMAIL_RE, pattern_msg='El correo electrónico no tiene un formato válido.'),
+                'telefono':     _get_str(f, 'telefono', 'teléfono', required=True,
+                                        pattern=_TEL_RE, pattern_msg='El teléfono debe contener exactamente 10 dígitos.'),
                 'roles':        roles,
                 'contrasena':   generate_password_hash(temp),
             }
             if any(r in roles for r in ('admin', 'responsable')):
-                datos['rfc'] = _get_str(f, 'rfc', 'RFC', upper=True, max_len=13)
+                datos['rfc'] = _get_str(f, 'rfc', 'RFC', upper=True, max_len=13,
+                                        pattern=_RFC_RE, pattern_msg='RFC inválido (formato: 3-4 letras, 6 dígitos, 3 caracteres).')
             if 'responsable' in roles:
                 datos['centro_id'] = _get_int(f, 'centro_id', 'centro de salud', required=True)
                 datos['cedulas_nums']  = [n.strip() for n in f.getlist('cedulas_nums[]') if n.strip()]
@@ -363,13 +376,17 @@ def editar_usuario(uid):
             'seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
             'apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
             'apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-            'curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
-            'email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True),
-            'telefono':     _get_str(f, 'telefono', 'teléfono'),
+            'curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18,
+                                    pattern=_CURP_RE, pattern_msg='CURP inválido (formato: AAAA######HAAAAAX#).'),
+            'email':        _get_str(f, 'email', 'correo electrónico', required=True, lower=True,
+                                    pattern=_EMAIL_RE, pattern_msg='El correo electrónico no tiene un formato válido.'),
+            'telefono':     _get_str(f, 'telefono', 'teléfono', required=True,
+                                    pattern=_TEL_RE, pattern_msg='El teléfono debe contener exactamente 10 dígitos.'),
             'roles':        roles,
         }
         if any(r in roles for r in ('admin', 'responsable')):
-            datos['rfc'] = _get_str(f, 'rfc', 'RFC', upper=True, max_len=13)
+            datos['rfc'] = _get_str(f, 'rfc', 'RFC', upper=True, max_len=13,
+                                    pattern=_RFC_RE, pattern_msg='RFC inválido (formato: 3-4 letras, 6 dígitos, 3 caracteres).')
         if 'responsable' in roles:
             datos['centro_id'] = _get_int(f, 'centro_id', 'centro de salud', required=True)
             datos['cedulas_nums']  = [n.strip() for n in f.getlist('cedulas_nums[]') if n.strip()]
@@ -438,7 +455,8 @@ def pacientes():
     if request.method == 'POST':
         f = request.form
         try:
-            curp = _get_str(f, 'curp', 'CURP', upper=True, max_len=18)
+            curp = _get_str(f, 'curp', 'CURP', upper=True, max_len=18,
+                            pattern=_CURP_RE, pattern_msg='CURP inválido (formato: AAAA######HAAAAAX#).')
             cert = _get_str(f, 'num_cert_nac', 'número de certificado de nacimiento', max_len=30)
             if not curp and not cert:
                 raise FormError('Debes llenar al menos CURP o N° Certificado de Nacimiento.')
@@ -499,7 +517,8 @@ def editar_paciente(pid):
             'paciente_seg_nombre':   _get_str(f, 'seg_nombre',   'segundo nombre'),
             'paciente_apellido_pat': _get_str(f, 'apellido_pat', 'apellido paterno', required=True),
             'paciente_apellido_mat': _get_str(f, 'apellido_mat', 'apellido materno'),
-            'paciente_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18),
+            'paciente_curp':         _get_str(f, 'curp', 'CURP', upper=True, max_len=18,
+                                             pattern=_CURP_RE, pattern_msg='CURP inválido (formato: AAAA######HAAAAAX#).'),
             'paciente_num_cert_nac': _get_str(f, 'num_cert_nac', 'número de certificado de nacimiento', max_len=30),
             'paciente_fecha_nac':    fecha_nac,
             'paciente_sexo':         _get_str(f, 'sexo', 'sexo', required=True),
@@ -617,7 +636,8 @@ def centros():
                 'centro_horario_fin':    h_fin,
                 'centro_latitud':        lat,
                 'centro_longitud':       lon,
-                'centro_telefono':       _get_str(f, 'telefono', 'teléfono'),
+                'centro_telefono':       _get_str(f, 'telefono', 'teléfono', required=True,
+                                                 pattern=_TEL_RE, pattern_msg='El teléfono debe contener exactamente 10 dígitos.'),
                 'centro_beacon':         _get_str(f, 'beacon', 'beacon'),
             }
             repo.crear_centro(datos)
