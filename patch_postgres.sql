@@ -471,3 +471,116 @@ BEGIN
         FROM tmp_urgencias
         ORDER BY dias_atraso DESC;
 END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SP: Recalcular alertas de inventario — ahora usa vw_inventarios en lugar
+-- de consultar las tablas base inventarios/lotes directamente.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE PROCEDURE sp_recalcular_alertas_inventario(
+    IN  p_dias_caducidad INTEGER,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(200)
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_total INTEGER := 0;
+BEGIN
+    IF p_dias_caducidad IS NULL THEN
+        p_dias_caducidad := 30;
+    END IF;
+    DELETE FROM alertas_inventario;
+
+    INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
+    SELECT inventario_id, 'CADUCADO'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  lote_fecha_caducidad < CURRENT_DATE
+      AND  inventario_stock_actual > 0;
+    GET DIAGNOSTICS v_total = ROW_COUNT;
+
+    INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
+    SELECT inventario_id, 'CERCA_CADUCAR'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  lote_fecha_caducidad >= CURRENT_DATE
+      AND  lote_fecha_caducidad <= CURRENT_DATE + p_dias_caducidad
+      AND  inventario_stock_actual > 0;
+
+    INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
+    SELECT inventario_id, 'AGOTADO'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  inventario_stock_actual = 0
+      AND  inventario_activo_desde IS NOT NULL;
+
+    INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
+    SELECT inventario_id, 'CERCA_AGOTAR'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  inventario_stock_inicial > 0
+      AND  inventario_stock_actual > 0
+      AND  (inventario_stock_actual::numeric / inventario_stock_inicial) < 0.20
+      AND  inventario_activo_desde IS NOT NULL;
+
+    p_ok := 1; p_msg := 'Alertas de inventario recalculadas correctamente.';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudieron recalcular las alertas.';
+END; $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- SP: KPIs generales del sistema (para panel de analítica)
+-- Devuelve una sola fila con 20 indicadores clave.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE OR REPLACE PROCEDURE sp_kpis_generales(
+    INOUT p_resultados REFCURSOR
+)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+    SELECT
+        -- 1-3: Personas
+        (SELECT COUNT(*) FROM vw_pacientes)                                                   AS total_pacientes,
+        (SELECT COUNT(*) FROM vw_tutores)                                                     AS total_tutores,
+        (SELECT COUNT(*) FROM vw_responsables)                                                AS total_responsables,
+        -- 4-5: Centros
+        (SELECT COUNT(*) FROM vw_centros_detalle)                                             AS total_centros,
+        (SELECT COUNT(DISTINCT centro_id) FROM aplicaciones
+         WHERE aplicacion_timestamp >= NOW() - INTERVAL '30 days')                            AS centros_activos_30d,
+        -- 6-9: Aplicaciones
+        (SELECT COUNT(*) FROM aplicaciones)                                                   AS total_aplicaciones,
+        (SELECT COUNT(*) FROM aplicaciones
+         WHERE DATE(aplicacion_timestamp) = CURRENT_DATE)                                     AS aplicaciones_hoy,
+        (SELECT COUNT(*) FROM aplicaciones
+         WHERE DATE_TRUNC('month', aplicacion_timestamp) = DATE_TRUNC('month', NOW()))        AS aplicaciones_mes,
+        ROUND(
+            (SELECT COUNT(*) FROM aplicaciones
+             WHERE DATE_TRUNC('month', aplicacion_timestamp) = DATE_TRUNC('month', NOW()))
+            ::NUMERIC
+            / NULLIF(EXTRACT(DAY FROM NOW())::INTEGER, 0), 1)                                 AS promedio_diario_mes,
+        -- 10-11: Cobertura y pacientes sin vacunar
+        ROUND(
+            (SELECT COUNT(DISTINCT paciente_id) FROM aplicaciones)::NUMERIC
+            / NULLIF((SELECT COUNT(*) FROM pacientes), 0) * 100, 1)                           AS pct_cobertura_global,
+        (SELECT COUNT(*) FROM pacientes p
+         WHERE NOT EXISTS (SELECT 1 FROM aplicaciones a
+                           WHERE a.paciente_id = p.paciente_id))                              AS pacientes_sin_aplicaciones,
+        -- 12-14: Catálogo clínico
+        (SELECT COUNT(*) FROM vacunas)                                                        AS total_vacunas,
+        (SELECT COUNT(*) FROM esquemas)                                                       AS total_esquemas,
+        (SELECT COUNT(*) FROM padecimientos)                                                  AS total_padecimientos,
+        -- 15-17: Inventario / lotes
+        (SELECT COUNT(DISTINCT inventario_id) FROM vw_inventarios
+         WHERE inventario_stock_actual > 0
+           AND lote_fecha_caducidad >= CURRENT_DATE)                                          AS lotes_activos,
+        (SELECT COUNT(DISTINCT inventario_id) FROM vw_inventarios
+         WHERE lote_fecha_caducidad BETWEEN CURRENT_DATE AND CURRENT_DATE + 30
+           AND inventario_stock_actual > 0)                                                   AS lotes_por_caducar_30d,
+        (SELECT COUNT(DISTINCT inventario_id) FROM vw_inventarios
+         WHERE lote_fecha_caducidad < CURRENT_DATE
+           AND inventario_stock_actual > 0)                                                   AS lotes_caducados_con_stock,
+        -- 18-19: Alertas
+        (SELECT COUNT(*) FROM vw_alertas_inventario)                                          AS total_alertas_inv,
+        (SELECT COUNT(*) FROM vw_alertas_dosis)                                               AS total_alertas_dosis,
+        -- 20: % centros activos en últimos 30 días
+        ROUND(
+            (SELECT COUNT(DISTINCT centro_id) FROM aplicaciones
+             WHERE aplicacion_timestamp >= NOW() - INTERVAL '30 days')::NUMERIC
+            / NULLIF((SELECT COUNT(*) FROM vw_centros_detalle), 0) * 100, 1)                  AS pct_centros_activos_30d;
+END; $$;

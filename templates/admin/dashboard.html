@@ -112,7 +112,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="{{ url_for('static', filename='js/highcharts.js') }}"></script>
 <script>
 fetch('/admin/api/mongo/aplicaciones-por-mes')
   .then(r => r.json())

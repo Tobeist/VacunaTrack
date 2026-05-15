@@ -69,11 +69,8 @@
       </a>
 
       <div class="sidebar-section-label">Análisis</div>
-      <a href="{{ url_for('admin.reportes') }}" class="sidebar-item {% if request.endpoint == 'admin.reportes' %}active{% endif %}">
-        <span class="si-icon"><i class="fa-solid fa-chart-bar"></i></span> Reportes
-      </a>
-      <a href="{{ url_for('admin.analytics') }}" class="sidebar-item {% if request.endpoint == 'admin.analytics' %}active{% endif %}">
-        <span class="si-icon"><i class="fa-brands fa-envira" style="color:#00a651"></i></span> Analytics MongoDB
+      <a href="{{ url_for('admin.analytics') }}" class="sidebar-item {% if request.endpoint in ('admin.analytics', 'admin.reportes') %}active{% endif %}">
+        <span class="si-icon"><i class="fa-solid fa-chart-line"></i></span> Analítica
       </a>
 
       <div class="sidebar-section-label">Catálogos</div>

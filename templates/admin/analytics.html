@@ -1,532 +1,712 @@
 {% extends 'base.html' %}
-{% block title %}Analytics MongoDB — VacunaTrack{% endblock %}
-{% block page_title %}Analytics MongoDB{% endblock %}
+{% block title %}Analítica — VacunaTrack{% endblock %}
+{% block page_title %}Analítica{% endblock %}
+
+{% block extra_css %}
+<style>
+.tab-bar { display:flex; gap:4px; border-bottom:2px solid var(--border); margin-bottom:24px; }
+.tab-btn {
+  padding:10px 20px; font-size:0.875rem; font-weight:600; cursor:pointer;
+  border:none; background:none; color:var(--text-muted); border-bottom:2px solid transparent;
+  margin-bottom:-2px; transition:color .15s, border-color .15s;
+}
+.tab-btn.active { color:var(--primary); border-bottom-color:var(--primary); }
+.tab-btn:hover:not(.active) { color:var(--text); }
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
+.kpi-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; margin-bottom:24px; }
+.kpi-card {
+  background:var(--card-bg); border:1px solid var(--border); border-radius:var(--radius);
+  padding:18px 20px; display:flex; flex-direction:column; gap:4px;
+}
+.kpi-value { font-size:2rem; font-weight:700; line-height:1.1; color:var(--text); }
+.kpi-label { font-size:0.8rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
+.kpi-formula { font-size:0.72rem; color:var(--text-muted); font-family:monospace; margin-top:4px; }
+.kpi-icon { font-size:1.3rem; margin-bottom:4px; }
+</style>
+{% endblock %}
 
 {% block content %}
 
-<div class="card mb-20">
-  <div class="card-body" style="padding:14px 22px">
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="background:#00a65122;color:#00a651;border-radius:20px;padding:4px 14px;font-size:0.8rem;font-weight:600">
-        <i class="fa-solid fa-circle" style="font-size:8px;margin-right:4px"></i> MongoDB conectado
-      </span>
-      <span class="text-muted fs-sm">Fuente de datos: colecciones <code>logs_aplicaciones</code>, <code>logs_acceso</code>, <code>eventos_inventario</code></span>
-      <div style="margin-left:auto;display:flex;gap:8px" id="resumen-badges">
-        <span class="badge badge-primary" id="badge-aplicaciones">— aplicaciones</span>
-        <span class="badge badge-success" id="badge-accesos">— accesos</span>
-        <span class="badge badge-warning" id="badge-inventario">— inventario</span>
+<!-- Tab bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('kpis',this)">
+    <i class="fa-solid fa-gauge-high"></i> KPIs
+  </button>
+  <button class="tab-btn" onclick="switchTab('reportes',this)">
+    <i class="fa-solid fa-chart-column"></i> Reportes
+  </button>
+  <button class="tab-btn" onclick="switchTab('avanzado',this)">
+    <i class="fa-solid fa-database"></i> Análisis Avanzado
+  </button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TAB 1: KPIs
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-kpis">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:1.05rem;font-weight:700">Indicadores Clave del Sistema</div>
+      <div class="text-muted fs-sm">12 KPIs calculados en tiempo real desde PostgreSQL · sp_kpis_generales</div>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="loadKPIs()">
+      <i class="fa-solid fa-arrows-rotate"></i> Actualizar
+    </button>
+  </div>
+
+  <div class="kpi-grid" id="kpi-grid">
+    <!-- populated by JS -->
+    <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">
+      <i class="fa-solid fa-spinner fa-spin fa-2x"></i><div class="mt-8">Calculando KPIs…</div>
+    </div>
+  </div>
+
+  <!-- Descripción de KPIs / fórmulas -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-function" style="color:var(--primary)"></i> Fórmulas y definiciones</span>
+    </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>#</th><th>KPI</th><th>Fórmula / Fuente</th><th>Significado operativo</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="fw-600">Total pacientes</td><td class="fs-sm font-mono">COUNT(*) FROM vw_pacientes</td><td class="fs-sm">Niños/as registrados en el sistema</td></tr>
+          <tr><td>2</td><td class="fw-600">Total tutores</td><td class="fs-sm font-mono">COUNT(*) FROM vw_tutores</td><td class="fs-sm">Tutores con acceso al portal</td></tr>
+          <tr><td>3</td><td class="fw-600">Total responsables</td><td class="fs-sm font-mono">COUNT(*) FROM vw_responsables</td><td class="fs-sm">Personal clínico con acceso</td></tr>
+          <tr><td>4</td><td class="fw-600">Total centros</td><td class="fs-sm font-mono">COUNT(*) FROM vw_centros_detalle</td><td class="fs-sm">Centros de salud registrados</td></tr>
+          <tr><td>5</td><td class="fw-600">Centros activos (30d)</td><td class="fs-sm font-mono">COUNT(DISTINCT centro_id) WHERE ts ≥ NOW()-30d</td><td class="fs-sm">Centros con al menos una aplicación en los últimos 30 días</td></tr>
+          <tr><td>6</td><td class="fw-600">% Centros activos (30d)</td><td class="fs-sm font-mono">centros_activos_30d / total_centros × 100</td><td class="fs-sm">Proporción de la red que estuvo operativa recientemente</td></tr>
+          <tr><td>7</td><td class="fw-600">Total aplicaciones</td><td class="fs-sm font-mono">COUNT(*) FROM aplicaciones</td><td class="fs-sm">Dosis históricamente administradas</td></tr>
+          <tr><td>8</td><td class="fw-600">Aplicaciones hoy</td><td class="fs-sm font-mono">COUNT(*) WHERE DATE(timestamp) = CURRENT_DATE</td><td class="fs-sm">Dosis aplicadas en el día actual</td></tr>
+          <tr><td>9</td><td class="fw-600">Aplicaciones este mes</td><td class="fs-sm font-mono">COUNT(*) WHERE DATE_TRUNC('month') = MES_ACTUAL</td><td class="fs-sm">Ritmo de vacunación mensual</td></tr>
+          <tr><td>10</td><td class="fw-600">Promedio diario (mes)</td><td class="fs-sm font-mono">aplicaciones_mes / EXTRACT(DAY FROM NOW())</td><td class="fs-sm">Cadencia diaria de vacunación en el mes en curso</td></tr>
+          <tr><td>11</td><td class="fw-600">Cobertura global</td><td class="fs-sm font-mono">COUNT(DISTINCT paciente_id) / total_pacientes × 100</td><td class="fs-sm">% de pacientes con al menos una vacuna aplicada</td></tr>
+          <tr><td>12</td><td class="fw-600">Pacientes sin vacunar</td><td class="fs-sm font-mono">COUNT(*) WHERE NOT EXISTS aplicaciones</td><td class="fs-sm">Pacientes registrados que aún no tienen ninguna dosis</td></tr>
+          <tr><td>13</td><td class="fw-600">Vacunas en catálogo</td><td class="fs-sm font-mono">COUNT(*) FROM vacunas</td><td class="fs-sm">Vacunas disponibles en el programa</td></tr>
+          <tr><td>14</td><td class="fw-600">Esquemas de vacunación</td><td class="fs-sm font-mono">COUNT(*) FROM esquemas</td><td class="fs-sm">Esquemas oficiales registrados (p. ej. infantil, adulto)</td></tr>
+          <tr><td>15</td><td class="fw-600">Padecimientos cubiertos</td><td class="fs-sm font-mono">COUNT(*) FROM padecimientos</td><td class="fs-sm">Enfermedades que el programa previene</td></tr>
+          <tr><td>16</td><td class="fw-600">Lotes activos con stock</td><td class="fs-sm font-mono">COUNT(*) FROM vw_inventarios WHERE stock > 0 AND fecha_cad ≥ HOY</td><td class="fs-sm">Lotes vigentes con dosis disponibles</td></tr>
+          <tr><td>17</td><td class="fw-600">Lotes por caducar (30d)</td><td class="fs-sm font-mono">COUNT(*) FROM vw_inventarios WHERE fecha_cad BETWEEN HOY AND HOY+30</td><td class="fs-sm">Lotes que requieren atención inmediata por proximidad de caducidad</td></tr>
+          <tr><td>18</td><td class="fw-600">Lotes caducados con stock</td><td class="fs-sm font-mono">COUNT(*) FROM vw_inventarios WHERE fecha_cad &lt; HOY AND stock > 0</td><td class="fs-sm">Lotes vencidos que aún tienen dosis — deben retirarse</td></tr>
+          <tr><td>19</td><td class="fw-600">Alertas de inventario</td><td class="fs-sm font-mono">COUNT(*) FROM vw_alertas_inventario</td><td class="fs-sm">Alertas activas de stock bajo o caducidad</td></tr>
+          <tr><td>20</td><td class="fw-600">Alertas de dosis</td><td class="fs-sm font-mono">COUNT(*) FROM vw_alertas_dosis</td><td class="fs-sm">Pacientes con dosis atrasadas o próximas a vencer el límite de edad</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TAB 2: REPORTES (Filterable, Highcharts)
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-reportes">
+
+  <!-- Filtros -->
+  <div class="card mb-20">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-filter" style="color:var(--primary)"></i> Filtros de reporte</span></div>
+    <div class="card-body">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+        <div class="form-group mb-0" style="min-width:160px">
+          <label class="form-label">Fecha desde</label>
+          <input type="date" id="filter-desde" class="form-control" value="2024-01-01">
+        </div>
+        <div class="form-group mb-0" style="min-width:160px">
+          <label class="form-label">Fecha hasta</label>
+          <input type="date" id="filter-hasta" class="form-control">
+        </div>
+        <div class="form-group mb-0" style="min-width:200px">
+          <label class="form-label">Centro (opcional)</label>
+          <select id="filter-centro" class="form-select">
+            <option value="">Todos los centros</option>
+            {% for c in centros %}
+            <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group mb-0" style="min-width:200px">
+          <label class="form-label">Vacuna (opcional)</label>
+          <select id="filter-vacuna" class="form-select">
+            <option value="">Todas las vacunas</option>
+            {% for v in vacunas %}
+            <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen rápido -->
+  <div class="card mb-20">
+    <div class="card-body">
+      <div style="display:flex;gap:32px;font-size:0.875rem;flex-wrap:wrap">
+        <div><div class="text-muted">Período</div><div class="fw-600" id="res-periodo">—</div></div>
+        <div><div class="text-muted">Total aplicaciones</div><div class="fw-600" id="res-total">—</div></div>
+        <div><div class="text-muted">Centros registrados</div><div class="fw-600">{{ centros|length }}</div></div>
+        <div><div class="text-muted">Vacunas en catálogo</div><div class="fw-600">{{ vacunas|length }}</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gráficas -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--primary)"></i> Aplicaciones por mes</span>
+        <span class="badge badge-secondary fs-sm">PostgreSQL · sp_chart_por_mes</span>
+      </div>
+      <div class="card-body"><div id="chart-por-mes" style="height:300px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-chart-pie" style="color:var(--secondary)"></i> Top vacunas aplicadas</span>
+        <span class="badge badge-secondary fs-sm">PostgreSQL · sp_chart_top_vacunas</span>
+      </div>
+      <div class="card-body"><div id="chart-top-vacunas" style="height:300px"></div></div>
+    </div>
+  </div>
+
+  <!-- Estados de dosis (leyenda) -->
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-palette" style="color:var(--warning)"></i> Estados de dosis</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+        <div><span class="badge badge-aplicada">✅ Aplicada</span><p class="text-muted fs-sm mt-4">Dosis ya administrada</p></div>
+        <div><span class="badge badge-aplicable">⏰ Aplicable</span><p class="text-muted fs-sm mt-4">Lista para aplicarse ahora</p></div>
+        <div><span class="badge badge-atrasada">⚠ Atrasada</span><p class="text-muted fs-sm mt-4">30+ días desde edad oportuna</p></div>
+        <div><span class="badge badge-cerca_limite">🔶 Cerca del límite</span><p class="text-muted fs-sm mt-4">Menos de 15 días para el límite</p></div>
+        <div><span class="badge badge-faltante">✕ Faltante</span><p class="text-muted fs-sm mt-4">Límite alcanzado o previa faltante</p></div>
+        <div><span class="badge badge-proxima">🔵 Próxima</span><p class="text-muted fs-sm mt-4">Aún no llega a edad oportuna</p></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Fila 1: Serie de tiempo + Top vacunas -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+<!-- ═══════════════════════════════════════════════════════════════════════
+     TAB 3: ANÁLISIS AVANZADO (MongoDB + PostgreSQL temp tables)
+═══════════════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-avanzado">
 
-  <div class="card">
+  <!-- MongoDB status banner -->
+  <div class="card mb-20">
+    <div class="card-body" style="padding:14px 22px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="background:#00a65122;color:#00a651;border-radius:20px;padding:4px 14px;font-size:0.8rem;font-weight:600">
+          <i class="fa-solid fa-circle" style="font-size:8px;margin-right:4px"></i> MongoDB
+        </span>
+        <span class="text-muted fs-sm">Colecciones: <code>logs_aplicaciones</code>, <code>logs_acceso</code>, <code>eventos_inventario</code>, <code>eventos_beacon</code>, <code>busquedas_gps</code></span>
+        <div style="margin-left:auto;display:flex;gap:8px" id="resumen-badges">
+          <span class="badge badge-primary" id="badge-aplicaciones">—</span>
+          <span class="badge badge-success" id="badge-accesos">—</span>
+          <span class="badge badge-warning" id="badge-inventario">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fila 1: Serie de tiempo + Top vacunas MongoDB -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-chart-line" style="color:var(--primary)"></i> Aplicaciones por mes — serie de tiempo</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · logs_aplicaciones</span>
+      </div>
+      <div class="card-body"><div id="chart-serie-tiempo" style="height:300px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-chart-pie" style="color:var(--secondary)"></i> Distribución por vacuna</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · logs_aplicaciones</span>
+      </div>
+      <div class="card-body"><div id="chart-vacunas-pie" style="height:300px"></div></div>
+    </div>
+  </div>
+
+  <!-- Fila 2: Por centro + Accesos por rol -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--success)"></i> Aplicaciones por centro</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · logs_aplicaciones</span>
+      </div>
+      <div class="card-body"><div id="chart-centros-bar" style="height:300px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-users" style="color:var(--warning)"></i> Actividad de accesos por rol</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · logs_acceso</span>
+      </div>
+      <div class="card-body"><div id="chart-accesos-donut" style="height:300px"></div></div>
+    </div>
+  </div>
+
+  <!-- Fila 3: Volumen de colecciones -->
+  <div class="card mb-20">
     <div class="card-header">
-      <span class="card-title">
-        <i class="fa-solid fa-chart-line" style="color:var(--primary)"></i>
-        Aplicaciones por mes — serie de tiempo
-      </span>
-      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_aplicaciones</span>
+      <span class="card-title"><i class="fa-solid fa-database" style="color:var(--orange)"></i> Volumen de datos por colección MongoDB</span>
+      <span class="badge badge-secondary fs-sm">MongoDB · todas las colecciones</span>
     </div>
-    <div class="card-body">
-      <div id="chart-serie-tiempo" style="height:300px"></div>
-    </div>
+    <div class="card-body"><div id="chart-colecciones" style="height:260px"></div></div>
   </div>
 
-  <div class="card">
+  <!-- Tabla últimos accesos -->
+  <div class="card mb-28">
     <div class="card-header">
-      <span class="card-title">
-        <i class="fa-solid fa-chart-pie" style="color:var(--secondary)"></i>
-        Distribución por vacuna
-      </span>
-      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_aplicaciones</span>
+      <span class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i> Últimos accesos registrados</span>
+      <span class="badge badge-secondary fs-sm">MongoDB · logs_acceso</span>
     </div>
-    <div class="card-body">
-      <div id="chart-vacunas-pie" style="height:300px"></div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Timestamp</th><th>Evento</th><th>Email</th><th>Rol</th><th>IP</th></tr></thead>
+        <tbody id="accesos-tbody">
+          <tr><td colspan="5" class="text-center text-muted" style="padding:30px">Cargando…</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-</div>
-
-<!-- Fila 2: Por centro + Accesos por rol -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-
-  <div class="card">
+  <!-- SPs con tablas temporales -->
+  <div class="card mb-20">
     <div class="card-header">
-      <span class="card-title">
-        <i class="fa-solid fa-hospital" style="color:var(--success)"></i>
-        Aplicaciones por centro de salud
+      <span class="card-title" style="font-size:1rem;font-weight:700">
+        <i class="fa-solid fa-table-list" style="color:var(--primary)"></i>
+        Reportes con tablas temporales — PostgreSQL
       </span>
-      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_aplicaciones</span>
+      <span class="badge badge-primary fs-sm">3 SPs · CREATE TEMP TABLE</span>
     </div>
-    <div class="card-body">
-      <div id="chart-centros-bar" style="height:300px"></div>
+    <div class="card-body" style="padding:10px 22px 4px">
+      <p class="text-muted fs-sm">Estos reportes utilizan tablas temporales (<code>ON COMMIT DROP</code>) para cálculos intermedios de ranking, cobertura y urgencia.</p>
     </div>
   </div>
 
-  <div class="card">
+  <!-- 1. Ranking centros -->
+  <div class="card mb-20">
     <div class="card-header">
-      <span class="card-title">
-        <i class="fa-solid fa-users" style="color:var(--warning)"></i>
-        Actividad de accesos por rol
-      </span>
-      <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_acceso</span>
+      <span class="card-title"><i class="fa-solid fa-ranking-star" style="color:var(--warning)"></i> Ranking de centros por actividad</span>
+      <span class="badge badge-secondary fs-sm">sp_ranking_centros_actividad · tmp_ranking_centros</span>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+        <label class="form-label mb-0 fs-sm">Últimos</label>
+        <select id="sel-meses-ranking" class="form-select" style="width:110px;padding:5px 8px">
+          <option value="3">3 meses</option>
+          <option value="6" selected>6 meses</option>
+          <option value="12">12 meses</option>
+        </select>
+      </div>
     </div>
-    <div class="card-body">
-      <div id="chart-accesos-donut" style="height:300px"></div>
-    </div>
-  </div>
-
-</div>
-
-<!-- Fila 3: Resumen de colecciones (gráfica de columnas) -->
-<div class="card mb-20">
-  <div class="card-header">
-    <span class="card-title">
-      <i class="fa-solid fa-database" style="color:var(--orange)"></i>
-      Volumen de datos por colección MongoDB
-    </span>
-    <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · todas las colecciones</span>
-  </div>
-  <div class="card-body">
-    <div id="chart-colecciones" style="height:260px"></div>
-  </div>
-</div>
-
-<!-- Tabla de últimos accesos -->
-<div class="card">
-  <div class="card-header">
-    <span class="card-title">
-      <i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i>
-      Últimos accesos registrados
-    </span>
-    <span class="badge badge-secondary" style="font-size:0.7rem">MongoDB · logs_acceso</span>
-  </div>
-  <div class="table-wrapper">
-    <table class="table" id="tabla-accesos">
-      <thead><tr>
-        <th>Timestamp</th><th>Evento</th><th>Email</th><th>Rol</th><th>IP</th>
-      </tr></thead>
-      <tbody id="accesos-tbody">
-        <tr><td colspan="5" class="text-center text-muted" style="padding:30px">Cargando…</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- ── Sección: SPs con tablas temporales ──────────────────────────────── -->
-<div class="card mb-20" style="margin-top:28px">
-  <div class="card-header">
-    <span class="card-title" style="font-size:1rem;font-weight:700">
-      <i class="fa-solid fa-database" style="color:var(--primary)"></i>
-      Reportes con tablas temporales — PostgreSQL
-    </span>
-    <span class="badge badge-primary" style="font-size:0.7rem">3 SPs · CREATE TEMP TABLE</span>
-  </div>
-  <div class="card-body" style="padding:10px 22px 4px">
-    <p class="text-muted fs-sm">Estos reportes utilizan tablas temporales (<code>ON COMMIT DROP</code>) para cálculos intermedios de ranking, cobertura y urgencia.</p>
-  </div>
-</div>
-
-<!-- 1. Ranking de centros -->
-<div class="card mb-20">
-  <div class="card-header">
-    <span class="card-title">
-      <i class="fa-solid fa-ranking-star" style="color:var(--warning)"></i>
-      Ranking de centros por actividad
-    </span>
-    <span class="badge badge-secondary" style="font-size:0.7rem">PostgreSQL · sp_ranking_centros_actividad · tmp_ranking_centros</span>
-    <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
-      <label class="form-label mb-0 fs-sm">Últimos</label>
-      <select id="sel-meses-ranking" class="form-select" style="width:110px;padding:5px 8px">
-        <option value="3">3 meses</option>
-        <option value="6" selected>6 meses</option>
-        <option value="12">12 meses</option>
-      </select>
+    <div class="card-body"><div id="chart-ranking-centros" style="height:300px"></div></div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>#</th><th>Centro</th><th>Ciudad</th><th>Aplicaciones (período)</th><th>Pacientes atendidos</th><th>Días activo</th><th>% del total</th></tr></thead>
+        <tbody id="tbody-ranking"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
+      </table>
     </div>
   </div>
-  <div class="card-body">
-    <div id="chart-ranking-centros" style="height:300px"></div>
-  </div>
-  <div class="table-wrapper">
-    <table class="table" id="tabla-ranking">
-      <thead><tr><th>#</th><th>Centro</th><th>Ciudad</th><th>Aplicaciones (período)</th><th>Pacientes atendidos</th><th>Días activo</th><th>% del total</th></tr></thead>
-      <tbody id="tbody-ranking"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
-    </table>
-  </div>
-</div>
 
-<!-- 2. Cobertura vacunal -->
-<div class="card mb-20">
-  <div class="card-header">
-    <span class="card-title">
-      <i class="fa-solid fa-shield-virus" style="color:var(--success)"></i>
-      Cobertura vacunal por esquema
-    </span>
-    <span class="badge badge-secondary" style="font-size:0.7rem">PostgreSQL · sp_reporte_cobertura_vacunal · tmp_cobertura</span>
-    <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
-      <select id="sel-esquema-cob" class="form-select" style="width:220px;padding:5px 8px">
-        {% for e in esquemas %}
-        <option value="{{ e.esquema_id }}">{{ e.esquema_nombre }}</option>
-        {% endfor %}
-      </select>
+  <!-- 2. Cobertura vacunal -->
+  <div class="card mb-20">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-shield-virus" style="color:var(--success)"></i> Cobertura vacunal por esquema</span>
+      <span class="badge badge-secondary fs-sm">sp_reporte_cobertura_vacunal · tmp_cobertura</span>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+        <select id="sel-esquema-cob" class="form-select" style="width:220px;padding:5px 8px">
+          {% for e in esquemas %}
+          <option value="{{ e.esquema_id }}">{{ e.esquema_nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="card-body"><div id="chart-cobertura" style="height:300px"></div></div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Vacuna</th><th>Dosis</th><th>Edad oportuna</th><th>Pacientes totales</th><th>Con dosis aplicada</th><th>% Cobertura</th><th>Nivel</th></tr></thead>
+        <tbody id="tbody-cobertura"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
+      </table>
     </div>
   </div>
-  <div class="card-body">
-    <div id="chart-cobertura" style="height:300px"></div>
-  </div>
-  <div class="table-wrapper">
-    <table class="table" id="tabla-cobertura">
-      <thead><tr><th>Vacuna</th><th>Dosis</th><th>Edad oportuna</th><th>Pacientes totales</th><th>Con dosis aplicada</th><th>% Cobertura</th><th>Nivel</th></tr></thead>
-      <tbody id="tbody-cobertura"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
-    </table>
-  </div>
-</div>
 
-<!-- 3. Dosis urgentes -->
-<div class="card mb-20">
-  <div class="card-header">
-    <span class="card-title">
-      <i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i>
-      Pacientes con dosis atrasadas — ranking de urgencia
-    </span>
-    <span class="badge badge-secondary" style="font-size:0.7rem">PostgreSQL · sp_pacientes_dosis_urgentes · tmp_urgencias</span>
-    <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
-      <select id="sel-centro-urg" class="form-select" style="width:200px;padding:5px 8px">
-        <option value="">Todos los centros</option>
-        {% for c in centros %}
-        <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
-        {% endfor %}
-      </select>
+  <!-- 3. Dosis urgentes -->
+  <div class="card mb-20">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i> Pacientes con dosis atrasadas — ranking de urgencia</span>
+      <span class="badge badge-secondary fs-sm">sp_pacientes_dosis_urgentes · tmp_urgencias</span>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+        <select id="sel-centro-urg" class="form-select" style="width:200px;padding:5px 8px">
+          <option value="">Todos los centros</option>
+          {% for c in centros %}
+          <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="card-body"><div id="chart-urgencias" style="height:300px"></div></div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>#</th><th>Paciente</th><th>Vacuna</th><th>Tipo dosis</th><th>Días de atraso</th><th>Días para límite</th><th>Urgencia</th></tr></thead>
+        <tbody id="tbody-urgencias"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
+      </table>
     </div>
   </div>
-  <div class="card-body">
-    <div id="chart-urgencias" style="height:300px"></div>
-  </div>
-  <div class="table-wrapper">
-    <table class="table" id="tabla-urgencias">
-      <thead><tr><th>#</th><th>Paciente</th><th>Vacuna</th><th>Tipo dosis</th><th>Días de atraso</th><th>Días para límite</th><th>Urgencia</th></tr></thead>
-      <tbody id="tbody-urgencias"><tr><td colspan="7" class="text-center text-muted" style="padding:24px">Cargando…</td></tr></tbody>
-    </table>
-  </div>
-</div>
+
+</div><!-- end tab-avanzado -->
 
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="{{ url_for('static', filename='js/highcharts.js') }}"></script>
 <script>
 
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+let avanzadoLoaded = false;
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'reportes') fetchReporteData();
+  if (id === 'avanzado' && !avanzadoLoaded) { loadAvanzado(); avanzadoLoaded = true; }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const HC_COLORS = ['#7C3AED','#2563EB','#16A34A','#D97706','#EA580C','#DC2626','#8B5CF6','#0891B2','#BE185D','#0D9488'];
+const NIVEL_BADGE = { ALTA:'badge-success', MEDIA:'badge-warning', BAJA:'badge-danger', SIN_DATOS:'badge-secondary', CRITICO:'badge-danger', URGENTE:'badge-warning', PENDIENTE:'badge-primary' };
 
-function emptyChart(containerId, message) {
-  document.getElementById(containerId).innerHTML =
-    `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">${message}</div>`;
+function emptyChart(id, msg) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:0.85rem">${msg}</div>`;
 }
 
-// ── 1. Serie de tiempo ────────────────────────────────────────────────────────
-fetch('/admin/api/mongo/aplicaciones-por-mes')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.length) { emptyChart('chart-serie-tiempo', 'Sin datos aún. Registra aplicaciones.'); return; }
-    Highcharts.chart('chart-serie-tiempo', {
-      chart: { type: 'areaspline', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
-      title: { text: null },
-      credits: { enabled: false },
-      xAxis: { categories: data.map(d => d.label), labels: { style: { fontSize: '11px' } } },
-      yAxis: { min: 0, title: { text: 'Aplicaciones' }, allowDecimals: false },
-      tooltip: { shared: true, valueSuffix: ' aplicaciones' },
-      legend: { enabled: false },
-      series: [{
-        name: 'Aplicaciones',
-        data: data.map(d => d.total),
-        color: '#7C3AED',
-        fillColor: { linearGradient: { x1:0,y1:0,x2:0,y2:1 },
-          stops: [[0,'rgba(124,58,237,0.35)'], [1,'rgba(124,58,237,0.02)']] },
-        marker: { enabled: true, radius: 4 },
-      }],
-      plotOptions: { areaspline: { dataLabels: { enabled: true, style: { fontSize:'10px' } } } }
-    });
-  })
-  .catch(() => emptyChart('chart-serie-tiempo', 'Error al conectar con MongoDB.'));
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB 1: KPIs
+// ═════════════════════════════════════════════════════════════════════════════
+const KPI_META = [
+  // Personas
+  { key:'total_pacientes',            label:'Total pacientes',             icon:'fa-baby',                color:'var(--primary)',   formula:'COUNT(*) vw_pacientes' },
+  { key:'total_tutores',              label:'Tutores registrados',         icon:'fa-users',               color:'var(--secondary)', formula:'COUNT(*) vw_tutores' },
+  { key:'total_responsables',         label:'Responsables de salud',       icon:'fa-user-doctor',         color:'var(--success)',   formula:'COUNT(*) vw_responsables' },
+  // Centros
+  { key:'total_centros',              label:'Centros de salud',            icon:'fa-hospital',            color:'var(--warning)',   formula:'COUNT(*) vw_centros_detalle' },
+  { key:'centros_activos_30d',        label:'Centros activos (30d)',       icon:'fa-location-dot',        color:'#0891B2',          formula:'COUNT(DISTINCT centro_id) WHERE ts ≥ NOW()-30d' },
+  { key:'pct_centros_activos_30d',    label:'% Centros activos (30d)',     icon:'fa-percent',             color:'#0891B2',          formula:'centros_activos_30d / total_centros × 100', suffix:'%' },
+  // Aplicaciones
+  { key:'total_aplicaciones',         label:'Total aplicaciones',          icon:'fa-syringe',             color:'var(--primary)',   formula:'COUNT(*) aplicaciones' },
+  { key:'aplicaciones_hoy',           label:'Aplicaciones hoy',            icon:'fa-calendar-day',        color:'var(--success)',   formula:'COUNT(*) WHERE DATE = CURRENT_DATE' },
+  { key:'aplicaciones_mes',           label:'Aplicaciones este mes',       icon:'fa-calendar-check',      color:'#BE185D',          formula:'COUNT(*) WHERE MONTH = mes actual' },
+  { key:'promedio_diario_mes',        label:'Promedio diario (mes)',        icon:'fa-chart-simple',        color:'#BE185D',          formula:'aplicaciones_mes / días transcurridos' },
+  // Cobertura
+  { key:'pct_cobertura_global',       label:'Cobertura global',            icon:'fa-shield-halved',       color:'var(--success)',   formula:'pacientes con ≥1 dosis / total × 100', suffix:'%' },
+  { key:'pacientes_sin_aplicaciones', label:'Pacientes sin vacunar',       icon:'fa-baby',                color:'var(--danger)',    formula:'COUNT(*) pacientes sin ninguna aplicación' },
+  // Catálogo clínico
+  { key:'total_vacunas',              label:'Vacunas en catálogo',         icon:'fa-vials',               color:'#D97706',          formula:'COUNT(*) FROM vacunas' },
+  { key:'total_esquemas',             label:'Esquemas de vacunación',      icon:'fa-calendar-check',      color:'#D97706',          formula:'COUNT(*) FROM esquemas' },
+  { key:'total_padecimientos',        label:'Padecimientos cubiertos',     icon:'fa-virus',               color:'#D97706',          formula:'COUNT(*) FROM padecimientos' },
+  // Inventario / lotes
+  { key:'lotes_activos',              label:'Lotes activos con stock',     icon:'fa-boxes-stacked',       color:'var(--success)',   formula:'inventarios con stock > 0 y no caducados' },
+  { key:'lotes_por_caducar_30d',      label:'Lotes por caducar (30d)',     icon:'fa-clock',               color:'var(--warning)',   formula:'vw_inventarios WHERE fecha_cad BETWEEN hoy y +30d' },
+  { key:'lotes_caducados_con_stock',  label:'Lotes caducados con stock',   icon:'fa-triangle-exclamation',color:'var(--danger)',    formula:'vw_inventarios WHERE fecha_cad < HOY AND stock > 0' },
+  // Alertas
+  { key:'total_alertas_inv',          label:'Alertas de inventario',       icon:'fa-warehouse',           color:'var(--danger)',    formula:'COUNT(*) vw_alertas_inventario' },
+  { key:'total_alertas_dosis',        label:'Alertas de dosis',            icon:'fa-triangle-exclamation',color:'var(--warning)',   formula:'COUNT(*) vw_alertas_dosis' },
+];
 
-// ── 2. Distribución por vacuna (pie) ─────────────────────────────────────────
-fetch('/admin/api/mongo/top-vacunas')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.length) { emptyChart('chart-vacunas-pie', 'Sin datos aún.'); return; }
-    Highcharts.chart('chart-vacunas-pie', {
-      chart: { type: 'pie', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
-      title: { text: null },
-      credits: { enabled: false },
-      tooltip: { pointFormat: '<b>{point.y}</b> aplicaciones ({point.percentage:.1f}%)' },
-      legend: { enabled: true, layout: 'vertical', align: 'right', verticalAlign: 'middle',
-        itemStyle: { fontSize: '11px', fontWeight: '500' } },
-      plotOptions: {
-        pie: {
-          allowPointSelect: true,
-          cursor: 'pointer',
-          showInLegend: true,
-          dataLabels: { enabled: false },
-          innerSize: '40%',
-        }
-      },
-      series: [{
-        name: 'Aplicaciones',
-        colorByPoint: true,
-        data: data.map((d, i) => ({ name: d.vacuna, y: d.total, color: HC_COLORS[i % HC_COLORS.length] })),
-      }],
-    });
-  })
-  .catch(() => emptyChart('chart-vacunas-pie', 'Error al conectar con MongoDB.'));
-
-// ── 3. Aplicaciones por centro (barras horizontales) ─────────────────────────
-fetch('/admin/api/mongo/aplicaciones-por-centro')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.length) { emptyChart('chart-centros-bar', 'Sin datos aún.'); return; }
-    Highcharts.chart('chart-centros-bar', {
-      chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
-      title: { text: null },
-      credits: { enabled: false },
-      xAxis: { categories: data.map(d => d.centro), labels: { style: { fontSize: '11px' } } },
-      yAxis: { min: 0, title: { text: null }, allowDecimals: false },
-      legend: { enabled: false },
-      tooltip: { valueSuffix: ' aplicaciones' },
-      series: [{
-        name: 'Aplicaciones',
-        data: data.map((d, i) => ({ y: d.total, color: HC_COLORS[i % HC_COLORS.length] })),
-        dataLabels: { enabled: true, style: { fontSize: '10px' } },
-      }],
-      plotOptions: { bar: { borderRadius: 3 } }
-    });
-  })
-  .catch(() => emptyChart('chart-centros-bar', 'Error al conectar con MongoDB.'));
-
-// ── 4. Accesos por rol (donut) ────────────────────────────────────────────────
-fetch('/admin/api/mongo/ultimos-accesos')
-  .then(r => r.json())
-  .then(data => {
-    if (!data.length) { emptyChart('chart-accesos-donut', 'Sin datos aún. Inicia sesión para generar logs.'); return; }
-    const counts = {};
-    data.forEach(d => { const rol = d.rol || 'desconocido'; counts[rol] = (counts[rol] || 0) + 1; });
-    const series = Object.entries(counts).map(([rol, total], i) => ({
-      name: rol, y: total, color: HC_COLORS[i % HC_COLORS.length]
-    }));
-    Highcharts.chart('chart-accesos-donut', {
-      chart: { type: 'pie', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
-      title: { text: null },
-      credits: { enabled: false },
-      tooltip: { pointFormat: '<b>{point.y}</b> accesos recientes' },
-      plotOptions: {
-        pie: {
-          innerSize: '55%',
-          allowPointSelect: true,
-          cursor: 'pointer',
-          showInLegend: true,
-          dataLabels: { enabled: true, format: '{point.name}<br>{point.y}',
-            style: { fontSize: '11px', fontWeight: '500' } },
-        }
-      },
-      legend: { enabled: true, layout: 'vertical', align: 'right', verticalAlign: 'middle',
-        itemStyle: { fontSize: '11px' } },
-      series: [{ name: 'Accesos', colorByPoint: true, data: series }],
-    });
-  })
-  .catch(() => emptyChart('chart-accesos-donut', 'Error al conectar con MongoDB.'));
-
-// ── 5. Volumen por colección + resumen badges ─────────────────────────────────
-fetch('/admin/api/mongo/resumen-logs')
-  .then(r => r.json())
-  .then(data => {
-    document.getElementById('badge-aplicaciones').textContent = data.aplicaciones + ' aplicaciones';
-    document.getElementById('badge-accesos').textContent      = data.accesos + ' accesos';
-    document.getElementById('badge-inventario').textContent   = data.inventario + ' inventario';
-
-    const colecciones = [
-      { name: 'logs_aplicaciones', y: data.aplicaciones, color: '#7C3AED' },
-      { name: 'logs_acceso',       y: data.accesos,       color: '#2563EB' },
-      { name: 'eventos_inventario',y: data.inventario,    color: '#D97706' },
-      { name: 'logs_sistema',      y: data.sistema,       color: '#16A34A' },
-    ];
-
-    Highcharts.chart('chart-colecciones', {
-      chart: { type: 'column', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
-      title: { text: null },
-      credits: { enabled: false },
-      xAxis: { categories: colecciones.map(c => c.name), labels: { style: { fontSize: '11px' } } },
-      yAxis: { min: 0, title: { text: 'Documentos' }, allowDecimals: false },
-      legend: { enabled: false },
-      tooltip: { valueSuffix: ' documentos' },
-      series: [{
-        name: 'Documentos',
-        colorByPoint: true,
-        data: colecciones,
-        dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: '600' } },
-      }],
-      plotOptions: { column: { borderRadius: 4 } }
-    });
-  })
-  .catch(() => emptyChart('chart-colecciones', 'Error al conectar con MongoDB.'));
-
-// ── Tabla últimos accesos ─────────────────────────────────────────────────────
-fetch('/admin/api/mongo/ultimos-accesos')
-  .then(r => r.json())
-  .then(data => {
-    const tbody = document.getElementById('accesos-tbody');
-    if (!data.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:30px">Sin registros aún.</td></tr>';
-      return;
-    }
-    tbody.innerHTML = data.map(d => {
-      const ts  = d.timestamp ? new Date(d.timestamp).toLocaleString('es-MX') : '—';
-      const ev  = d.evento === 'login' ? '<span class="badge badge-success">login</span>'
-                : d.evento === 'logout' ? '<span class="badge badge-secondary">logout</span>'
-                : '<span class="badge badge-danger">fallido</span>';
-      return `<tr>
-        <td class="fs-sm" style="font-family:monospace">${ts}</td>
-        <td>${ev}</td>
-        <td class="fs-sm">${d.email || '—'}</td>
-        <td>${d.rol ? `<span class="badge badge-primary">${d.rol}</span>` : '—'}</td>
-        <td class="fs-sm text-muted">${d.ip || '—'}</td>
-      </tr>`;
-    }).join('');
-  })
-  .catch(() => {
-    document.getElementById('accesos-tbody').innerHTML =
-      '<tr><td colspan="5" class="text-center text-muted" style="padding:30px">Error al cargar datos.</td></tr>';
-  });
-
-// ── Reportes con tablas temporales (PostgreSQL) ───────────────────────────────
-
-const NIVEL_BADGE = {
-  ALTA:     'badge-success',
-  MEDIA:    'badge-warning',
-  BAJA:     'badge-danger',
-  SIN_DATOS:'badge-secondary',
-  CRITICO:  'badge-danger',
-  URGENTE:  'badge-warning',
-  PENDIENTE:'badge-primary',
-};
-
-function loadRanking() {
-  const meses = document.getElementById('sel-meses-ranking').value;
-  fetch('/admin/api/ranking-centros?meses=' + meses)
+function loadKPIs() {
+  document.getElementById('kpi-grid').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)"><i class="fa-solid fa-spinner fa-spin fa-2x"></i><div class="mt-8">Calculando KPIs…</div></div>`;
+  fetch('/admin/api/kpis')
     .then(r => r.json())
     .then(data => {
-      if (!data.length) { emptyChart('chart-ranking-centros','Sin datos de aplicaciones aún.'); return; }
-      Highcharts.chart('chart-ranking-centros', {
-        chart: { type: 'bar', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
-        title: { text: null }, credits: { enabled: false },
-        xAxis: { categories: data.map(d => d.centro_nombre), labels:{style:{fontSize:'11px'}} },
-        yAxis: { min:0, title:{text:'Aplicaciones'}, allowDecimals:false },
-        legend: { enabled:false },
-        tooltip: { valueSuffix:' aplicaciones en el período' },
-        series: [{ name:'Aplicaciones', data: data.map((d,i)=>({y:d.aplicaciones_periodo, color:HC_COLORS[i%HC_COLORS.length]})),
-          dataLabels:{enabled:true,style:{fontSize:'10px'}} }],
-        plotOptions: { bar:{borderRadius:3} }
-      });
-      document.getElementById('tbody-ranking').innerHTML = data.map(d => `
-        <tr>
-          <td class="fw-600">${d.ranking}</td>
-          <td class="fw-600">${d.centro_nombre}</td>
-          <td class="text-muted fs-sm">${d.ciudad_nombre}</td>
-          <td>${d.aplicaciones_periodo}</td>
-          <td>${d.pacientes_atendidos}</td>
-          <td>${d.dias_con_actividad}</td>
-          <td><span class="badge badge-primary">${d.pct_del_total ?? 0}%</span></td>
-        </tr>`).join('');
-    })
-    .catch(() => emptyChart('chart-ranking-centros','Error al obtener datos.'));
-}
-
-function loadCobertura() {
-  const eid = document.getElementById('sel-esquema-cob').value;
-  fetch('/admin/api/cobertura-vacunal?esquema_id=' + eid)
-    .then(r => r.json())
-    .then(data => {
-      if (!data.length) { emptyChart('chart-cobertura','Sin dosis en este esquema.'); return; }
-      const labels = data.map(d => d.vacuna_nombre + ' (' + d.dosis_tipo + ')');
-      const vals   = data.map(d => d.pct_cobertura ?? 0);
-      const colors = data.map(d =>
-        d.nivel_cobertura === 'ALTA' ? '#16A34A' :
-        d.nivel_cobertura === 'MEDIA' ? '#D97706' : '#DC2626');
-      Highcharts.chart('chart-cobertura', {
-        chart: { type:'column', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
-        title: { text:null }, credits:{enabled:false},
-        xAxis: { categories:labels, labels:{style:{fontSize:'10px'},rotation:-20} },
-        yAxis: { min:0, max:100, title:{text:'% Cobertura'}, plotLines:[{value:80,color:'#16A34A',dashStyle:'Dash',width:2,label:{text:'Meta 80%',style:{color:'#16A34A'}}},{value:50,color:'#D97706',dashStyle:'Dash',width:1}] },
-        legend: {enabled:false},
-        tooltip: { valueSuffix:'% de cobertura' },
-        series: [{ name:'Cobertura', colorByPoint:true, data:vals.map((v,i)=>({y:v,color:colors[i]})),
-          dataLabels:{enabled:true,format:'{point.y:.1f}%',style:{fontSize:'10px'}} }],
-        plotOptions: { column:{borderRadius:3} }
-      });
-      document.getElementById('tbody-cobertura').innerHTML = data.map(d => `
-        <tr>
-          <td class="fw-600">${d.vacuna_nombre}</td>
-          <td class="fs-sm">${d.dosis_tipo}</td>
-          <td class="fs-sm">${d.dosis_edad_oportuna_dias} días</td>
-          <td>${d.total_pacientes}</td>
-          <td>${d.pacientes_con_dosis}</td>
-          <td><strong>${d.pct_cobertura ?? 0}%</strong></td>
-          <td><span class="badge ${NIVEL_BADGE[d.nivel_cobertura] || 'badge-secondary'}">${d.nivel_cobertura}</span></td>
-        </tr>`).join('');
-    })
-    .catch(() => emptyChart('chart-cobertura','Error al obtener datos.'));
-}
-
-function loadUrgencias() {
-  const cid = document.getElementById('sel-centro-urg').value;
-  fetch('/admin/api/dosis-urgentes' + (cid ? '?centro_id='+cid : ''))
-    .then(r => r.json())
-    .then(data => {
-      if (!data.length) {
-        emptyChart('chart-urgencias','Sin dosis atrasadas. ¡Todos los pacientes están al día!');
-        document.getElementById('tbody-urgencias').innerHTML =
-          '<tr><td colspan="7" class="text-center text-muted" style="padding:24px">Sin pacientes con dosis atrasadas.</td></tr>';
+      if (!Object.keys(data).length) {
+        document.getElementById('kpi-grid').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-muted)">Sin datos. Ejecuta el script patch_postgres.sql en la base de datos.</div>`;
         return;
       }
-      const criticos  = data.filter(d => d.nivel_urgencia === 'CRITICO').length;
-      const urgentes  = data.filter(d => d.nivel_urgencia === 'URGENTE').length;
-      const pendientes= data.filter(d => d.nivel_urgencia === 'PENDIENTE').length;
-      Highcharts.chart('chart-urgencias', {
-        chart: { type:'pie', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
-        title: { text: data.length + ' pacientes con dosis atrasadas', style:{fontSize:'13px'} },
-        credits:{enabled:false},
-        tooltip:{ pointFormat:'<b>{point.y}</b> pacientes ({point.percentage:.1f}%)' },
-        plotOptions:{ pie:{ innerSize:'50%', dataLabels:{enabled:true,format:'{point.name}: {point.y}'} } },
-        series:[{ name:'Urgencia', colorByPoint:true, data:[
-          {name:'Crítico (>60 días)', y:criticos,  color:'#DC2626'},
-          {name:'Urgente (30-60 días)',y:urgentes,  color:'#D97706'},
-          {name:'Pendiente (<30 días)',y:pendientes,color:'#7C3AED'},
-        ]}]
-      });
-      document.getElementById('tbody-urgencias').innerHTML = data.map(d => `
-        <tr>
-          <td class="fw-600">${d.ranking_urgencia}</td>
-          <td class="fw-600">${d.paciente_nombre}</td>
-          <td class="fs-sm">${d.vacuna_nombre}</td>
-          <td class="fs-sm">${d.dosis_tipo}</td>
-          <td><strong style="color:${d.nivel_urgencia==='CRITICO'?'var(--danger)':d.nivel_urgencia==='URGENTE'?'var(--warning)':'var(--primary)'}">${d.dias_atraso} días</strong></td>
-          <td class="fs-sm text-muted">${d.dias_para_limite ?? '—'}</td>
-          <td><span class="badge ${NIVEL_BADGE[d.nivel_urgencia]}">${d.nivel_urgencia}</span></td>
-        </tr>`).join('');
+      document.getElementById('kpi-grid').innerHTML = KPI_META.map(m => {
+        const raw = data[m.key];
+        const val = raw !== null && raw !== undefined ? raw : '—';
+        const display = m.suffix ? val + m.suffix : val;
+        return `<div class="kpi-card">
+          <div class="kpi-icon" style="color:${m.color}"><i class="fa-solid ${m.icon}"></i></div>
+          <div class="kpi-value" style="color:${m.color}">${display}</div>
+          <div class="kpi-label">${m.label}</div>
+          <div class="kpi-formula">${m.formula}</div>
+        </div>`;
+      }).join('');
     })
-    .catch(() => emptyChart('chart-urgencias','Error al obtener datos.'));
+    .catch(() => {
+      document.getElementById('kpi-grid').innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--danger)"><i class="fa-solid fa-circle-xmark fa-2x"></i><div class="mt-8">Error al cargar KPIs.</div></div>`;
+    });
 }
 
+document.addEventListener('DOMContentLoaded', loadKPIs);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB 2: REPORTES
+// ═════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  const el = document.getElementById('filter-hasta');
+  if (el) el.value = new Date().toISOString().split('T')[0];
+});
+
+let chartMes = null;
+let chartVac = null;
+
+function fetchReporteData() {
+  const desde  = document.getElementById('filter-desde').value;
+  const hasta  = document.getElementById('filter-hasta').value;
+  const centro = document.getElementById('filter-centro').value;
+  const vacuna = document.getElementById('filter-vacuna').value;
+  const params = new URLSearchParams({ desde, hasta });
+  if (centro) params.set('centro', centro);
+  if (vacuna) params.set('vacuna', vacuna);
+
+  fetch('/admin/api/reporte-datos?' + params)
+    .then(r => r.json())
+    .then(data => {
+      document.getElementById('res-periodo').textContent = desde + ' → ' + hasta;
+      document.getElementById('res-total').textContent   = data.total ?? 0;
+
+      // Chart: por mes
+      if (chartMes) { try { chartMes.destroy(); } catch(e){} }
+      if (!data.por_mes.length) { emptyChart('chart-por-mes', 'Sin datos para el período seleccionado.'); }
+      else {
+        chartMes = Highcharts.chart('chart-por-mes', {
+          chart: { type:'column', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
+          title: { text:null }, credits:{enabled:false},
+          xAxis: { categories: data.por_mes.map(r => r.mes), labels:{style:{fontSize:'11px'}} },
+          yAxis: { min:0, title:{text:'Aplicaciones'}, allowDecimals:false },
+          legend: { enabled:false },
+          tooltip: { valueSuffix:' aplicaciones' },
+          series: [{ name:'Aplicaciones', data: data.por_mes.map(r => r.total),
+            color:'#7C3AED', dataLabels:{enabled:true,style:{fontSize:'10px'}} }],
+          plotOptions: { column:{borderRadius:4} }
+        });
+      }
+
+      // Chart: top vacunas
+      if (chartVac) { try { chartVac.destroy(); } catch(e){} }
+      if (!data.top_vacunas.length) { emptyChart('chart-top-vacunas', 'Sin datos para el período seleccionado.'); }
+      else {
+        chartVac = Highcharts.chart('chart-top-vacunas', {
+          chart: { type:'pie', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
+          title: { text:null }, credits:{enabled:false},
+          tooltip: { pointFormat:'<b>{point.y}</b> aplicaciones ({point.percentage:.1f}%)' },
+          legend: { enabled:true, layout:'vertical', align:'right', verticalAlign:'middle',
+            itemStyle:{fontSize:'11px',fontWeight:'500'} },
+          plotOptions: { pie: { allowPointSelect:true, cursor:'pointer', showInLegend:true,
+            dataLabels:{enabled:false}, innerSize:'40%' } },
+          series: [{ name:'Aplicaciones', colorByPoint:true,
+            data: data.top_vacunas.map((r,i) => ({ name:r.vacuna_nombre, y:r.total, color:HC_COLORS[i%HC_COLORS.length] })) }],
+        });
+      }
+    })
+    .catch(err => console.error('Error cargando reporte:', err));
+}
+
+['filter-desde','filter-hasta','filter-centro','filter-vacuna'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', fetchReporteData);
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// TAB 3: ANÁLISIS AVANZADO
+// ═════════════════════════════════════════════════════════════════════════════
+function loadAvanzado() {
+  loadMongoCharts();
   loadRanking();
   loadCobertura();
   loadUrgencias();
   document.getElementById('sel-meses-ranking').addEventListener('change', loadRanking);
   document.getElementById('sel-esquema-cob').addEventListener('change', loadCobertura);
   document.getElementById('sel-centro-urg').addEventListener('change', loadUrgencias);
-});
+}
+
+// MongoDB charts ──────────────────────────────────────────────────────────────
+function loadMongoCharts() {
+  fetch('/admin/api/mongo/aplicaciones-por-mes')
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){emptyChart('chart-serie-tiempo','Sin datos aún.');return;}
+      Highcharts.chart('chart-serie-tiempo',{
+        chart:{type:'areaspline',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        xAxis:{categories:data.map(d=>d.label),labels:{style:{fontSize:'11px'}}},
+        yAxis:{min:0,title:{text:'Aplicaciones'},allowDecimals:false},
+        tooltip:{shared:true,valueSuffix:' aplicaciones'},legend:{enabled:false},
+        series:[{name:'Aplicaciones',data:data.map(d=>d.total),color:'#7C3AED',
+          fillColor:{linearGradient:{x1:0,y1:0,x2:0,y2:1},stops:[[0,'rgba(124,58,237,0.35)'],[1,'rgba(124,58,237,0.02)']]},
+          marker:{enabled:true,radius:4}}],
+        plotOptions:{areaspline:{dataLabels:{enabled:true,style:{fontSize:'10px'}}}}
+      });
+    }).catch(()=>emptyChart('chart-serie-tiempo','Error al conectar con MongoDB.'));
+
+  fetch('/admin/api/mongo/top-vacunas')
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){emptyChart('chart-vacunas-pie','Sin datos aún.');return;}
+      Highcharts.chart('chart-vacunas-pie',{
+        chart:{type:'pie',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        tooltip:{pointFormat:'<b>{point.y}</b> aplicaciones ({point.percentage:.1f}%)'},
+        legend:{enabled:true,layout:'vertical',align:'right',verticalAlign:'middle',itemStyle:{fontSize:'11px',fontWeight:'500'}},
+        plotOptions:{pie:{allowPointSelect:true,cursor:'pointer',showInLegend:true,dataLabels:{enabled:false},innerSize:'40%'}},
+        series:[{name:'Aplicaciones',colorByPoint:true,
+          data:data.map((d,i)=>({name:d.vacuna,y:d.total,color:HC_COLORS[i%HC_COLORS.length]}))}],
+      });
+    }).catch(()=>emptyChart('chart-vacunas-pie','Error al conectar con MongoDB.'));
+
+  fetch('/admin/api/mongo/aplicaciones-por-centro')
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){emptyChart('chart-centros-bar','Sin datos aún.');return;}
+      Highcharts.chart('chart-centros-bar',{
+        chart:{type:'bar',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        xAxis:{categories:data.map(d=>d.centro),labels:{style:{fontSize:'11px'}}},
+        yAxis:{min:0,title:{text:null},allowDecimals:false},
+        legend:{enabled:false},tooltip:{valueSuffix:' aplicaciones'},
+        series:[{name:'Aplicaciones',data:data.map((d,i)=>({y:d.total,color:HC_COLORS[i%HC_COLORS.length]})),
+          dataLabels:{enabled:true,style:{fontSize:'10px'}}}],
+        plotOptions:{bar:{borderRadius:3}}
+      });
+    }).catch(()=>emptyChart('chart-centros-bar','Error al conectar con MongoDB.'));
+
+  fetch('/admin/api/mongo/ultimos-accesos')
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){emptyChart('chart-accesos-donut','Sin datos aún.');return;}
+      const counts={};
+      data.forEach(d=>{const rol=d.rol||'desconocido';counts[rol]=(counts[rol]||0)+1;});
+      const series=Object.entries(counts).map(([rol,total],i)=>({name:rol,y:total,color:HC_COLORS[i%HC_COLORS.length]}));
+      Highcharts.chart('chart-accesos-donut',{
+        chart:{type:'pie',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        tooltip:{pointFormat:'<b>{point.y}</b> accesos recientes'},
+        plotOptions:{pie:{innerSize:'55%',allowPointSelect:true,cursor:'pointer',showInLegend:true,
+          dataLabels:{enabled:true,format:'{point.name}<br>{point.y}',style:{fontSize:'11px',fontWeight:'500'}}}},
+        legend:{enabled:true,layout:'vertical',align:'right',verticalAlign:'middle',itemStyle:{fontSize:'11px'}},
+        series:[{name:'Accesos',colorByPoint:true,data:series}],
+      });
+      // tabla accesos
+      const tbody=document.getElementById('accesos-tbody');
+      tbody.innerHTML=data.map(d=>{
+        const ts=d.timestamp?new Date(d.timestamp).toLocaleString('es-MX'):'—';
+        const ev=d.evento==='login'?'<span class="badge badge-success">login</span>'
+                :d.evento==='logout'?'<span class="badge badge-secondary">logout</span>'
+                :'<span class="badge badge-danger">fallido</span>';
+        return `<tr><td class="fs-sm" style="font-family:monospace">${ts}</td><td>${ev}</td>
+          <td class="fs-sm">${d.email||'—'}</td>
+          <td>${d.rol?`<span class="badge badge-primary">${d.rol}</span>`:'—'}</td>
+          <td class="fs-sm text-muted">${d.ip||'—'}</td></tr>`;
+      }).join('');
+    }).catch(()=>emptyChart('chart-accesos-donut','Error al conectar con MongoDB.'));
+
+  fetch('/admin/api/mongo/resumen-logs')
+    .then(r=>r.json()).then(data=>{
+      document.getElementById('badge-aplicaciones').textContent=data.aplicaciones+' aplicaciones';
+      document.getElementById('badge-accesos').textContent=data.accesos+' accesos';
+      document.getElementById('badge-inventario').textContent=data.inventario+' inventario';
+      const cols=[
+        {name:'logs_aplicaciones',y:data.aplicaciones,color:'#7C3AED'},
+        {name:'logs_acceso',      y:data.accesos,      color:'#2563EB'},
+        {name:'eventos_inventario',y:data.inventario,  color:'#D97706'},
+        {name:'logs_sistema',     y:data.sistema,      color:'#16A34A'},
+        {name:'eventos_beacon',   y:data.beacon||0,    color:'#0891B2'},
+        {name:'busquedas_gps',    y:data.gps||0,       color:'#BE185D'},
+      ];
+      Highcharts.chart('chart-colecciones',{
+        chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        xAxis:{categories:cols.map(c=>c.name),labels:{style:{fontSize:'11px'}}},
+        yAxis:{min:0,title:{text:'Documentos'},allowDecimals:false},
+        legend:{enabled:false},tooltip:{valueSuffix:' documentos'},
+        series:[{name:'Documentos',colorByPoint:true,data:cols,
+          dataLabels:{enabled:true,style:{fontSize:'11px',fontWeight:'600'}}}],
+        plotOptions:{column:{borderRadius:4}}
+      });
+    }).catch(()=>emptyChart('chart-colecciones','Error al conectar con MongoDB.'));
+}
+
+// PostgreSQL temp-table reports ───────────────────────────────────────────────
+function loadRanking() {
+  const meses=document.getElementById('sel-meses-ranking').value;
+  fetch('/admin/api/ranking-centros?meses='+meses)
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){emptyChart('chart-ranking-centros','Sin datos de aplicaciones aún.');return;}
+      Highcharts.chart('chart-ranking-centros',{
+        chart:{type:'bar',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        xAxis:{categories:data.map(d=>d.centro_nombre),labels:{style:{fontSize:'11px'}}},
+        yAxis:{min:0,title:{text:'Aplicaciones'},allowDecimals:false},
+        legend:{enabled:false},tooltip:{valueSuffix:' aplicaciones en el período'},
+        series:[{name:'Aplicaciones',data:data.map((d,i)=>({y:d.aplicaciones_periodo,color:HC_COLORS[i%HC_COLORS.length]})),
+          dataLabels:{enabled:true,style:{fontSize:'10px'}}}],
+        plotOptions:{bar:{borderRadius:3}}
+      });
+      document.getElementById('tbody-ranking').innerHTML=data.map(d=>`
+        <tr><td class="fw-600">${d.ranking}</td><td class="fw-600">${d.centro_nombre}</td>
+        <td class="text-muted fs-sm">${d.ciudad_nombre}</td><td>${d.aplicaciones_periodo}</td>
+        <td>${d.pacientes_atendidos}</td><td>${d.dias_con_actividad}</td>
+        <td><span class="badge badge-primary">${d.pct_del_total??0}%</span></td></tr>`).join('');
+    }).catch(()=>emptyChart('chart-ranking-centros','Error al obtener datos.'));
+}
+
+function loadCobertura() {
+  const eid=document.getElementById('sel-esquema-cob').value;
+  fetch('/admin/api/cobertura-vacunal?esquema_id='+eid)
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){emptyChart('chart-cobertura','Sin dosis en este esquema.');return;}
+      const labels=data.map(d=>d.vacuna_nombre+' ('+d.dosis_tipo+')');
+      const vals=data.map(d=>d.pct_cobertura??0);
+      const colors=data.map(d=>d.nivel_cobertura==='ALTA'?'#16A34A':d.nivel_cobertura==='MEDIA'?'#D97706':'#DC2626');
+      Highcharts.chart('chart-cobertura',{
+        chart:{type:'column',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:null},credits:{enabled:false},
+        xAxis:{categories:labels,labels:{style:{fontSize:'10px'},rotation:-20}},
+        yAxis:{min:0,max:100,title:{text:'% Cobertura'},
+          plotLines:[{value:80,color:'#16A34A',dashStyle:'Dash',width:2,label:{text:'Meta 80%',style:{color:'#16A34A'}}},
+                     {value:50,color:'#D97706',dashStyle:'Dash',width:1}]},
+        legend:{enabled:false},tooltip:{valueSuffix:'% de cobertura'},
+        series:[{name:'Cobertura',colorByPoint:true,data:vals.map((v,i)=>({y:v,color:colors[i]})),
+          dataLabels:{enabled:true,format:'{point.y:.1f}%',style:{fontSize:'10px'}}}],
+        plotOptions:{column:{borderRadius:3}}
+      });
+      document.getElementById('tbody-cobertura').innerHTML=data.map(d=>`
+        <tr><td class="fw-600">${d.vacuna_nombre}</td><td class="fs-sm">${d.dosis_tipo}</td>
+        <td class="fs-sm">${d.dosis_edad_oportuna_dias} días</td><td>${d.total_pacientes}</td>
+        <td>${d.pacientes_con_dosis}</td><td><strong>${d.pct_cobertura??0}%</strong></td>
+        <td><span class="badge ${NIVEL_BADGE[d.nivel_cobertura]||'badge-secondary'}">${d.nivel_cobertura}</span></td></tr>`).join('');
+    }).catch(()=>emptyChart('chart-cobertura','Error al obtener datos.'));
+}
+
+function loadUrgencias() {
+  const cid=document.getElementById('sel-centro-urg').value;
+  fetch('/admin/api/dosis-urgentes'+(cid?'?centro_id='+cid:''))
+    .then(r=>r.json()).then(data=>{
+      if(!data.length){
+        emptyChart('chart-urgencias','Sin dosis atrasadas. ¡Todos los pacientes están al día!');
+        document.getElementById('tbody-urgencias').innerHTML='<tr><td colspan="7" class="text-center text-muted" style="padding:24px">Sin pacientes con dosis atrasadas.</td></tr>';
+        return;
+      }
+      const criticos=data.filter(d=>d.nivel_urgencia==='CRITICO').length;
+      const urgentes=data.filter(d=>d.nivel_urgencia==='URGENTE').length;
+      const pendientes=data.filter(d=>d.nivel_urgencia==='PENDIENTE').length;
+      Highcharts.chart('chart-urgencias',{
+        chart:{type:'pie',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
+        title:{text:data.length+' pacientes con dosis atrasadas',style:{fontSize:'13px'}},
+        credits:{enabled:false},
+        tooltip:{pointFormat:'<b>{point.y}</b> pacientes ({point.percentage:.1f}%)'},
+        plotOptions:{pie:{innerSize:'50%',dataLabels:{enabled:true,format:'{point.name}: {point.y}'}}},
+        series:[{name:'Urgencia',colorByPoint:true,data:[
+          {name:'Crítico (>60 días)',y:criticos,color:'#DC2626'},
+          {name:'Urgente (30-60 días)',y:urgentes,color:'#D97706'},
+          {name:'Pendiente (<30 días)',y:pendientes,color:'#7C3AED'},
+        ]}]
+      });
+      document.getElementById('tbody-urgencias').innerHTML=data.map(d=>`
+        <tr><td class="fw-600">${d.ranking_urgencia}</td><td class="fw-600">${d.paciente_nombre}</td>
+        <td class="fs-sm">${d.vacuna_nombre}</td><td class="fs-sm">${d.dosis_tipo}</td>
+        <td><strong style="color:${d.nivel_urgencia==='CRITICO'?'var(--danger)':d.nivel_urgencia==='URGENTE'?'var(--warning)':'var(--primary)'}">${d.dias_atraso} días</strong></td>
+        <td class="fs-sm text-muted">${d.dias_para_limite??'—'}</td>
+        <td><span class="badge ${NIVEL_BADGE[d.nivel_urgencia]}">${d.nivel_urgencia}</span></td></tr>`).join('');
+    }).catch(()=>emptyChart('chart-urgencias','Error al obtener datos.'));
+}
 
 </script>
 {% endblock %}

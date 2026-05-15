@@ -1600,7 +1600,20 @@ def analytics():
         return redir
     return render_template('admin/analytics.html',
                            esquemas=repo.listar_esquemas(),
-                           centros=repo.listar_centros())
+                           centros=repo.listar_centros(),
+                           vacunas=repo.listar_vacunas())
+
+
+@admin_bp.route('/admin/api/kpis')
+def api_kpis():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data = repo.kpis_generales()
+    except Exception:
+        data = {}
+    return jsonify(data)
 
 
 @admin_bp.route('/admin/api/ranking-centros')
@@ -1656,13 +1669,7 @@ def api_dosis_urgentes():
 
 @admin_bp.route('/admin/reportes')
 def reportes():
-    redir = _require_admin()
-    if redir:
-        return redir
-    return render_template('admin/reportes.html',
-                           centros=repo.listar_centros(),
-                           vacunas=repo.listar_vacunas(),
-                           esquemas=repo.listar_esquemas())
+    return redirect(url_for('admin.analytics'))
 
 
 @admin_bp.route('/admin/api/reporte-datos')

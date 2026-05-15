@@ -142,37 +142,35 @@ BEGIN
 
     -- CADUCADO
     INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
-    SELECT i.inventario_id, 'CADUCADO'::tipo_alerta_inv
-    FROM   inventarios i
-    JOIN   lotes        l ON l.lote_id = i.lote_id
-    WHERE  l.lote_fecha_caducidad < CURRENT_DATE
-      AND  i.inventario_stock_actual > 0;
+    SELECT inventario_id, 'CADUCADO'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  lote_fecha_caducidad < CURRENT_DATE
+      AND  inventario_stock_actual > 0;
     GET DIAGNOSTICS v_total = ROW_COUNT;
 
     -- CERCA_CADUCAR
     INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
-    SELECT i.inventario_id, 'CERCA_CADUCAR'::tipo_alerta_inv
-    FROM   inventarios i
-    JOIN   lotes        l ON l.lote_id = i.lote_id
-    WHERE  l.lote_fecha_caducidad >= CURRENT_DATE
-      AND  l.lote_fecha_caducidad <= CURRENT_DATE + p_dias_caducidad
-      AND  i.inventario_stock_actual > 0;
+    SELECT inventario_id, 'CERCA_CADUCAR'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  lote_fecha_caducidad >= CURRENT_DATE
+      AND  lote_fecha_caducidad <= CURRENT_DATE + p_dias_caducidad
+      AND  inventario_stock_actual > 0;
 
     -- AGOTADO
     INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
-    SELECT i.inventario_id, 'AGOTADO'::tipo_alerta_inv
-    FROM   inventarios i
-    WHERE  i.inventario_stock_actual = 0
-      AND  i.inventario_activo_desde IS NOT NULL;
+    SELECT inventario_id, 'AGOTADO'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  inventario_stock_actual = 0
+      AND  inventario_activo_desde IS NOT NULL;
 
     -- CERCA_AGOTAR: < 20% del stock inicial
     INSERT INTO alertas_inventario(inventario_id, alerta_inv_tipo)
-    SELECT i.inventario_id, 'CERCA_AGOTAR'::tipo_alerta_inv
-    FROM   inventarios i
-    WHERE  i.inventario_stock_inicial > 0
-      AND  i.inventario_stock_actual > 0
-      AND  (i.inventario_stock_actual::numeric / i.inventario_stock_inicial) < 0.20
-      AND  i.inventario_activo_desde IS NOT NULL;
+    SELECT inventario_id, 'CERCA_AGOTAR'::tipo_alerta_inv
+    FROM   vw_inventarios
+    WHERE  inventario_stock_inicial > 0
+      AND  inventario_stock_actual > 0
+      AND  (inventario_stock_actual::numeric / inventario_stock_inicial) < 0.20
+      AND  inventario_activo_desde IS NOT NULL;
 
     p_ok := 1; p_msg := 'Alertas de inventario recalculadas correctamente.';
 EXCEPTION

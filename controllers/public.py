@@ -30,10 +30,13 @@ def _require_tutor():
 
 @public_bp.route('/')
 def landing():
+    dash  = repo.stats_dashboard()
+    total = repo.resumen_periodo('2000-01-01', '2099-12-31')['total']
     stats = {
-        'aplicaciones': len(repo.listar_aplicaciones()),
-        'centros':       len(repo.listar_centros()),
-        'esquemas':      len(repo.listar_esquemas()),
+        'aplicaciones': total,
+        'centros':      int(dash.get('centros', 0)),
+        'vacunas':      len(repo.listar_vacunas()),
+        'esquemas':     len(repo.listar_esquemas()),
     }
     return render_template('public/landing.html', stats=stats)
 
@@ -59,11 +62,46 @@ def scheme_doses(esquema_id):
 def api_stats_publicas():
     desde = '2000-01-01'
     hasta = '2099-12-31'
-    por_mes    = repo.chart_por_mes(desde, hasta)
+    por_mes     = repo.chart_por_mes(desde, hasta)
     top_vacunas = repo.chart_top_vacunas(desde, hasta)
     for r in por_mes:
         r.pop('mes_orden', None)
-    return jsonify({'por_mes': por_mes, 'top_vacunas': top_vacunas})
+
+    vacunas_raw = repo.listar_vacunas()
+    vacunas = [
+        {
+            'vacuna_nombre':     v.get('vacuna_nombre', ''),
+            'padecimientos':     v.get('padecimientos', '—'),
+            'total_aplicaciones': int(v.get('total_aplicaciones') or 0),
+        }
+        for v in vacunas_raw
+    ]
+
+    centros_raw = repo.listar_centros()
+    centros = [
+        {
+            'centro_nombre':      c.get('centro_nombre', ''),
+            'ciudad_nombre':      c.get('ciudad_nombre', ''),
+            'estado_nombre':      c.get('estado_nombre', ''),
+            'total_aplicaciones': int(c.get('total_aplicaciones') or 0),
+        }
+        for c in centros_raw
+    ]
+
+    # Centros por estado para gráfica de barras
+    estados: dict[str, int] = {}
+    for c in centros_raw:
+        est = c.get('estado_nombre') or 'Sin estado'
+        estados[est] = estados.get(est, 0) + 1
+    centros_por_estado = [{'estado': k, 'total': v} for k, v in sorted(estados.items())]
+
+    return jsonify({
+        'por_mes':           por_mes,
+        'top_vacunas':       top_vacunas,
+        'vacunas':           vacunas,
+        'centros':           centros,
+        'centros_por_estado': centros_por_estado,
+    })
 
 
 @public_bp.route('/tutor')

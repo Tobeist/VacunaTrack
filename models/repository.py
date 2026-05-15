@@ -867,3 +867,28 @@ def actualizar_imagen_usuario(usuario_id: int, ruta: str) -> None:
 
 def actualizar_imagen_paciente(paciente_id: int, ruta: str) -> None:
     _sp('sp_actualizar_imagen_paciente', [paciente_id, ruta], out_count=2)
+
+
+# ─────────────────────────────────────────────
+# KPIs
+# ─────────────────────────────────────────────
+
+def kpis_generales() -> dict:
+    row = db.call_read_sp_one('sp_kpis_generales')
+    if not row:
+        return {}
+    int_keys = [
+        'total_pacientes', 'total_tutores', 'total_responsables',
+        'total_centros', 'centros_activos_30d', 'total_aplicaciones',
+        'aplicaciones_hoy', 'aplicaciones_mes', 'pacientes_sin_aplicaciones',
+        'total_vacunas', 'total_esquemas', 'total_padecimientos',
+        'lotes_activos', 'lotes_por_caducar_30d', 'lotes_caducados_con_stock',
+        'total_alertas_inv', 'total_alertas_dosis',
+    ]
+    for k in int_keys:
+        if row.get(k) is not None:
+            row[k] = int(row[k])
+    for k in ('pct_cobertura_global', 'promedio_diario_mes', 'pct_centros_activos_30d'):
+        if row.get(k) is not None:
+            row[k] = float(row[k])
+    return row
