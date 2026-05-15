@@ -287,7 +287,7 @@
 </div>
 
 {# ── Modal Editar ─────────────────────────────────────────────────────── #}
-<div class="modal-overlay" id="modal-editar-usuario" style="display:none">
+<div class="modal-overlay" id="modal-editar-usuario">
   <div class="modal" style="max-width:580px">
     <div class="modal-header">
       <span class="modal-title">✏️ Editar Usuario</span>
@@ -500,15 +500,12 @@ function openEditModal(data) {
     addCedulaRow(container, cd.cedula_numero || '', cd.cedula_especialidad || ''));
 
   syncConditionals('editar');
-  document.getElementById('modal-editar-usuario').style.display = 'flex';
+  document.getElementById('modal-editar-usuario').classList.add('open');
 }
 
 function closeEditModal() {
-  document.getElementById('modal-editar-usuario').style.display = 'none';
+  document.getElementById('modal-editar-usuario').classList.remove('open');
 }
-document.getElementById('modal-editar-usuario').addEventListener('click', function(e) {
-  if (e.target === this) closeEditModal();
-});
 
 /* Aplicar filtro activos por defecto al cargar */
 filterUsuarios();
