@@ -344,6 +344,9 @@ def usuarios():
                 datos['cedulas_specs'] = f.getlist('cedulas_specs[]')[:len(datos['cedulas_nums'])]
                 if not datos['cedulas_nums']:
                     raise FormError('Debes registrar al menos una cédula profesional.')
+                for num in datos['cedulas_nums']:
+                    if not _re.fullmatch(r'\d{7,8}', num):
+                        raise FormError(f'Cédula "{num}" inválida. Debe contener 7 u 8 dígitos.')
             nuevo = repo.crear_usuario(datos)
             file = request.files.get('foto')
             if file and file.filename and _allowed_file(file.filename):
@@ -393,6 +396,9 @@ def editar_usuario(uid):
             datos['cedulas_specs'] = f.getlist('cedulas_specs[]')[:len(datos['cedulas_nums'])]
             if not datos['cedulas_nums']:
                 raise FormError('Debes registrar al menos una cédula profesional.')
+            for num in datos['cedulas_nums']:
+                if not _re.fullmatch(r'\d{7,8}', num):
+                    raise FormError(f'Cédula "{num}" inválida. Debe contener 7 u 8 dígitos.')
         repo.actualizar_usuario(uid, datos)
         file = request.files.get('foto')
         if file and file.filename and _allowed_file(file.filename):
