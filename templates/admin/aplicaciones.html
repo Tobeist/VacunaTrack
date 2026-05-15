@@ -41,12 +41,22 @@
           </select>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Lote <span class="required">*</span></label>
-          <select name="inventario_id" id="sel-inv-admin" class="form-select" required disabled>
-            <option value="">— Selecciona dosis primero —</option>
-          </select>
-          <div id="inv-hint-admin" class="form-hint" style="display:none"></div>
+        <div class="form-row form-row-2">
+          <div class="form-group">
+            <label class="form-label">Código de lote <span class="required">*</span></label>
+            <input type="text" name="lote_codigo" class="form-control"
+                   placeholder="Ej: LOTE-2024-001" style="text-transform:uppercase" required>
+            <p class="form-hint">El lote debe estar registrado en el sistema.</p>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Centro de salud <span class="required">*</span></label>
+            <select name="centro_id" class="form-select" required>
+              <option value="">— Selecciona centro —</option>
+              {% for c in centros %}
+              <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
@@ -171,44 +181,6 @@
 
 {% block extra_js %}
 <script>
-const SEL_DOSIS_A = document.getElementById('sel-dosis-admin');
-const SEL_INV_A   = document.getElementById('sel-inv-admin');
-const INV_HINT_A  = document.getElementById('inv-hint-admin');
-
-async function cargarLotesAdmin(dosisId) {
-  if (!dosisId) {
-    SEL_INV_A.innerHTML = '<option value="">— Selecciona dosis primero —</option>';
-    SEL_INV_A.disabled = true;
-    INV_HINT_A.style.display = 'none';
-    return;
-  }
-  SEL_INV_A.innerHTML = '<option value="">Cargando…</option>';
-  SEL_INV_A.disabled = true;
-  INV_HINT_A.style.display = 'none';
-  try {
-    const res  = await fetch(`/admin/api/inventarios-para-dosis/${dosisId}`);
-    const data = await res.json();
-    if (data.length === 0) {
-      SEL_INV_A.innerHTML = '<option value="">Sin lotes disponibles</option>';
-      INV_HINT_A.textContent = 'No hay lotes activos con stock para esta vacuna. Registra un lote nuevo.';
-      INV_HINT_A.style.display = 'block';
-      INV_HINT_A.classList.add('text-danger');
-      return;
-    }
-    SEL_INV_A.innerHTML = '<option value="">— Selecciona lote —</option>';
-    data.forEach(inv => {
-      const opt = document.createElement('option');
-      opt.value = inv.inventario_id;
-      opt.textContent = `Lote ${inv.lote_codigo} — ${inv.centro_nombre} (${inv.stock} dosis · cad. ${inv.lote_caducidad || 's/f'})`;
-      SEL_INV_A.appendChild(opt);
-    });
-    SEL_INV_A.disabled = false;
-  } catch (e) {
-    SEL_INV_A.innerHTML = '<option value="">Error al cargar lotes</option>';
-  }
-}
-
-SEL_DOSIS_A.addEventListener('change', () => cargarLotesAdmin(SEL_DOSIS_A.value));
 
 function _fieldA(label, value, mono, fullWidth) {
   const gs = fullWidth ? 'grid-column:1/-1' : '';

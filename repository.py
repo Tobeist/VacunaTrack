@@ -332,6 +332,20 @@ def registrar_aplicacion(datos: dict) -> dict:
     return db.call_read_sp_one('sp_obtener_aplicacion', [r['p_id']]) or {}
 
 
+def registrar_aplicacion_retroactiva(datos: dict) -> dict:
+    """
+    datos: paciente_id, usuario_id, centro_id, lote_codigo (texto), dosis_id,
+           aplicacion_observaciones.
+    No valida ni descuenta inventario (aplicacion_es_retroactiva=TRUE).
+    """
+    r = _sp('sp_registrar_aplicacion_retroactiva', [
+        datos['paciente_id'], datos['usuario_id'], datos['centro_id'],
+        datos['lote_codigo'], datos['dosis_id'],
+        datos.get('aplicacion_observaciones'),
+    ])
+    return db.call_read_sp_one('sp_obtener_aplicacion', [r['p_id']]) or {}
+
+
 def obtener_aplicacion(aplicacion_id: int) -> dict | None:
     return db.call_read_sp_one('sp_obtener_aplicacion', [aplicacion_id])
 

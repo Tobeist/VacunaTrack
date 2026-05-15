@@ -1286,26 +1286,11 @@ def aplicaciones():
     if request.method == 'POST':
         f = request.form
         try:
-            inventario_id = _get_int(f, 'inventario_id', 'inventario',  required=True)
-            pid           = _get_int(f, 'paciente_id',   'paciente',    required=True)
-            did           = _get_int(f, 'dosis_id',      'dosis',       required=True)
-            resp_id       = _get_int(f, 'responsable_id', 'responsable', required=True)
-
-            inv = repo.obtener_inventario(inventario_id)
-            if not inv:
-                raise FormError('El inventario seleccionado no existe.')
-            if not inv.get('inventario_activo') or (inv.get('inventario_stock_actual') or 0) <= 0:
-                raise FormError('No hay stock disponible en el inventario seleccionado.')
-
-            cad = inv.get('lote_fecha_caducidad')
-            if cad and isinstance(cad, date) and cad < date.today():
-                raise FormError(
-                    f'El lote caducó el {cad.strftime("%d/%m/%Y")}. No se puede aplicar una vacuna caducada.'
-                )
-
-            if repo.dosis_ya_aplicada(pid, did):
-                repo.registrar_alerta_dosis(pid, did, 'FALTANTE')
-                raise FormError('Esta dosis ya fue aplicada anteriormente a este paciente.')
+            pid        = _get_int(f, 'paciente_id',   'paciente',    required=True)
+            did        = _get_int(f, 'dosis_id',      'dosis',       required=True)
+            resp_id    = _get_int(f, 'responsable_id', 'responsable', required=True)
+            centro_id  = _get_int(f, 'centro_id',     'centro de salud', required=True)
+            lote_codigo = _get_str(f, 'lote_codigo',  'código de lote', required=True)
 
             pac = repo.obtener_paciente(pid)
             dos = repo.obtener_dosis(did)
@@ -1314,39 +1299,37 @@ def aplicaciones():
             if not dos:
                 raise FormError('La dosis seleccionada no existe.')
 
-            aplicaciones_previas = repo.aplicaciones_de_paciente(pid)
-            ok, error_msg = validar_aplicacion(pac, dos, aplicaciones_previas)
-            if not ok:
-                tipo_alerta = 'ATRASADA' if 'límite' in (error_msg or '').lower() else 'FALTANTE'
-                repo.registrar_alerta_dosis(pid, did, tipo_alerta)
-                raise FormError(error_msg)
+            if repo.dosis_ya_aplicada(pid, did):
+                repo.registrar_alerta_dosis(pid, did, 'FALTANTE')
+                raise FormError('Esta dosis ya fue aplicada anteriormente a este paciente.')
 
             datos = {
                 'paciente_id':              pid,
                 'usuario_id':               resp_id,
-                'centro_id':                inv['centro_id'],
-                'lote_id':                  inv['lote_id'],
+                'centro_id':                centro_id,
+                'lote_codigo':              lote_codigo.strip().upper(),
                 'dosis_id':                 did,
                 'aplicacion_observaciones': _get_str(f, 'observaciones', 'observaciones') or '',
             }
-            result = repo.registrar_aplicacion(datos)
+            result = repo.registrar_aplicacion_retroactiva(datos)
+            centro = repo.obtener_centro(centro_id)
             try:
                 mdb.log_aplicacion(
-                    pg_aplicacion_id=result.get('p_id') if result else None,
+                    pg_aplicacion_id=result.get('aplicacion_id') if result else None,
                     pg_paciente_id=pid,
                     pg_usuario_id=resp_id,
-                    pg_centro_id=inv['centro_id'],
-                    pg_lote_id=inv['lote_id'],
+                    pg_centro_id=centro_id,
+                    pg_lote_id=result.get('lote_id') if result else None,
                     pg_dosis_id=did,
                     vacuna_nombre=dos.get('vacuna_nombre', '—'),
                     paciente_nombre=f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}",
                     responsable_nombre=session.get('user_name', '—'),
-                    centro_nombre=inv.get('centro_nombre', '—'),
+                    centro_nombre=centro.get('centro_nombre', '—') if centro else '—',
                     observaciones=datos['aplicacion_observaciones'] or None,
                 )
             except Exception:
                 pass
-            flash('Aplicación registrada.', 'success')
+            flash('Aplicación retroactiva registrada.', 'success')
         except Exception as e:
             _flash_error(e)
         return redirect(url_for('admin.aplicaciones'))
@@ -1364,8 +1347,7 @@ def aplicaciones():
                            aplicaciones=repo.listar_aplicaciones(),
                            pacientes=repo.listar_pacientes(),
                            responsables=repo.listar_responsables(),
-                           inventarios=[i for i in repo.listar_inventarios()
-                                        if i['inventario_activo'] and i['inventario_stock_actual'] > 0],
+                           centros=repo.listar_centros(),
                            dosis_list=dosis_list)
 
 

@@ -501,6 +501,11 @@ RETURNS TRIGGER AS $$
 DECLARE
     v_inventario_id integer;
 BEGIN
+    -- Registros retroactivos/manuales no afectan inventario
+    IF NEW.aplicacion_es_retroactiva THEN
+        RETURN NEW;
+    END IF;
+
     SELECT inventario_id INTO v_inventario_id
     FROM inventarios
     WHERE centro_id                = NEW.centro_id
@@ -1756,6 +1761,44 @@ EXCEPTION
     WHEN OTHERS THEN p_ok := 0; p_msg := 'Error al registrar aplicación: ' || SQLERRM;
 END; $$;
 
+CREATE OR REPLACE PROCEDURE sp_registrar_aplicacion_retroactiva(
+    IN  p_paciente_id   INTEGER,
+    IN  p_usuario_id    INTEGER,
+    IN  p_centro_id     INTEGER,
+    IN  p_lote_codigo   VARCHAR(50),
+    IN  p_dosis_id      INTEGER,
+    IN  p_observaciones TEXT,
+    OUT p_ok SMALLINT, OUT p_msg VARCHAR(150), OUT p_id INTEGER)
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_lote_id INTEGER;
+BEGIN
+    SELECT lote_id INTO v_lote_id FROM lotes WHERE lote_codigo = TRIM(p_lote_codigo);
+    IF v_lote_id IS NULL THEN
+        p_ok := 0; p_msg := 'Lote no encontrado: ' || p_lote_codigo; RETURN;
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM pacientes WHERE paciente_id = p_paciente_id) THEN
+        p_ok := 0; p_msg := 'Paciente no encontrado'; RETURN;
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM dosis WHERE dosis_id = p_dosis_id) THEN
+        p_ok := 0; p_msg := 'Dosis no encontrada'; RETURN;
+    END IF;
+    IF NOT EXISTS(SELECT 1 FROM centros_salud WHERE centro_id = p_centro_id) THEN
+        p_ok := 0; p_msg := 'Centro de salud no encontrado'; RETURN;
+    END IF;
+    IF EXISTS(SELECT 1 FROM aplicaciones WHERE paciente_id = p_paciente_id AND dosis_id = p_dosis_id) THEN
+        p_ok := 0; p_msg := 'Esta dosis ya fue aplicada a este paciente'; RETURN;
+    END IF;
+    INSERT INTO aplicaciones(paciente_id, usuario_id, centro_id, lote_id, dosis_id,
+        aplicacion_timestamp, aplicacion_observaciones, aplicacion_es_retroactiva)
+    VALUES(p_paciente_id, p_usuario_id, p_centro_id, v_lote_id, p_dosis_id,
+           NOW(), p_observaciones, TRUE)
+    RETURNING aplicacion_id INTO p_id;
+    p_ok := 1; p_msg := 'Aplicación retroactiva registrada';
+EXCEPTION
+    WHEN OTHERS THEN p_ok := 0; p_msg := 'Error: ' || SQLERRM;
+END; $$;
+
 CREATE OR REPLACE PROCEDURE sp_asignar_inventario(
     IN  p_centro_id     INTEGER, IN  p_lote_id         INTEGER,
     IN  p_stock_inicial INTEGER, IN  p_stock_actual     INTEGER,
@@ -2881,3 +2924,10 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN p_ok := 0; p_msg := 'Error: ' || SQLERRM;
 END; $$;
+
+
+-- ─────────────────────────────────────────────────────────
+-- MIGRACIÓN: soporte de registros retroactivos de aplicaciones
+-- ─────────────────────────────────────────────────────────
+ALTER TABLE aplicaciones
+    ADD COLUMN IF NOT EXISTS aplicacion_es_retroactiva BOOLEAN NOT NULL DEFAULT FALSE;
