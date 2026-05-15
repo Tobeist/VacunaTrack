@@ -199,9 +199,15 @@ function renderPatientCard(data, containerId) {
   if (!container) return;
 
   const p = data.paciente;
+  const avatarHtml = p.imagen
+    ? `<img src="/static/${p.imagen}" alt="" style="width:68px;height:68px;border-radius:50%;object-fit:cover;border:3px solid rgba(255,255,255,0.3);flex-shrink:0">`
+    : `<div style="width:68px;height:68px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0">${p.sexo === 'M' ? '👦' : '👧'}</div>`;
   container.innerHTML = `
     <div class="patient-card mb-20">
-      <div class="pc-name">${p.nombre}</div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:8px">
+        ${avatarHtml}
+        <div class="pc-name" style="margin-bottom:0">${p.nombre}</div>
+      </div>
       <div class="pc-meta">
         <span>📅 Nacimiento: <strong>${formatDate(p.fecha_nac)}</strong></span>
         <span>🎂 Edad: <strong>${p.edad_texto}</strong></span>

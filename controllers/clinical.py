@@ -51,6 +51,7 @@ def _patient_response(paciente):
             'edad_texto': days_to_human(age_days),
             'sexo':       paciente['paciente_sexo'],
             'curp':       paciente.get('paciente_curp'),
+            'imagen':     paciente.get('paciente_imagen') or '',
         },
         'historial': historial,
     })
