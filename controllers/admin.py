@@ -345,8 +345,8 @@ def usuarios():
                 if not datos['cedulas_nums']:
                     raise FormError('Debes registrar al menos una cédula profesional.')
                 for num in datos['cedulas_nums']:
-                    if not _re.fullmatch(r'(AE-)?\d{5,8}', num):
-                        raise FormError(f'Cédula "{num}" inválida. Formato esperado: 5-8 dígitos o AE-#####.')
+                    if len(num) > 20:
+                        raise FormError(f'Cédula "{num}" excede el límite de 20 caracteres.')
             nuevo = repo.crear_usuario(datos)
             file = request.files.get('foto')
             if file and file.filename and _allowed_file(file.filename):
