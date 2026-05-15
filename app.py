@@ -55,5 +55,20 @@ def capitalize_filter(value):
     return value.title()
 
 
+_DOSIS_TIPO_LABELS = {
+    'UNICA':         'Única',
+    'SERIE_PRIMARIA': 'Serie primaria',
+    'REFUERZO':      'Refuerzo',
+    'ANUAL':         'Anual',
+    'ADICIONAL':     'Adicional',
+}
+
+@app.template_filter('dosis_label')
+def dosis_label_filter(value):
+    if not value:
+        return '—'
+    return _DOSIS_TIPO_LABELS.get(value, value.replace('_', ' ').title())
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
