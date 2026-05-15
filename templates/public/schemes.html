@@ -19,9 +19,9 @@
       {% if session.user_role == 'admin' %}
         {% set _dash = url_for('admin.dashboard') %}
       {% elif session.user_role == 'responsable' %}
-        {% set _dash = url_for('responsable.dashboard') %}
+        {% set _dash = url_for('clinical.lookup') %}
       {% else %}
-        {% set _dash = url_for('tutor.dashboard') %}
+        {% set _dash = url_for('public.tutor_dashboard') %}
       {% endif %}
       <a href="{{ _dash }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-gauge"></i> Mi Panel</a>
     {% else %}
