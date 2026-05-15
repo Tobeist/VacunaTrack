@@ -122,7 +122,7 @@
         <div class="su-name">{{ (session.user_name or 'Usuario')|cap }}</div>
         <div class="su-role">
           {% if session.user_role == 'admin' %}Administrador
-          {% elif session.user_role == 'responsable' %}Responsables
+          {% elif session.user_role == 'responsable' %}Responsable
           {% elif session.user_role == 'tutor' %}Tutor
           {% endif %}
         </div>
