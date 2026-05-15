@@ -15,7 +15,18 @@
   </a>
   <div style="display:flex;gap:12px">
     <a href="{{ url_for('public.landing') }}" class="btn btn-secondary btn-sm"><i class="fa-solid fa-arrow-left"></i> Inicio</a>
-    <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión</a>
+    {% if session.user_role %}
+      {% if session.user_role == 'admin' %}
+        {% set _dash = url_for('admin.dashboard') %}
+      {% elif session.user_role == 'responsable' %}
+        {% set _dash = url_for('responsable.dashboard') %}
+      {% else %}
+        {% set _dash = url_for('tutor.dashboard') %}
+      {% endif %}
+      <a href="{{ _dash }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-gauge"></i> Mi Panel</a>
+    {% else %}
+      <a href="{{ url_for('auth.login') }}" class="btn btn-primary btn-sm"><i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión</a>
+    {% endif %}
   </div>
 </nav>
 
@@ -121,7 +132,7 @@ function days_to_human(days) {
 // Buscar
 document.getElementById('scheme-search').addEventListener('input', function() {
   const q = this.value.toLowerCase();
-  document.querySelectorTodas('.scheme-row').forEach(row => {
+  document.querySelectorAll('.scheme-row').forEach(row => {
     row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 });
