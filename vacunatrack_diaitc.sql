@@ -988,7 +988,10 @@ CREATE OR REPLACE PROCEDURE sp_buscar_usuario_por_email(
 LANGUAGE plpgsql AS $$
 BEGIN
     OPEN p_resultados FOR
-        SELECT usuario_id AS id, email, password, first_name, last_name, role
+        SELECT usuario_id AS id, email, password,
+               INITCAP(first_name) AS first_name,
+               INITCAP(last_name)  AS last_name,
+               role
         FROM vw_usuarios_auth WHERE email = LOWER(TRIM(p_email))
         ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'responsable' THEN 1 ELSE 2 END
         LIMIT 1;
