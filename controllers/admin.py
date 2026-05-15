@@ -1274,6 +1274,7 @@ def inventario():
         return redirect(url_for('admin.inventario'))
 
     repo.recalcular_alertas_inventario()
+    repo.recalcular_alertas_dosis()
     return render_template('admin/inventario.html',
                            inventarios=repo.listar_inventarios(),
                            transferencias=repo.listar_transferencias(),

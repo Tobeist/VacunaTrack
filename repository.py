@@ -855,6 +855,16 @@ def listar_alertas_dosis() -> list[dict]:
     return db.call_read_sp('sp_listar_alertas_dosis')
 
 
+def alertas_dosis_de_pacientes(paciente_ids: list[int]) -> list[dict]:
+    if not paciente_ids:
+        return []
+    return db.query(
+        'SELECT * FROM vw_alertas_dosis WHERE paciente_id = ANY(%s) '
+        'ORDER BY alerta_dosis_pac_timestamp DESC',
+        (paciente_ids,)
+    )
+
+
 def recalcular_alertas_inventario(dias_caducidad: int = 30) -> None:
     """Pobla la tabla alertas_inventario según el estado actual de los lotes y stocks."""
     try:
@@ -867,6 +877,60 @@ def registrar_alerta_dosis(paciente_id: int, dosis_id: int, tipo: str) -> None:
     """Registra una alerta clínica para un paciente. tipo ∈ APLICABLE|ATRASADA|CERCA_LIMITE|FALTANTE."""
     try:
         db.call_write_sp('sp_registrar_alerta_dosis', [paciente_id, dosis_id, tipo], out_count=2)
+    except Exception:
+        pass
+
+
+def recalcular_alertas_dosis(paciente_ids: list[int] | None = None) -> None:
+    """Recalcula alertas de dosis según edad e intervalos.
+    Si paciente_ids es None, recalcula para todos los pacientes.
+    Si se pasa una lista, solo recalcula para esos pacientes.
+    """
+    from utils.helpers import (enrich_history,
+                               STATUS_APLICABLE, STATUS_ATRASADA,
+                               STATUS_CERCA_LIMITE, STATUS_FALTANTE)
+    _ALERTABLE = {STATUS_APLICABLE, STATUS_ATRASADA, STATUS_CERCA_LIMITE, STATUS_FALTANTE}
+    _TIPO = {
+        STATUS_APLICABLE:    'APLICABLE',
+        STATUS_ATRASADA:     'ATRASADA',
+        STATUS_CERCA_LIMITE: 'CERCA_LIMITE',
+        STATUS_FALTANTE:     'FALTANTE',
+    }
+    try:
+        if paciente_ids is None:
+            pacientes = listar_pacientes()
+        else:
+            pacientes = [obtener_paciente(pid) for pid in paciente_ids]
+            pacientes = [p for p in pacientes if p]
+
+        if not pacientes:
+            return
+
+        ids = [p['paciente_id'] for p in pacientes]
+        db.execute('DELETE FROM alertas_dosis_pacientes WHERE paciente_id = ANY(%s)', (ids,))
+
+        for pac in pacientes:
+            pid        = pac['paciente_id']
+            esquema_id = pac.get('esquema_id')
+            birth_date = pac.get('paciente_fecha_nac')
+            if not esquema_id or not birth_date:
+                continue
+            rows     = historial_vacunacion_paciente(pid, esquema_id)
+            enriched = enrich_history(rows, birth_date)
+            for row in enriched:
+                status  = row.get('status')
+                dosis_id = row.get('dosis_id')
+                if status not in _ALERTABLE or not dosis_id:
+                    continue
+                try:
+                    db.execute(
+                        "INSERT INTO alertas_dosis_pacientes"
+                        "(paciente_id, dosis_id, alerta_dosis_pac_tipo) "
+                        "VALUES (%s, %s, %s::tipo_alerta_dosis)",
+                        (pid, dosis_id, _TIPO[status])
+                    )
+                except Exception:
+                    pass
     except Exception:
         pass
 

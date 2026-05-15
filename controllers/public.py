@@ -110,7 +110,11 @@ def tutor_dashboard():
     if redir:
         return redir
     hijos = repo.pacientes_de_tutor(session['user_id'])
-    return render_template('public/tutor_dashboard.html', hijos=hijos)
+    ids_hijos = [h['paciente_id'] for h in hijos]
+    if ids_hijos:
+        repo.recalcular_alertas_dosis(ids_hijos)
+    alertas = repo.alertas_dosis_de_pacientes(ids_hijos)
+    return render_template('public/tutor_dashboard.html', hijos=hijos, alertas=alertas)
 
 
 @public_bp.route('/tutor/historial/<int:paciente_id>')
