@@ -125,6 +125,10 @@
                           "esquema":      p.esquema_nombre,
                           "imagen":       p.paciente_imagen or ""
                         } | tojson }}'>👁️</button>
+                <a href="{{ url_for('admin.historial_paciente', pid=p.paciente_id) }}"
+                   class="btn btn-secondary btn-sm" title="Ver historial">
+                  <i class="fa-solid fa-notes-medical"></i>
+                </a>
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-paciente-{{ p.paciente_id }}"
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">

@@ -545,6 +545,21 @@ def editar_paciente(pid):
     return redirect(url_for('admin.pacientes'))
 
 
+@admin_bp.route('/admin/pacientes/<int:pid>/historial')
+def historial_paciente(pid):
+    redir = _require_admin()
+    if redir:
+        return redir
+    paciente = repo.obtener_paciente(pid)
+    if not paciente:
+        flash('Paciente no encontrado.', 'error')
+        return redirect(url_for('admin.pacientes'))
+    aplicaciones = repo.aplicaciones_de_paciente(pid)
+    return render_template('admin/historial_paciente.html',
+                           paciente=paciente,
+                           aplicaciones=aplicaciones)
+
+
 @admin_bp.route('/admin/pacientes/<int:pid>/eliminar', methods=['POST'])
 def eliminar_paciente(pid):
     redir = _require_admin()
