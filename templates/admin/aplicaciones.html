@@ -85,6 +85,18 @@
             <td class="fs-sm">{{ a.centro_nombre }}</td>
             <td>
               <div style="display:flex;gap:6px">
+                <button class="btn btn-secondary btn-sm btn-detail-aplic" title="Ver detalle"
+                        data-det='{{ {
+                          "id":           a.aplicacion_id,
+                          "timestamp":    a.aplicacion_timestamp|format_datetime,
+                          "paciente":     a.paciente,
+                          "vacuna":       a.vacuna_nombre,
+                          "dosis_tipo":   a.dosis_tipo,
+                          "responsable":  a.responsable,
+                          "centro":       a.centro_nombre,
+                          "observaciones":a.aplicacion_observaciones or "",
+                          "lote":         a.lote_codigo or ""
+                        } | tojson }}'>👁️</button>
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-aplic-{{ a.aplicacion_id }}"
                         title="Editar observaciones">✏️</button>
                 <button class="btn btn-danger btn-sm" data-open-modal="anular-aplic-{{ a.aplicacion_id }}"
@@ -141,6 +153,19 @@
     </div>
   </div>
 
+  {# ── Modal Detalle Aplicación ─────────────────────────────────────────── #}
+  <div class="modal-overlay" id="modal-detalle-aplic">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <span class="modal-title">👁️ Detalle de Aplicación</span>
+        <button class="btn-close" onclick="document.getElementById('modal-detalle-aplic').classList.remove('open')">✕</button>
+      </div>
+      <div class="modal-body" id="detalle-aplic-body"></div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-aplic').classList.remove('open')">Cerrar</button>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 
@@ -184,5 +209,40 @@ async function cargarLotesAdmin(dosisId) {
 }
 
 SEL_DOSIS_A.addEventListener('change', () => cargarLotesAdmin(SEL_DOSIS_A.value));
+
+function _fieldA(label, value, mono, fullWidth) {
+  const gs = fullWidth ? 'grid-column:1/-1' : '';
+  const vs = mono ? 'font-family:monospace;font-size:0.875rem' : 'font-size:0.875rem';
+  return `<div style="${gs}">
+    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:3px">${label}</div>
+    <div style="${vs}">${value || '—'}</div>
+  </div>`;
+}
+
+function openDetailModalAplic(d) {
+  document.getElementById('detalle-aplic-body').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border-light);margin-bottom:16px">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--success-light);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">💉</div>
+      <div>
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px">${d.vacuna}</div>
+        <span class="badge badge-aplicada">${d.dosis_tipo}</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 20px">
+      ${_fieldA('Fecha y hora', d.timestamp, false, true)}
+      ${_fieldA('Paciente', d.paciente)}
+      ${_fieldA('Responsable', d.responsable)}
+      ${_fieldA('Centro', d.centro, false, true)}
+      ${_fieldA('Lote', d.lote, true)}
+      ${_fieldA('Observaciones', d.observaciones
+          ? `<span style="white-space:pre-wrap">${d.observaciones}</span>`
+          : '<span class="text-muted">Sin observaciones</span>', false, true)}
+    </div>`;
+  document.getElementById('modal-detalle-aplic').classList.add('open');
+}
+
+document.querySelectorAll('.btn-detail-aplic').forEach(btn => {
+  btn.addEventListener('click', () => openDetailModalAplic(JSON.parse(btn.dataset.det)));
+});
 </script>
 {% endblock %}
