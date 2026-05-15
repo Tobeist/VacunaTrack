@@ -457,7 +457,15 @@ def pacientes():
                 'paciente_nfc':          _get_str(f, 'nfc', 'UID NFC'),
                 'esquema_id':            _get_int(f, 'esquema_id', 'esquema de vacunación', required=True),
             }
-            result = repo.crear_paciente(datos)
+            nuevo = repo.crear_paciente(datos)
+            file = request.files.get('foto')
+            if file and file.filename and _allowed_file(file.filename):
+                filename  = f"paciente_{nuevo['paciente_id']}_{int(_time_fn())}.{file.filename.rsplit('.',1)[1].lower()}"
+                upload_dir = os.path.join(current_app.static_folder, 'uploads', 'fotos')
+                os.makedirs(upload_dir, exist_ok=True)
+                file.save(os.path.join(upload_dir, filename))
+                repo.actualizar_imagen_paciente(nuevo['paciente_id'], f"uploads/fotos/{filename}")
+            result = nuevo
             mdb.log_sistema(
                 evento='paciente_creado',
                 entidad='paciente',
@@ -499,6 +507,13 @@ def editar_paciente(pid):
             'esquema_id':            _get_int(f, 'esquema_id', 'esquema de vacunación', required=True),
         }
         repo.actualizar_paciente(pid, campos)
+        file = request.files.get('foto')
+        if file and file.filename and _allowed_file(file.filename):
+            filename  = f"paciente_{pid}_{int(_time_fn())}.{file.filename.rsplit('.',1)[1].lower()}"
+            upload_dir = os.path.join(current_app.static_folder, 'uploads', 'fotos')
+            os.makedirs(upload_dir, exist_ok=True)
+            file.save(os.path.join(upload_dir, filename))
+            repo.actualizar_imagen_paciente(pid, f"uploads/fotos/{filename}")
         flash('Paciente actualizado.', 'success')
     except Exception as e:
         _flash_error(e)

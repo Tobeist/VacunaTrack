@@ -8,7 +8,22 @@
   <div class="card">
     <div class="card-header"><span class="card-title"><i class="fa-solid fa-baby" style="color:var(--primary)"></i> Registrar Paciente</span></div>
     <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.pacientes') }}">
+      <form method="POST" action="{{ url_for('admin.pacientes') }}" enctype="multipart/form-data">
+
+        <div class="form-group" style="display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div style="position:relative;cursor:pointer" onclick="document.getElementById('foto-pac-crear').click()">
+            <div id="pac-avatar-preview" style="width:72px;height:72px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;border:2px solid var(--border)">
+              <i class="fa-solid fa-baby" style="color:var(--text-muted)"></i>
+            </div>
+            <div style="position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+              <i class="fa-solid fa-camera" style="font-size:10px;color:#fff"></i>
+            </div>
+          </div>
+          <input type="file" name="foto" id="foto-pac-crear" accept="image/*" style="display:none"
+                 onchange="previewPacAvatar(this,'pac-avatar-preview')">
+          <span style="font-size:0.75rem;color:var(--text-muted)">Foto (opcional)</span>
+        </div>
+
         <div class="form-row form-row-2">
           <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
             <input type="text" name="prim_nombre" class="form-control" required></div>
@@ -95,10 +110,6 @@
             <td><span class="badge badge-primary">{{ p.esquema_nombre }}</span></td>
             <td>
               <div style="display:flex;gap:6px;align-items:center">
-                <form method="POST" action="{{ url_for('admin.subir_foto_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data" style="display:inline-flex;align-items:center;gap:4px">
-                  <input type="file" name="foto" accept="image/*" style="display:none" id="foto-pac-{{ p.paciente_id }}" onchange="this.form.submit()">
-                  <button type="button" class="btn btn-secondary btn-sm" title="Subir foto" onclick="document.getElementById('foto-pac-{{ p.paciente_id }}').click()">📷</button>
-                </form>
                 <button class="btn btn-secondary btn-sm" data-open-modal="edit-paciente-{{ p.paciente_id }}"
                         title="Editar">✏️</button>
                 <form method="POST" action="{{ url_for('admin.eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
@@ -115,27 +126,31 @@
                 <span class="modal-title">✏️ Editar Paciente</span>
                 <button class="btn-close" data-close-modal="edit-paciente-{{ p.paciente_id }}">✕</button>
               </div>
-              <form method="POST" action="{{ url_for('admin.editar_paciente', pid=p.paciente_id) }}">
+              <form method="POST" action="{{ url_for('admin.editar_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data">
                 <div class="modal-body">
                   <div style="display:flex;align-items:center;gap:16px;padding:4px 0 12px;border-bottom:1px solid var(--border-light);margin-bottom:12px">
-                    {% if p.paciente_imagen %}
-                    <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt=""
-                         style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border)">
-                    {% else %}
-                    <div style="width:56px;height:56px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                      <i class="fa-solid fa-baby" style="font-size:22px;color:var(--text-muted)"></i>
+                    <div style="position:relative;cursor:pointer;flex-shrink:0"
+                         onclick="document.getElementById('foto-edit-pac-{{ p.paciente_id }}').click()">
+                      {% if p.paciente_imagen %}
+                      <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt=""
+                           id="pac-edit-preview-{{ p.paciente_id }}"
+                           style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+                      {% else %}
+                      <div id="pac-edit-preview-{{ p.paciente_id }}"
+                           style="width:56px;height:56px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center">
+                        <i class="fa-solid fa-baby" style="font-size:22px;color:var(--text-muted)"></i>
+                      </div>
+                      {% endif %}
+                      <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+                        <i class="fa-solid fa-camera" style="font-size:9px;color:#fff"></i>
+                      </div>
                     </div>
-                    {% endif %}
                     <div>
                       <div class="fw-600">{{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}</div>
-                      <form method="POST" action="{{ url_for('admin.subir_foto_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data" style="display:inline">
-                        <input type="file" name="foto" accept="image/*" style="display:none"
-                               id="foto-edit-pac-{{ p.paciente_id }}" onchange="this.form.submit()">
-                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:4px"
-                                onclick="document.getElementById('foto-edit-pac-{{ p.paciente_id }}').click()">
-                          <i class="fa-solid fa-camera"></i> Cambiar foto
-                        </button>
-                      </form>
+                      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">Haz clic en la foto para cambiarla</div>
+                      <input type="file" name="foto" accept="image/*" style="display:none"
+                             id="foto-edit-pac-{{ p.paciente_id }}"
+                             onchange="previewPacAvatar(this,'pac-edit-preview-{{ p.paciente_id }}')">
                     </div>
                   </div>
                   <div class="form-row form-row-2">
@@ -194,4 +209,21 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function previewPacAvatar(input, previewId) {
+  const el = document.getElementById(previewId);
+  if (!input.files || !input.files[0] || !el) return;
+  const reader = new FileReader();
+  const isImg = el.tagName === 'IMG';
+  const size  = isImg ? el.style.width : '56px';
+  reader.onload = e => {
+    el.outerHTML = `<img id="${previewId}" src="${e.target.result}"
+      style="width:${size};height:${size};border-radius:50%;object-fit:cover;border:2px solid var(--border)">`;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+</script>
 {% endblock %}
