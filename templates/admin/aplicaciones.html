@@ -81,7 +81,7 @@
     <div class="table-wrapper">
       <table class="table" id="tabla-aplic">
         <thead><tr>
-          <th>Fecha</th><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Responsable</th><th style="width:130px">Centro</th><th>Acciones</th>
+          <th>Fecha</th><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Responsable</th><th>Centro</th><th>Acciones</th>
         </tr></thead>
         <tbody>
           {% for a in aplicaciones %}
@@ -91,7 +91,7 @@
             <td>{{ a.vacuna_nombre }}</td>
             <td><span class="badge badge-aplicada">{{ a.dosis_tipo|dosis_label }}</span></td>
             <td class="fs-sm">{{ a.responsable }}</td>
-            <td class="fs-sm" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ a.centro_nombre }}">{{ a.centro_nombre }}</td>
+            <td class="fs-sm">{{ a.centro_nombre }}</td>
             <td>
               <div style="display:flex;gap:6px">
                 <button class="btn btn-secondary btn-sm btn-detail-aplic" title="Ver detalle"
