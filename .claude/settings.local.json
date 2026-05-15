@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip index *)",
+      "Bash(pip install *)",
+      "Bash(pip show *)",
+      "Bash(git add *)",
+      "Bash(git rm *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Read(//tmp/**)",
+      "Bash(git fetch *)",
+      "Bash(git pull *)",
+      "Bash(curl -s https://code.highcharts.com/highcharts.js -o static/js/highcharts.js)",
+      "Bash(curl -sL \"https://code.highcharts.com/11.2.0/highcharts.js\" -o static/js/highcharts.js)",
+      "Bash(curl -sL \"https://cdnjs.cloudflare.com/ajax/libs/highcharts/11.2.0/highcharts.js\" -o static/js/highcharts.js)"
+    ]
+  }
+}
