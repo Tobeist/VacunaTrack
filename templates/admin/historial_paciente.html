@@ -5,15 +5,18 @@
 {% block content %}
 <div style="display:flex;flex-direction:column;gap:20px">
 
+  <!-- Encabezado del paciente -->
   <div class="card">
     <div class="card-body" style="display:flex;align-items:center;gap:20px;padding:20px 24px">
       {% if paciente.paciente_imagen %}
         <img src="{{ url_for('static', filename=paciente.paciente_imagen) }}"
              style="width:56px;height:56px;border-radius:50%;object-fit:cover;flex-shrink:0">
       {% else %}
-        <div style="width:56px;height:56px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🧒</div>
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">
+          {{ '👦' if paciente.paciente_sexo == 'M' else '👧' }}
+        </div>
       {% endif %}
-      <div style="flex:1">
+      <div style="flex:1;min-width:0">
         <div style="font-size:1.15rem;font-weight:700">
           {{ paciente.paciente_prim_nombre|cap }}
           {% if paciente.paciente_seg_nombre %}{{ paciente.paciente_seg_nombre|cap }}{% endif %}
@@ -22,45 +25,64 @@
         </div>
         <div class="text-muted fs-sm" style="margin-top:4px;display:flex;gap:20px;flex-wrap:wrap">
           <span><strong>CURP:</strong> {{ paciente.paciente_curp }}</span>
-          <span><strong>Fecha de nacimiento:</strong> {{ paciente.paciente_fecha_nac|format_date }}</span>
-          <span><strong>Sexo:</strong> {{ paciente.paciente_sexo }}</span>
+          <span><strong>Nacimiento:</strong> {{ paciente.paciente_fecha_nac|format_date }}</span>
+          <span><strong>Sexo:</strong> {{ 'Masculino' if paciente.paciente_sexo == 'M' else 'Femenino' }}</span>
           {% if paciente.esquema_nombre %}<span><strong>Esquema:</strong> {{ paciente.esquema_nombre }}</span>{% endif %}
         </div>
       </div>
-      <a href="{{ url_for('admin.pacientes') }}" class="btn btn-secondary btn-sm">
+      <a href="{{ url_for('admin.pacientes') }}" class="btn btn-secondary btn-sm" style="flex-shrink:0">
         <i class="fa-solid fa-arrow-left"></i> Volver
       </a>
     </div>
   </div>
 
+  <!-- Leyenda de estados -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.8rem;align-items:center">
+    <span style="color:var(--text-secondary);font-weight:500">Estado:</span>
+    <span class="badge badge-aplicada">✅ Aplicada</span>
+    <span class="badge badge-aplicable">⏰ Aplicable</span>
+    <span class="badge badge-cerca_limite">🔶 Cerca del límite</span>
+    <span class="badge badge-atrasada">⚠ Atrasada</span>
+    <span class="badge badge-faltante">✕ Faltante</span>
+    <span class="badge badge-proxima">🔵 Próxima</span>
+  </div>
+
+  <!-- Esquema de vacunación con estados -->
   <div class="card">
     <div class="card-header">
       <span class="card-title">
-        <i class="fa-solid fa-notes-medical" style="color:var(--success)"></i>
-        Aplicaciones registradas ({{ aplicaciones|length }})
+        <i class="fa-solid fa-notes-medical" style="color:var(--primary)"></i> Esquema de Vacunación
       </span>
-    </div>
-    <div class="card-body" style="padding:16px 22px 12px">
-      <input type="text" class="form-control" placeholder="🔍 Buscar…" data-search-table="tabla-hist-pac">
+      <a href="{{ url_for('admin.historial_paciente', pid=paciente.paciente_id) }}" class="btn btn-secondary btn-sm">
+        <i class="fa-solid fa-rotate"></i> Actualizar
+      </a>
     </div>
     <div class="table-wrapper">
-      <table class="table" id="tabla-hist-pac">
-        <thead><tr>
-          <th>Fecha</th><th>Vacuna</th><th>Dosis</th><th>Responsable</th><th>Centro</th><th>Lote</th><th>Observaciones</th>
-        </tr></thead>
-        <tbody>
-          {% for a in aplicaciones %}
+      <table class="table">
+        <thead>
           <tr>
-            <td class="fs-sm">{{ a.aplicacion_timestamp|format_datetime }}</td>
-            <td class="fw-600">{{ a.vacuna_nombre }}</td>
-            <td><span class="badge badge-aplicada">{{ a.dosis_tipo|dosis_label }}</span></td>
-            <td class="fs-sm">{{ a.responsable }}</td>
-            <td class="fs-sm">{{ a.centro_nombre }}</td>
-            <td class="fs-sm" style="font-family:monospace">{{ a.lote_codigo or '—' }}</td>
-            <td class="fs-sm text-muted">{{ a.aplicacion_observaciones or '—' }}</td>
+            <th>Vacuna</th>
+            <th>Dosis</th>
+            <th>Edad recomendada</th>
+            <th>Estado</th>
+            <th>Fecha aplicación</th>
+            <th>Responsable</th>
+            <th>Centro</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in historial %}
+          <tr class="status-{{ d.status }}">
+            <td class="fw-600">{{ d.vacuna_nombre }}</td>
+            <td><span class="badge badge-primary">{{ d.dosis_tipo }}</span></td>
+            <td class="fs-sm">{{ d.edad_texto }}</td>
+            <td><span class="badge badge-{{ d.status }}">{{ d.status_label }}</span></td>
+            <td class="fs-sm">{{ d.aplicacion_timestamp|format_datetime if d.aplicacion_timestamp else '—' }}</td>
+            <td class="fs-sm">{{ d.responsable|cap if d.responsable else '—' }}</td>
+            <td class="fs-sm">{{ d.centro_nombre or '—' }}</td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="text-center text-muted" style="padding:40px">Sin aplicaciones registradas.</td></tr>
+          <tr><td colspan="7" class="text-center text-muted" style="padding:40px">Sin dosis en el esquema.</td></tr>
           {% endfor %}
         </tbody>
       </table>

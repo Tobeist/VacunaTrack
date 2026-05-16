@@ -15,7 +15,7 @@ from functools import partial
 
 from models import repository as repo
 from models import mongo_db as mdb
-from utils.helpers import days_to_human, generate_temp_password, validar_aplicacion
+from utils.helpers import days_to_human, generate_temp_password, validar_aplicacion, enrich_history
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -583,10 +583,11 @@ def historial_paciente(pid):
     if not paciente:
         flash('Paciente no encontrado.', 'error')
         return redirect(url_for('admin.pacientes'))
-    aplicaciones = repo.aplicaciones_de_paciente(pid)
+    rows     = repo.historial_vacunacion_paciente(pid, paciente['esquema_id'])
+    historial = enrich_history(rows, paciente['paciente_fecha_nac'])
     return render_template('admin/historial_paciente.html',
                            paciente=paciente,
-                           aplicaciones=aplicaciones)
+                           historial=historial)
 
 
 @admin_bp.route('/admin/pacientes/<int:pid>/eliminar', methods=['POST'])
