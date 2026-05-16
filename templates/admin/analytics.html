@@ -135,9 +135,9 @@
       </div>
       <div class="table-wrapper">
         <table class="table">
-          <thead><tr><th>Fecha y hora</th><th>Evento</th><th>Email</th><th>Rol</th><th>IP</th></tr></thead>
+          <thead><tr><th>Fecha y hora</th><th>Evento</th><th>Email</th><th>Rol</th></tr></thead>
           <tbody id="accesos-tbody">
-            <tr><td colspan="5" class="text-center text-muted" style="padding:24px">Cargando…</td></tr>
+            <tr><td colspan="4" class="text-center text-muted" style="padding:24px">Cargando…</td></tr>
           </tbody>
         </table>
       </div>
@@ -424,11 +424,11 @@ function setRolAcceso(rol, btn) {
 
 function loadAccesosTable(rol) {
   const tbody = document.getElementById('accesos-tbody');
-  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
   fetch('/admin/api/mongo/ultimos-accesos?rol=' + rol)
     .then(r => r.json()).then(data => {
       if (!data.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px">Sin accesos registrados para este rol.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:20px">Sin accesos registrados para este rol.</td></tr>';
         return;
       }
       tbody.innerHTML = data.map(d => {
@@ -442,11 +442,10 @@ function loadAccesosTable(rol) {
           <td>${ev}</td>
           <td class="fs-sm">${d.email||'—'}</td>
           <td>${rolBadge}</td>
-          <td class="fs-sm text-muted">${d.ip||'—'}</td>
         </tr>`;
       }).join('');
     }).catch(() => {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px">Error al cargar los datos.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:20px">Error al cargar los datos.</td></tr>';
     });
 }
 
