@@ -416,8 +416,10 @@ function fetchReporteData() {
   fetch('/admin/api/reporte-datos?' + params)
     .then(r => r.json())
     .then(data => {
-      document.getElementById('res-periodo').textContent = desde + ' → ' + hasta;
-      document.getElementById('res-total').textContent   = data.total ?? 0;
+      const elPeriodo = document.getElementById('res-periodo');
+      const elTotal   = document.getElementById('res-total');
+      if (elPeriodo) elPeriodo.textContent = desde + ' → ' + hasta;
+      if (elTotal)   elTotal.textContent   = data.total ?? 0;
 
       // Chart: por mes
       if (chartMes) { try { chartMes.destroy(); } catch(e){} }
