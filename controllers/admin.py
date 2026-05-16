@@ -300,10 +300,12 @@ def dashboard():
     alertas = []
     for a in repo.listar_alertas_inventario()[-5:]:
         ts = a.get('alerta_inv_timestamp') or a.get('ts')
-        alertas.append({'tipo': 'inventario', 'subtipo': a['alerta_inv_tipo'], 'ts': ts, 'paciente': None})
+        alertas.append({'tipo': 'inventario', 'subtipo': a['alerta_inv_tipo'], 'ts': ts,
+                        'vacuna': a.get('vacuna_nombre'), 'centro': a.get('centro_nombre')})
     for a in repo.listar_alertas_dosis()[-5:]:
         alertas.append({'tipo': 'dosis', 'subtipo': a['alerta_dosis_pac_tipo'],
-                        'ts': a['alerta_dosis_pac_timestamp'], 'paciente': a.get('paciente')})
+                        'ts': a['alerta_dosis_pac_timestamp'], 'paciente': a.get('paciente'),
+                        'vacuna': a.get('vacuna_nombre'), 'dosis_tipo': a.get('dosis_tipo')})
     alertas.sort(key=lambda x: x['ts'] or datetime.min, reverse=True)
 
     return render_template('admin/dashboard.html', stats=stats, alertas=alertas[:10])

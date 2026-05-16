@@ -67,16 +67,21 @@
         {% for a in alertas %}
         <div style="padding:12px 18px;border-bottom:1px solid var(--border-light);display:flex;gap:12px;align-items:flex-start">
           <span style="font-size:18px;margin-top:1px">{{ '📦' if a.tipo == 'inventario' else '💉' }}</span>
-          <div>
-            <div class="fw-600 fs-sm">
-              {% if a.tipo == 'inventario' %}
+          <div style="min-width:0">
+            {% if a.tipo == 'inventario' %}
+              <div class="fs-sm">
                 <span class="badge badge-{{ a.subtipo }}">{{ a.subtipo|replace('_',' ')|title }}</span>
-              {% else %}
-                Dosis {{ a.subtipo|replace('_',' ') }}
-                {% if a.paciente %} — {{ a.paciente }}{% endif %}
-              {% endif %}
-            </div>
-            <div class="text-muted" style="font-size:0.75rem;margin-top:2px">{{ a.ts|format_datetime }}</div>
+                {% if a.vacuna %}<span class="fw-600"> {{ a.vacuna }}</span>{% endif %}
+              </div>
+              {% if a.centro %}<div class="text-muted" style="font-size:0.75rem;margin-top:2px">{{ a.centro }}</div>{% endif %}
+            {% else %}
+              <div class="fs-sm">
+                <span class="badge badge-{{ a.subtipo|lower }}">{{ a.subtipo|replace('_',' ')|title }}</span>
+                {% if a.paciente %}<span class="fw-600"> {{ a.paciente }}</span>{% endif %}
+              </div>
+              {% if a.vacuna %}<div class="text-muted" style="font-size:0.75rem;margin-top:2px">{{ a.vacuna }}{% if a.dosis_tipo %} · {{ a.dosis_tipo|dosis_label }}{% endif %}</div>{% endif %}
+            {% endif %}
+            <div class="text-muted" style="font-size:0.72rem;margin-top:2px">{{ a.ts|format_datetime }}</div>
           </div>
         </div>
         {% endfor %}
