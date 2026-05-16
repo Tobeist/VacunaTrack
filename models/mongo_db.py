@@ -19,7 +19,7 @@ Collections:
 
 from __future__ import annotations
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
@@ -335,3 +335,33 @@ def resumen_logs() -> dict:
         }
     except PyMongoError:
         return {'aplicaciones': 0, 'inventario': 0, 'accesos': 0, 'sistema': 0, 'beacon': 0, 'gps': 0}
+
+
+def ultimas_aplicaciones(limit: int = 8) -> list[dict]:
+    """Return the most recent vaccine application events."""
+    try:
+        docs = (
+            get_db().logs_aplicaciones
+            .find({}, {'_id': 0, 'pg_lote_id': 0, 'pg_dosis_id': 0, 'pg_usuario_id': 0})
+            .sort('timestamp', -1)
+            .limit(limit)
+        )
+        return list(docs)
+    except PyMongoError:
+        return []
+
+
+def top_centros_mes(limit: int = 5) -> list[dict]:
+    """Return top centers by application count for the current calendar month."""
+    now = datetime.now(timezone.utc)
+    inicio_mes = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    try:
+        pipeline = [
+            {'$match': {'timestamp': {'$gte': inicio_mes}}},
+            {'$group': {'_id': '$centro_nombre', 'total': {'$sum': 1}}},
+            {'$sort': {'total': -1}},
+            {'$limit': limit},
+        ]
+        return list(get_db().logs_aplicaciones.aggregate(pipeline))
+    except PyMongoError:
+        return []

@@ -42,12 +42,12 @@
   </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
+<div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start;margin-top:20px">
 
   <div class="card">
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--primary)"></i> Aplicaciones (últimos 12 meses)</span>
-      <a href="{{ url_for('admin.reportes') }}" class="btn btn-secondary btn-sm">Ver más</a>
+      <a href="{{ url_for('admin.analytics') }}" class="btn btn-secondary btn-sm">Ver más</a>
     </div>
     <div class="card-body">
       <div id="dash-chart" style="height:280px"></div>
@@ -96,13 +96,95 @@
 
 </div>
 
+<!-- Row 2: Últimas aplicaciones + Lotes próximos a caducar -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i> Últimas aplicaciones</span>
+      <span class="badge badge-secondary fs-sm">MongoDB</span>
+    </div>
+    <div class="table-wrapper">
+      <table class="table" id="dash-ultimas-table">
+        <thead><tr><th>Paciente</th><th>Vacuna</th><th>Centro</th><th>Fecha</th></tr></thead>
+        <tbody id="dash-ultimas-tbody">
+          <tr><td colspan="4" class="text-center text-muted" style="padding:24px"><i class="fa-solid fa-spinner fa-spin"></i> Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-clock" style="color:var(--warning)"></i> Lotes por caducar (30 días)</span>
+      <a href="{{ url_for('admin.inventario') }}" class="btn btn-secondary btn-sm">Ver inventario</a>
+    </div>
+    {% if lotes_proximos %}
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Vacuna</th><th>Centro</th><th>Caducidad</th><th>Stock</th></tr></thead>
+        <tbody>
+          {% for l in lotes_proximos %}
+          {% set dias = (l.lote_fecha_caducidad - today).days %}
+          <tr>
+            <td class="fw-600">{{ l.vacuna_nombre }}</td>
+            <td class="fs-sm text-muted">{{ l.centro_nombre }}</td>
+            <td class="fs-sm {% if dias <= 7 %}text-danger fw-600{% elif dias <= 15 %}text-warning{% endif %}">
+              {{ l.lote_fecha_caducidad|format_date }}
+              <span class="text-muted" style="font-size:0.7rem">({{ dias }}d)</span>
+            </td>
+            <td><span class="fw-600">{{ l.inventario_stock_actual }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body text-center" style="padding:36px">
+      <i class="fa-solid fa-circle-check" style="font-size:28px;color:var(--success)"></i>
+      <p class="mt-8 text-muted fs-sm">Sin lotes próximos a caducar</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Row 3: Cobertura + Top centros del mes -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--success)"></i> Cobertura vacunal global</span>
+      <a href="{{ url_for('admin.analytics') }}" class="btn btn-secondary btn-sm">Detalle</a>
+    </div>
+    <div class="card-body" style="display:flex;align-items:center;gap:24px">
+      <div id="dash-cobertura-chart" style="height:180px;flex:0 0 180px"></div>
+      <div id="dash-cobertura-info">
+        <div class="text-muted fs-sm" style="margin-bottom:4px">Calculando…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-ranking-star" style="color:var(--warning)"></i> Top centros — mes actual</span>
+      <span class="badge badge-secondary fs-sm">MongoDB</span>
+    </div>
+    <div class="card-body">
+      <div id="dash-centros-chart" style="height:180px"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Shortcuts -->
 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:20px">
   {% set shortcuts = [
     (url_for('admin.pacientes'),    'fa-baby',        'var(--primary)',   'Nuevo Paciente'),
     (url_for('admin.usuarios'),     'fa-users',       'var(--secondary)', 'Nuevo Usuario'),
     (url_for('admin.usuarios'),     'fa-user-doctor', 'var(--success)',   'Gestionar Usuarios'),
     (url_for('admin.lotes'),        'fa-boxes-stacked','var(--warning)',  'Nuevo Lote'),
-    (url_for('admin.reportes'),     'fa-chart-bar',   'var(--orange)',    'Ver Reportes'),
+    (url_for('admin.analytics'),    'fa-chart-bar',   'var(--orange)',    'Ver Analítica'),
     (url_for('admin.inventario'),   'fa-warehouse',   'var(--danger)',    'Ver Inventario'),
   ] %}
   {% for href, icon, color, label in shortcuts %}
@@ -122,6 +204,7 @@
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/highcharts.js') }}"></script>
 <script>
+// ── Gráfica aplicaciones 12 meses ────────────────────────────────────────────
 fetch('/admin/api/mongo/aplicaciones-por-mes')
   .then(r => r.json())
   .then(data => {
@@ -147,6 +230,93 @@ fetch('/admin/api/mongo/aplicaciones-por-mes')
   .catch(() => {
     document.getElementById('dash-chart').innerHTML =
       '<p style="color:var(--text-muted);text-align:center;padding:40px">Sin datos en MongoDB aún.<br>Registra aplicaciones para ver la gráfica.</p>';
+  });
+
+// ── Últimas aplicaciones (MongoDB) ───────────────────────────────────────────
+fetch('/admin/api/mongo/ultimas-aplicaciones')
+  .then(r => r.json())
+  .then(data => {
+    const tbody = document.getElementById('dash-ultimas-tbody');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted" style="padding:24px">Sin aplicaciones registradas aún.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(d => {
+      const ts = d.timestamp ? new Date(d.timestamp).toLocaleDateString('es-MX', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+      return `<tr>
+        <td class="fw-600 fs-sm">${d.paciente_nombre || '—'}</td>
+        <td class="fs-sm">${d.vacuna_nombre || '—'}</td>
+        <td class="fs-sm text-muted">${d.centro_nombre || '—'}</td>
+        <td class="fs-sm text-muted">${ts}</td>
+      </tr>`;
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('dash-ultimas-tbody').innerHTML =
+      '<tr><td colspan="4" class="text-center text-muted" style="padding:24px">No se pudo conectar con MongoDB.</td></tr>';
+  });
+
+// ── Cobertura global (PostgreSQL KPIs) ───────────────────────────────────────
+fetch('/admin/api/kpis')
+  .then(r => r.json())
+  .then(data => {
+    const pct  = parseFloat(data.pct_cobertura_global) || 0;
+    const sinV = parseInt(data.pacientes_sin_aplicaciones) || 0;
+    const total = parseInt(data.total_pacientes) || 0;
+    const conV  = total - sinV;
+
+    Highcharts.chart('dash-cobertura-chart', {
+      chart: { type: 'pie', backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, margin: [0,0,0,0] },
+      title: { text: pct.toFixed(1) + '%', align: 'center', verticalAlign: 'middle',
+               style: { fontSize: '1.4rem', fontWeight: '700', color: 'var(--text)' } },
+      credits: { enabled: false },
+      tooltip: { pointFormat: '<b>{point.y}</b> pacientes' },
+      plotOptions: { pie: { innerSize: '70%', dataLabels: { enabled: false }, enableMouseTracking: true } },
+      series: [{ name: 'Pacientes', colorByPoint: true, data: [
+        { name: 'Vacunados', y: conV,  color: '#16A34A' },
+        { name: 'Sin dosis',  y: sinV,  color: '#E5E7EB' },
+      ]}],
+    });
+
+    document.getElementById('dash-cobertura-info').innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div><span style="display:inline-block;width:10px;height:10px;background:#16A34A;border-radius:50%;margin-right:6px"></span>
+          <span class="fs-sm"><strong>${conV}</strong> con al menos 1 dosis</span></div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#E5E7EB;border-radius:50%;margin-right:6px"></span>
+          <span class="fs-sm"><strong>${sinV}</strong> sin vacunar</span></div>
+        <div class="text-muted fs-sm" style="margin-top:4px">Total: ${total} pacientes</div>
+      </div>`;
+  })
+  .catch(() => {
+    document.getElementById('dash-cobertura-info').innerHTML = '<span class="text-muted fs-sm">No disponible</span>';
+  });
+
+// ── Top centros del mes (MongoDB) ─────────────────────────────────────────────
+fetch('/admin/api/mongo/top-centros-mes')
+  .then(r => r.json())
+  .then(data => {
+    if (!data.length) {
+      document.getElementById('dash-centros-chart').innerHTML =
+        '<p style="color:var(--text-muted);text-align:center;padding:40px;font-size:0.85rem">Sin aplicaciones este mes aún.</p>';
+      return;
+    }
+    const HC_COLORS = ['#7C3AED','#2563EB','#16A34A','#D97706','#EA580C'];
+    Highcharts.chart('dash-centros-chart', {
+      chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'inherit' }, margin: [0,40,20,0] },
+      title: { text: null },
+      credits: { enabled: false },
+      xAxis: { categories: data.map(d => d.centro), labels: { style: { fontSize: '11px' } } },
+      yAxis: { min: 0, title: { text: null }, allowDecimals: false },
+      legend: { enabled: false },
+      tooltip: { valueSuffix: ' aplicaciones' },
+      series: [{ name: 'Aplicaciones', data: data.map((d, i) => ({ y: d.total, color: HC_COLORS[i % HC_COLORS.length] })),
+        dataLabels: { enabled: true, style: { fontSize: '11px', fontWeight: '600' } } }],
+      plotOptions: { bar: { borderRadius: 3 } },
+    });
+  })
+  .catch(() => {
+    document.getElementById('dash-centros-chart').innerHTML =
+      '<p style="color:var(--text-muted);text-align:center;padding:40px;font-size:0.85rem">No se pudo conectar con MongoDB.</p>';
   });
 </script>
 {% endblock %}

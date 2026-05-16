@@ -34,11 +34,8 @@
   <button class="tab-btn active" onclick="switchTab('kpis',this)">
     <i class="fa-solid fa-gauge-high"></i> KPIs
   </button>
-  <button class="tab-btn" onclick="switchTab('reportes',this)">
-    <i class="fa-solid fa-chart-column"></i> Reportes
-  </button>
   <button class="tab-btn" onclick="switchTab('avanzado',this)">
-    <i class="fa-solid fa-database"></i> Análisis Avanzado
+    <i class="fa-solid fa-database"></i> Análisis
   </button>
 </div>
 
@@ -100,13 +97,16 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     TAB 2: REPORTES (Filterable, Highcharts)
+     TAB 2: ANÁLISIS (Reportes + MongoDB + PostgreSQL temp tables)
 ═══════════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-reportes">
+<div class="tab-panel" id="tab-avanzado">
 
-  <!-- Filtros -->
+  <!-- Filtros de reporte (PostgreSQL) -->
   <div class="card mb-20">
-    <div class="card-header"><span class="card-title"><i class="fa-solid fa-filter" style="color:var(--primary)"></i> Filtros de reporte</span></div>
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-filter" style="color:var(--primary)"></i> Filtros de reporte</span>
+      <span class="badge badge-secondary fs-sm">PostgreSQL · sp_chart_por_mes · sp_chart_top_vacunas</span>
+    </div>
     <div class="card-body">
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
         <div class="form-group mb-0" style="min-width:160px">
@@ -139,7 +139,6 @@
     </div>
   </div>
 
-  <!-- Resumen rápido -->
   <div class="card mb-20">
     <div class="card-body">
       <div style="display:flex;gap:32px;font-size:0.875rem;flex-wrap:wrap">
@@ -151,7 +150,6 @@
     </div>
   </div>
 
-  <!-- Gráficas -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="card">
       <div class="card-header">
@@ -169,26 +167,7 @@
     </div>
   </div>
 
-  <!-- Estados de dosis (leyenda) -->
-  <div class="card">
-    <div class="card-header"><span class="card-title"><i class="fa-solid fa-palette" style="color:var(--warning)"></i> Estados de dosis</span></div>
-    <div class="card-body">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
-        <div><span class="badge badge-aplicada">✅ Aplicada</span><p class="text-muted fs-sm mt-4">Dosis ya administrada</p></div>
-        <div><span class="badge badge-aplicable">⏰ Aplicable</span><p class="text-muted fs-sm mt-4">Lista para aplicarse ahora</p></div>
-        <div><span class="badge badge-atrasada">⚠ Atrasada</span><p class="text-muted fs-sm mt-4">30+ días desde edad oportuna</p></div>
-        <div><span class="badge badge-cerca_limite">🔶 Cerca del límite</span><p class="text-muted fs-sm mt-4">Menos de 15 días para el límite</p></div>
-        <div><span class="badge badge-faltante">✕ Faltante</span><p class="text-muted fs-sm mt-4">Límite alcanzado o previa faltante</p></div>
-        <div><span class="badge badge-proxima">🔵 Próxima</span><p class="text-muted fs-sm mt-4">Aún no llega a edad oportuna</p></div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════════════
-     TAB 3: ANÁLISIS AVANZADO (MongoDB + PostgreSQL temp tables)
-═══════════════════════════════════════════════════════════════════════ -->
-<div class="tab-panel" id="tab-avanzado">
+  <hr style="margin:24px 0;border:none;border-top:1px solid var(--border)">
 
   <!-- MongoDB status banner -->
   <div class="card mb-20">
@@ -350,6 +329,21 @@
     </div>
   </div>
 
+  <!-- Estados de dosis (leyenda) -->
+  <div class="card">
+    <div class="card-header"><span class="card-title"><i class="fa-solid fa-palette" style="color:var(--warning)"></i> Estados de dosis</span></div>
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+        <div><span class="badge badge-aplicada">✅ Aplicada</span><p class="text-muted fs-sm mt-4">Dosis ya administrada</p></div>
+        <div><span class="badge badge-aplicable">⏰ Aplicable</span><p class="text-muted fs-sm mt-4">Lista para aplicarse ahora</p></div>
+        <div><span class="badge badge-atrasada">⚠ Atrasada</span><p class="text-muted fs-sm mt-4">30+ días desde edad oportuna</p></div>
+        <div><span class="badge badge-cerca_limite">🔶 Cerca del límite</span><p class="text-muted fs-sm mt-4">Menos de 15 días para el límite</p></div>
+        <div><span class="badge badge-faltante">✕ Faltante</span><p class="text-muted fs-sm mt-4">Límite alcanzado o previa faltante</p></div>
+        <div><span class="badge badge-proxima">🔵 Próxima</span><p class="text-muted fs-sm mt-4">Aún no llega a edad oportuna</p></div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- end tab-avanzado -->
 
 {% endblock %}
@@ -366,7 +360,6 @@ function switchTab(id, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'reportes') fetchReporteData();
   if (id === 'avanzado' && !avanzadoLoaded) { loadAvanzado(); avanzadoLoaded = true; }
 }
 
@@ -503,15 +496,15 @@ function fetchReporteData() {
     .catch(err => console.error('Error cargando reporte:', err));
 }
 
-['filter-desde','filter-hasta','filter-centro','filter-vacuna'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('change', fetchReporteData);
-});
-
 // ═════════════════════════════════════════════════════════════════════════════
-// TAB 3: ANÁLISIS AVANZADO
+// TAB 2: ANÁLISIS (Reportes + MongoDB + SPs)
 // ═════════════════════════════════════════════════════════════════════════════
 function loadAvanzado() {
+  fetchReporteData();
+  ['filter-desde','filter-hasta','filter-centro','filter-vacuna'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', fetchReporteData);
+  });
   loadMongoCharts();
   loadRanking();
   loadCobertura();

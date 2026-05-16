@@ -308,7 +308,19 @@ def dashboard():
                         'vacuna': a.get('vacuna_nombre'), 'dosis_tipo': a.get('dosis_tipo')})
     alertas.sort(key=lambda x: x['ts'] or datetime.min, reverse=True)
 
-    return render_template('admin/dashboard.html', stats=stats, alertas=alertas[:10])
+    from datetime import timedelta
+    hoy = date.today()
+    en_30 = hoy + timedelta(days=30)
+    todos_inv = repo.listar_inventarios()
+    lotes_proximos = [
+        i for i in todos_inv
+        if i.get('inventario_activo')
+        and (i.get('inventario_stock_actual') or 0) > 0
+        and i.get('lote_fecha_caducidad')
+        and hoy <= i['lote_fecha_caducidad'] <= en_30
+    ][:6]
+    return render_template('admin/dashboard.html', stats=stats, alertas=alertas[:10],
+                           lotes_proximos=lotes_proximos, today=hoy)
 
 
 @admin_bp.route('/admin/usuarios', methods=['GET', 'POST'])
@@ -1774,6 +1786,27 @@ def api_mongo_busquedas_gps():
         if hasattr(d.get('timestamp'), 'isoformat'):
             d['timestamp'] = d['timestamp'].isoformat()
     return jsonify(docs)
+
+
+@admin_bp.route('/admin/api/mongo/ultimas-aplicaciones')
+def api_mongo_ultimas_aplicaciones():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    docs = mdb.ultimas_aplicaciones(8)
+    for d in docs:
+        if hasattr(d.get('timestamp'), 'isoformat'):
+            d['timestamp'] = d['timestamp'].isoformat()
+    return jsonify(docs)
+
+
+@admin_bp.route('/admin/api/mongo/top-centros-mes')
+def api_mongo_top_centros_mes():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    raw = mdb.top_centros_mes(5)
+    return jsonify([{'centro': r['_id'], 'total': r['total']} for r in raw])
 
 
 @admin_bp.route('/admin/perfil')
