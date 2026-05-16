@@ -178,14 +178,22 @@
 </div>
 
 <!-- Shortcuts -->
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-top:20px">
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-top:20px">
   {% set shortcuts = [
-    (url_for('admin.pacientes'),    'fa-baby',        'var(--primary)',   'Nuevo Paciente'),
-    (url_for('admin.usuarios'),     'fa-users',       'var(--secondary)', 'Nuevo Usuario'),
-    (url_for('admin.usuarios'),     'fa-user-doctor', 'var(--success)',   'Gestionar Usuarios'),
-    (url_for('admin.lotes'),        'fa-boxes-stacked','var(--warning)',  'Nuevo Lote'),
-    (url_for('admin.analytics'),    'fa-chart-bar',   'var(--orange)',    'Ver Analítica'),
-    (url_for('admin.inventario'),   'fa-warehouse',   'var(--danger)',    'Ver Inventario'),
+    (url_for('admin.pacientes'),    'fa-baby',           'var(--primary)',   'Pacientes'),
+    (url_for('admin.usuarios'),     'fa-users',          'var(--secondary)', 'Usuarios'),
+    (url_for('admin.inventario'),   'fa-warehouse',      'var(--danger)',    'Inventario'),
+    (url_for('admin.lotes'),        'fa-boxes-stacked',  'var(--warning)',   'Lotes'),
+    (url_for('admin.centros'),      'fa-hospital',       'var(--success)',   'Centros'),
+    (url_for('admin.esquemas'),     'fa-sitemap',        'var(--primary)',   'Esquemas'),
+    (url_for('admin.vacunas'),      'fa-syringe',        '#0891b2',          'Vacunas'),
+    (url_for('admin.fabricantes'),  'fa-industry',       '#64748b',          'Fabricantes'),
+    (url_for('admin.padecimientos'),'fa-notes-medical',  '#dc2626',          'Padecimientos'),
+    (url_for('admin.relaciones'),   'fa-people-arrows',  '#7c3aed',          'Relaciones'),
+    (url_for('admin.aplicaciones'), 'fa-check-double',   '#059669',          'Aplicaciones'),
+    (url_for('admin.geografia'),    'fa-map-location-dot','#d97706',         'Geografía'),
+    (url_for('admin.analytics'),    'fa-chart-bar',      'var(--orange)',    'Analítica'),
+    (url_for('admin.perfil'),       'fa-circle-user',    '#475569',          'Perfil'),
   ] %}
   {% for href, icon, color, label in shortcuts %}
   <a href="{{ href }}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-decoration:none;transition:var(--transition);box-shadow:var(--shadow-sm)"
