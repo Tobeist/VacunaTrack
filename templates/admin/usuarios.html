@@ -202,7 +202,7 @@
             <td>
               {% for rol in u.roles %}
                 {% if rol == 'admin' %}
-                  <span class="badge" style="background:var(--primary-light);color:var(--primary)">
+                  <span class="badge" style="background:transparent;color:var(--primary)">
                     <i class="fa-solid fa-user-shield"></i> Admin
                   </span>
                 {% elif rol == 'responsable' %}
@@ -597,7 +597,7 @@ function _field(label, value, mono, fullWidth) {
 
 function openDetailModalUsuario(d) {
   const rolesHtml = (d.roles || []).map(r => ({
-    admin:       '<span class="badge" style="background:var(--primary-light);color:var(--primary)"><i class="fa-solid fa-user-shield"></i> Admin</span>',
+    admin:       '<span class="badge" style="background:transparent;color:var(--primary)"><i class="fa-solid fa-user-shield"></i> Admin</span>',
     responsable: '<span class="badge" style="background:var(--success-light);color:var(--success)"><i class="fa-solid fa-user-nurse"></i> Responsable</span>',
     tutor:       '<span class="badge" style="background:var(--warning-light);color:var(--warning)"><i class="fa-solid fa-person-breastfeeding"></i> Tutor</span>'
   })[r] || r).join(' ');
