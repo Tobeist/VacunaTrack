@@ -233,6 +233,7 @@ fetch('/admin/api/mongo/aplicaciones-por-mes')
   });
 
 // ── Últimas aplicaciones (MongoDB) ───────────────────────────────────────────
+function _capWords(s) { return s ? s.replace(/\b\w/g, c => c.toUpperCase()) : '—'; }
 fetch('/admin/api/mongo/ultimas-aplicaciones')
   .then(r => r.json())
   .then(data => {
@@ -244,7 +245,7 @@ fetch('/admin/api/mongo/ultimas-aplicaciones')
     tbody.innerHTML = data.map(d => {
       const ts = d.timestamp ? new Date(d.timestamp).toLocaleDateString('es-MX', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
       return `<tr>
-        <td class="fw-600 fs-sm">${d.paciente_nombre || '—'}</td>
+        <td class="fw-600 fs-sm">${_capWords(d.paciente_nombre)}</td>
         <td class="fs-sm">${d.vacuna_nombre || '—'}</td>
         <td class="fs-sm text-muted">${d.centro_nombre || '—'}</td>
         <td class="fs-sm text-muted">${ts}</td>

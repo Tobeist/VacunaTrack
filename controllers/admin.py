@@ -1434,7 +1434,7 @@ def aplicaciones():
                     pg_lote_id=inv['lote_id'],
                     pg_dosis_id=did,
                     vacuna_nombre=dos.get('vacuna_nombre', '—'),
-                    paciente_nombre=f"{pac['paciente_prim_nombre']} {pac['paciente_apellido_pat']}",
+                    paciente_nombre=f"{pac['paciente_prim_nombre'].title()} {pac['paciente_apellido_pat'].title()}",
                     responsable_nombre=session.get('user_name', '—'),
                     centro_nombre=inv.get('centro_nombre', '—'),
                     observaciones=datos['aplicacion_observaciones'] or None,

@@ -151,7 +151,7 @@ def register_application():
                 pg_lote_id=inv['lote_id'],
                 pg_dosis_id=dosis_id,
                 vacuna_nombre=dosis['vacuna_nombre'] if dosis and 'vacuna_nombre' in dosis else '—',
-                paciente_nombre=(f"{paciente['paciente_prim_nombre']} {paciente['paciente_apellido_pat']}"
+                paciente_nombre=(f"{paciente['paciente_prim_nombre'].title()} {paciente['paciente_apellido_pat'].title()}"
                                  if paciente else '—'),
                 responsable_nombre=session.get('user_name', '—'),
                 centro_nombre=inv.get('centro_nombre', '—'),
