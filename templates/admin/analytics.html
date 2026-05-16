@@ -101,55 +101,6 @@
 ═══════════════════════════════════════════════════════════════════════ -->
 <div class="tab-panel" id="tab-avanzado">
 
-  <!-- Filtros de reporte (PostgreSQL) -->
-  <div class="card mb-20">
-    <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-filter" style="color:var(--primary)"></i> Filtros de reporte</span>
-      <span class="badge badge-secondary fs-sm">PostgreSQL · sp_chart_por_mes · sp_chart_top_vacunas</span>
-    </div>
-    <div class="card-body">
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
-        <div class="form-group mb-0" style="min-width:160px">
-          <label class="form-label">Fecha desde</label>
-          <input type="date" id="filter-desde" class="form-control" value="2024-01-01">
-        </div>
-        <div class="form-group mb-0" style="min-width:160px">
-          <label class="form-label">Fecha hasta</label>
-          <input type="date" id="filter-hasta" class="form-control">
-        </div>
-        <div class="form-group mb-0" style="min-width:200px">
-          <label class="form-label">Centro (opcional)</label>
-          <select id="filter-centro" class="form-select">
-            <option value="">Todos los centros</option>
-            {% for c in centros %}
-            <option value="{{ c.centro_id }}">{{ c.centro_nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="form-group mb-0" style="min-width:200px">
-          <label class="form-label">Vacuna (opcional)</label>
-          <select id="filter-vacuna" class="form-select">
-            <option value="">Todas las vacunas</option>
-            {% for v in vacunas %}
-            <option value="{{ v.vacuna_id }}">{{ v.vacuna_nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card mb-20">
-    <div class="card-body">
-      <div style="display:flex;gap:32px;font-size:0.875rem;flex-wrap:wrap">
-        <div><div class="text-muted">Período</div><div class="fw-600" id="res-periodo">—</div></div>
-        <div><div class="text-muted">Total aplicaciones</div><div class="fw-600" id="res-total">—</div></div>
-        <div><div class="text-muted">Centros registrados</div><div class="fw-600">{{ centros|length }}</div></div>
-        <div><div class="text-muted">Vacunas en catálogo</div><div class="fw-600">{{ vacunas|length }}</div></div>
-      </div>
-    </div>
-  </div>
-
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="card">
       <div class="card-header">
@@ -500,11 +451,6 @@ function fetchReporteData() {
 // TAB 2: ANÁLISIS (Reportes + MongoDB + SPs)
 // ═════════════════════════════════════════════════════════════════════════════
 function loadAvanzado() {
-  fetchReporteData();
-  ['filter-desde','filter-hasta','filter-centro','filter-vacuna'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', fetchReporteData);
-  });
   loadMongoCharts();
   loadRanking();
   loadCobertura();
