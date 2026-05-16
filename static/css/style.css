@@ -35,8 +35,8 @@
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{font-size:15px}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased}
+html{font-size:15px;overflow-x:hidden}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 a{color:var(--primary);text-decoration:none}
 a:hover{color:var(--primary-dark)}
 
@@ -264,8 +264,11 @@ tr.inv-ok{background:#F0FDF4}
 
 /* ── Responsive layout helpers (must appear BEFORE media queries) ────── */
 .col-2-detail{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+.col-2-detail > *{min-width:0}
 .col-2-detail-rev{display:grid;grid-template-columns:380px 1fr;gap:22px;align-items:start}
+.col-2-detail-rev > *{min-width:0}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.grid-2 > *{min-width:0}
 .profile-info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;font-size:0.875rem}
 .landing-section{padding:40px 32px}
 .landing-nav{background:#fff;border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)}
@@ -331,6 +334,12 @@ tr.inv-ok{background:#F0FDF4}
   /* Collapsa TODOS los grids con columnas fijas o múltiples definidas inline */
   [style*="grid-template-columns"]:not([style*="auto-fill"]):not([style*="auto-fit"]){
     grid-template-columns:1fr !important;
+  }
+  /* Evita que los hijos del grid expandan más allá del espacio asignado */
+  [style*="grid-template-columns"] > *,
+  [style*="display:flex"] > *,
+  [style*="display: flex"] > *{
+    min-width:0;
   }
 }
 
