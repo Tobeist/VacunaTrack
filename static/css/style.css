@@ -355,5 +355,7 @@ tr.inv-ok{background:#F0FDF4}
   .profile-info-grid{grid-template-columns:1fr}
   .landing-nav-actions .btn-sm{font-size:0.78rem;padding:6px 10px}
   .nav-label{display:none}
+  .landing-nav{height:64px;flex-wrap:nowrap}
+  .landing-nav-actions{width:auto}
 }
 
