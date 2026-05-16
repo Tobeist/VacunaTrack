@@ -369,7 +369,9 @@ def usuarios():
                 os.makedirs(upload_dir, exist_ok=True)
                 file.save(os.path.join(upload_dir, filename))
                 repo.actualizar_imagen_usuario(nuevo['usuario_id'], f"uploads/fotos/{filename}")
-            flash(f'Usuario registrado. Contraseña temporal: <strong>{temp}</strong>', 'success')
+            nombre_completo = f'{datos["prim_nombre"]} {datos["apellido_pat"]}'.strip()
+            session['_show_pwd'] = {'nombre': nombre_completo, 'pwd': temp}
+            flash('Usuario registrado correctamente.', 'success')
         except Exception as e:
             _flash_error(e)
         return redirect(url_for('admin.usuarios'))
@@ -425,6 +427,26 @@ def editar_usuario(uid):
     except Exception as e:
         _flash_error(e)
     return redirect(url_for('admin.usuarios'))
+
+
+@admin_bp.route('/admin/usuarios/<int:uid>/resetear-password', methods=['POST'])
+def resetear_password_usuario(uid):
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    u = repo.obtener_usuario(uid)
+    if not u:
+        return jsonify({'error': 'Usuario no encontrado'}), 404
+    temp = generate_temp_password()
+    repo.cambiar_password(None, uid, generate_password_hash(temp))
+    nombre = f'{u.get("usuario_prim_nombre", "")} {u.get("usuario_apellido_pat", "")}'.strip()
+    return jsonify({'nombre': nombre, 'pwd': temp})
+
+
+@admin_bp.route('/admin/clear-temp-pwd')
+def clear_temp_pwd():
+    session.pop('_show_pwd', None)
+    return '', 204
 
 
 @admin_bp.route('/admin/usuarios/<int:uid>/toggle-activo', methods=['POST'])

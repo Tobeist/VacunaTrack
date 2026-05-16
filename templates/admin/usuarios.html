@@ -250,6 +250,10 @@
                           "imagen":       u.usuario_imagen or "",
                           "activo":       u.usuario_activo
                         } | tojson }}'>👁️</button>
+                <button class="btn btn-secondary btn-sm" title="Resetear contraseña"
+                        onclick="openResetConfirm({{ uid }}, '{{ u.usuario_prim_nombre|cap }} {{ u.usuario_apellido_pat|cap }}')">
+                  <i class="fa-solid fa-key"></i>
+                </button>
                 <button class="btn btn-secondary btn-sm btn-edit-usuario" title="Editar"
                         data-user='{{ {
                           "uid":         uid,
@@ -296,6 +300,51 @@
     </div>
   </div>
 
+</div>
+
+{# ── Modal Contraseña Temporal ────────────────────────────────────────── #}
+<div class="modal-overlay" id="modal-contrasena">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title"><i class="fa-solid fa-key" style="color:var(--warning)"></i> Contraseña temporal</span>
+    </div>
+    <div class="modal-body">
+      <p class="fs-sm">Comparte esta contraseña con <strong id="cp-nombre"></strong>. El usuario deberá cambiarla al iniciar sesión por primera vez.</p>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:16px">
+        <input type="text" id="cp-pwd" class="form-control"
+               readonly style="font-family:monospace;font-size:1.15rem;letter-spacing:0.08em;font-weight:600">
+        <button class="btn btn-secondary" id="btn-copy-pwd" title="Copiar" onclick="copyPassword()">
+          <i class="fa-solid fa-copy"></i>
+        </button>
+      </div>
+      <p class="text-muted fs-sm mt-8"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning)"></i> Esta contraseña solo se muestra una vez.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="document.getElementById('modal-contrasena').classList.remove('open')">
+        <i class="fa-solid fa-check"></i> Entendido
+      </button>
+    </div>
+  </div>
+</div>
+
+{# ── Modal Confirmar Reset ─────────────────────────────────────────────── #}
+<div class="modal-overlay" id="modal-confirm-reset">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <span class="modal-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--danger)"></i> Resetear contraseña</span>
+      <button class="btn-close" onclick="document.getElementById('modal-confirm-reset').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>¿Resetear la contraseña de <strong id="reset-nombre-confirm"></strong>?</p>
+      <p class="text-muted fs-sm mt-8">Se generará una nueva contraseña temporal. La contraseña actual quedará inválida de inmediato y el usuario deberá usar la nueva al próximo acceso.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-confirm-reset').classList.remove('open')">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarReset()">
+        <i class="fa-solid fa-key"></i> Sí, resetear
+      </button>
+    </div>
+  </div>
 </div>
 
 {# ── Modal Editar ─────────────────────────────────────────────────────── #}
@@ -597,5 +646,54 @@ document.querySelectorAll('.btn-detail-usuario').forEach(btn => {
 
 /* Aplicar filtro activos por defecto al cargar */
 filterUsuarios();
+
+/* ── Contraseña temporal ───────────────────────────────────────────────── */
+function showPasswordModal(nombre, pwd) {
+  document.getElementById('cp-nombre').textContent = nombre;
+  document.getElementById('cp-pwd').value = pwd;
+  document.getElementById('btn-copy-pwd').innerHTML = '<i class="fa-solid fa-copy"></i>';
+  document.getElementById('modal-contrasena').classList.add('open');
+}
+
+function copyPassword() {
+  const input = document.getElementById('cp-pwd');
+  navigator.clipboard.writeText(input.value).then(() => {
+    const btn = document.getElementById('btn-copy-pwd');
+    btn.innerHTML = '<i class="fa-solid fa-check" style="color:var(--success)"></i>';
+    setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-copy"></i>'; }, 2000);
+  });
+}
+
+/* ── Reset de contraseña ───────────────────────────────────────────────── */
+let _resetUid = null;
+
+function openResetConfirm(uid, nombre) {
+  _resetUid = uid;
+  document.getElementById('reset-nombre-confirm').textContent = nombre;
+  document.getElementById('modal-confirm-reset').classList.add('open');
+}
+
+async function confirmarReset() {
+  document.getElementById('modal-confirm-reset').classList.remove('open');
+  try {
+    const r = await fetch(`/admin/usuarios/${_resetUid}/resetear-password`, { method: 'POST' });
+    const data = await r.json();
+    if (data.pwd) {
+      showPasswordModal(data.nombre, data.pwd);
+    } else {
+      Toast.show('Error al resetear la contraseña.', 'error');
+    }
+  } catch {
+    Toast.show('Error de conexión al resetear la contraseña.', 'error');
+  }
+}
+
+/* ── Auto-mostrar modal si hay contraseña de usuario recién creado ─────── */
+{% if session.get('_show_pwd') %}
+document.addEventListener('DOMContentLoaded', () => {
+  showPasswordModal('{{ session._show_pwd.nombre }}', '{{ session._show_pwd.pwd }}');
+  fetch('{{ url_for("admin.clear_temp_pwd") }}');
+});
+{% endif %}
 </script>
 {% endblock %}
