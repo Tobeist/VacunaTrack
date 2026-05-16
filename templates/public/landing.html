@@ -10,11 +10,11 @@
 </head>
 <body style="margin:0;background:var(--bg)">
 
-<nav style="background:#fff;border-bottom:1px solid var(--border);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:var(--shadow-sm)">
-  <div style="display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem;color:var(--primary)">
+<nav class="landing-nav">
+  <div class="landing-nav-brand">
     <span style="font-size:22px">💉</span> VacunaTrack
   </div>
-  <div style="display:flex;gap:12px;align-items:center">
+  <div class="landing-nav-actions">
     <a href="{{ url_for('public.schemes') }}" class="btn btn-secondary btn-sm">
       <i class="fa-solid fa-list-check"></i> Esquemas
     </a>
@@ -93,11 +93,11 @@
 </section>
 
 <!-- ── Estadísticas de vacunación ─────────────────────────────────────── -->
-<section style="background:#fff;padding:40px 32px;margin-top:40px">
+<section class="landing-section" style="background:#fff;margin-top:40px">
   <div style="max-width:1100px;margin:0 auto">
     <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:6px">Estadísticas públicas de vacunación</h2>
     <p style="color:var(--text-muted);font-size:0.875rem;margin-bottom:24px">Datos agregados y anónimos del programa nacional de vacunación infantil.</p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+    <div class="grid-2">
       <div class="card">
         <div class="card-header">
           <span class="card-title"><i class="fa-solid fa-chart-column"></i> Aplicaciones por mes</span>
@@ -125,7 +125,7 @@
 </section>
 
 <!-- ── Catálogo de vacunas ────────────────────────────────────────────── -->
-<section style="padding:40px 32px;margin-top:8px">
+<section class="landing-section" style="margin-top:8px">
   <div style="max-width:1100px;margin:0 auto">
     <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:6px">Vacunas del programa</h2>
     <p style="color:var(--text-muted);font-size:0.875rem;margin-bottom:24px">Enfermedades cubiertas por el esquema nacional de vacunación infantil.</p>
