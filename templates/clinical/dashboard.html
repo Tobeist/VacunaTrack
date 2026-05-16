@@ -6,11 +6,15 @@
 
 {% set nombre_resp = responsable.responsable_prim_nombre if responsable else 'Responsable' %}
 
-<!-- Bienvenida -->
-<p class="text-muted fs-sm" style="margin-bottom:20px">
-  Bienvenido, <strong>{{ nombre_resp }}</strong> —
-  {% if responsable and responsable.centro_nombre %}{{ responsable.centro_nombre }}{% endif %}
-</p>
+<!-- Bienvenida estilo tutor -->
+<div class="page-header" style="margin-bottom:20px">
+  <div>
+    <div class="page-title">Bienvenido, {{ nombre_resp }} 👋</div>
+    <div class="page-subtitle">
+      {% if responsable and responsable.centro_nombre %}{{ responsable.centro_nombre }}{% endif %}
+    </div>
+  </div>
+</div>
 
 <!-- Tarjetas de estadísticas -->
 <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
@@ -31,7 +35,7 @@
   </div>
 </div>
 
-<!-- Fila principal: inventario + lotes próximos -->
+<!-- Fila principal: inventario + panel derecho -->
 <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start">
 
   <!-- Inventario del centro -->
@@ -121,27 +125,24 @@
       {% endif %}
     </div>
 
-    <!-- Accesos rápidos -->
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">
-          <i class="fa-solid fa-bolt" style="color:var(--warning)"></i> Accesos rápidos
-        </span>
-      </div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
-        <a href="{{ url_for('clinical.lookup') }}" class="btn btn-primary" style="text-align:center">
-          <i class="fa-solid fa-magnifying-glass"></i> Buscar paciente
-        </a>
-        <a href="{{ url_for('clinical.register_application') }}" class="btn btn-secondary" style="text-align:center">
-          <i class="fa-solid fa-syringe"></i> Registrar aplicación
-        </a>
-        <a href="{{ url_for('clinical.confirmar_inventario') }}" class="btn btn-secondary" style="text-align:center;position:relative">
-          <i class="fa-solid fa-box-open"></i> Confirmar inventario
-          {% if stats.pendientes_confirmacion %}
-          <span class="badge" style="background:var(--warning);color:#000;margin-left:6px">{{ stats.pendientes_confirmacion }}</span>
-          {% endif %}
-        </a>
-      </div>
+    <!-- Accesos rápidos: tarjetas estilo admin -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      {% set shortcuts = [
+        (url_for('clinical.lookup'),              'fa-magnifying-glass', 'var(--primary)',  'Buscar paciente'),
+        (url_for('clinical.register_application'),'fa-syringe',          'var(--success)',   'Registrar aplicación'),
+        (url_for('clinical.confirmar_inventario'), 'fa-box-open',         'var(--orange)',    'Confirmar inventario'),
+        (url_for('clinical.profile'),              'fa-circle-user',      '#475569',          'Mi perfil'),
+      ] %}
+      {% for href, icon, color, label in shortcuts %}
+      <a href="{{ href }}" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px;text-decoration:none;transition:var(--transition);box-shadow:var(--shadow-sm)"
+         onmouseenter="this.style.boxShadow='var(--shadow)';this.style.transform='translateY(-2px)'"
+         onmouseleave="this.style.boxShadow='var(--shadow-sm)';this.style.transform='none'">
+        <div style="width:40px;height:40px;background:{{ color }}22;border-radius:var(--radius);display:flex;align-items:center;justify-content:center">
+          <i class="fa-solid {{ icon }}" style="color:{{ color }};font-size:16px"></i>
+        </div>
+        <span style="font-size:0.78rem;font-weight:600;color:var(--text);text-align:center">{{ label }}</span>
+      </a>
+      {% endfor %}
     </div>
 
   </div>
