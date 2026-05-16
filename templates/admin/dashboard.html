@@ -102,7 +102,6 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i> Últimas aplicaciones</span>
-      <span class="badge badge-secondary fs-sm">MongoDB</span>
     </div>
     <div class="table-wrapper">
       <table class="table" id="dash-ultimas-table">
@@ -168,7 +167,6 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-ranking-star" style="color:var(--warning)"></i> Top centros — mes actual</span>
-      <span class="badge badge-secondary fs-sm">MongoDB</span>
     </div>
     <div class="card-body">
       <div id="dash-centros-chart" style="height:180px"></div>
@@ -237,10 +235,10 @@ fetch('/admin/api/mongo/aplicaciones-por-mes')
   })
   .catch(() => {
     document.getElementById('dash-chart').innerHTML =
-      '<p style="color:var(--text-muted);text-align:center;padding:40px">Sin datos en MongoDB aún.<br>Registra aplicaciones para ver la gráfica.</p>';
+      '<p style="color:var(--text-muted);text-align:center;padding:40px">Sin datos aún.<br>Registra aplicaciones para ver la gráfica.</p>';
   });
 
-// ── Últimas aplicaciones (MongoDB) ───────────────────────────────────────────
+// ── Últimas aplicaciones ──────────────────────────────────────────────────────
 function _capWords(s) { return s ? s.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join(' ') : '—'; }
 fetch('/admin/api/mongo/ultimas-aplicaciones')
   .then(r => r.json())
@@ -262,10 +260,10 @@ fetch('/admin/api/mongo/ultimas-aplicaciones')
   })
   .catch(() => {
     document.getElementById('dash-ultimas-tbody').innerHTML =
-      '<tr><td colspan="4" class="text-center text-muted" style="padding:24px">No se pudo conectar con MongoDB.</td></tr>';
+      '<tr><td colspan="4" class="text-center text-muted" style="padding:24px">Error al cargar los datos.</td></tr>';
   });
 
-// ── Cobertura global (PostgreSQL KPIs) ───────────────────────────────────────
+// ── Cobertura global ──────────────────────────────────────────────────────────
 fetch('/admin/api/kpis')
   .then(r => r.json())
   .then(data => {
@@ -300,7 +298,7 @@ fetch('/admin/api/kpis')
     document.getElementById('dash-cobertura-info').innerHTML = '<span class="text-muted fs-sm">No disponible</span>';
   });
 
-// ── Top centros del mes (MongoDB) ─────────────────────────────────────────────
+// ── Top centros del mes ───────────────────────────────────────────────────────
 fetch('/admin/api/mongo/top-centros-mes')
   .then(r => r.json())
   .then(data => {
@@ -325,7 +323,7 @@ fetch('/admin/api/mongo/top-centros-mes')
   })
   .catch(() => {
     document.getElementById('dash-centros-chart').innerHTML =
-      '<p style="color:var(--text-muted);text-align:center;padding:40px;font-size:0.85rem">No se pudo conectar con MongoDB.</p>';
+      '<p style="color:var(--text-muted);text-align:center;padding:40px;font-size:0.85rem">Error al cargar los datos.</p>';
   });
 </script>
 {% endblock %}
