@@ -50,14 +50,7 @@ Sube el repositorio a la VM (vía `scp`, consola de GCP o cliente SFTP) y extrae
 
 ```bash
 unzip vacunatrack.zip
-cd vacunatrack_diaitc
-```
-
-O bien clona directamente desde GitHub si tienes acceso:
-
-```bash
-git clone https://github.com/Tobeist/VacunaTrack.git
-cd VacunaTrack
+cd vacunatrack
 ```
 
 ---
@@ -205,7 +198,7 @@ Copia la plantilla y edítala:
 
 ```bash
 cp .env.example .env
-nano .env
+vi .env
 ```
 
 Contenido final del `.env`:
@@ -355,7 +348,7 @@ Comparte esa URL `https://...` para acceder desde cualquier navegador o celular.
 - La API usada es `navigator.bluetooth.requestDevice()` con filtro `namePrefix: 'FSC-'`, que muestra únicamente los beacons de VacunaTrack en el selector del sistema operativo — no otros dispositivos Bluetooth cercanos.
 - La detección también puede ocurrir por **proximidad GPS** como respaldo cuando Bluetooth no está disponible.
 
-**Requisito técnico:** Android con Chrome, bajo HTTPS. Bluetooth activado en el teléfono. El dispositivo beacon debe estar encendido y dentro del rango (~10 m).
+**Requisito técnico:** Navegador que soporte Bluetooth (Chrome en Andorid funciona, en Apple, usar navegador especializado como Bluefy), bajo HTTPS. Bluetooth activado en el teléfono. El dispositivo beacon debe estar encendido y dentro del rango (~10 m).
 
 ---
 
@@ -392,6 +385,7 @@ vacunatrack_diaitc/
 │
 ├── static/
 │   ├── css/style.css
+    ├── uploads/
 │   └── js/main.js
 │
 └── templates/
