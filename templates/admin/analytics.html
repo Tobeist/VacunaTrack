@@ -143,15 +143,8 @@
     </div>
   </div>
 
-  <!-- Fila 1: Serie de tiempo + Top vacunas MongoDB -->
+  <!-- Fila 1: Distribución por vacuna (full width) + Por centro -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title"><i class="fa-solid fa-chart-line" style="color:var(--primary)"></i> Aplicaciones por mes — serie de tiempo</span>
-        <span class="badge badge-secondary fs-sm">MongoDB · logs_aplicaciones</span>
-      </div>
-      <div class="card-body"><div id="chart-serie-tiempo" style="height:300px"></div></div>
-    </div>
     <div class="card">
       <div class="card-header">
         <span class="card-title"><i class="fa-solid fa-chart-pie" style="color:var(--secondary)"></i> Distribución por vacuna</span>
@@ -159,10 +152,7 @@
       </div>
       <div class="card-body"><div id="chart-vacunas-pie" style="height:300px"></div></div>
     </div>
-  </div>
 
-  <!-- Fila 2: Por centro + Accesos por rol -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="card">
       <div class="card-header">
         <span class="card-title"><i class="fa-solid fa-hospital" style="color:var(--success)"></i> Aplicaciones por centro</span>
@@ -170,12 +160,44 @@
       </div>
       <div class="card-body"><div id="chart-centros-bar" style="height:300px"></div></div>
     </div>
+  </div>
+
+  <!-- Fila 2: Accesos por rol + tabla últimos accesos -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="card">
       <div class="card-header">
         <span class="card-title"><i class="fa-solid fa-users" style="color:var(--warning)"></i> Actividad de accesos por rol</span>
         <span class="badge badge-secondary fs-sm">MongoDB · logs_acceso</span>
       </div>
       <div class="card-body"><div id="chart-accesos-donut" style="height:300px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i> Últimos accesos</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · logs_acceso</span>
+        <div style="display:flex;gap:6px;align-items:center;margin-left:auto">
+          <button class="btn btn-secondary btn-sm acceso-rol-btn active" data-rol="admin"
+                  onclick="setRolAcceso('admin',this)">
+            <i class="fa-solid fa-user-shield" style="color:var(--primary)"></i> Admin
+          </button>
+          <button class="btn btn-secondary btn-sm acceso-rol-btn" data-rol="responsable"
+                  onclick="setRolAcceso('responsable',this)">
+            <i class="fa-solid fa-user-nurse" style="color:var(--success)"></i> Responsable
+          </button>
+          <button class="btn btn-secondary btn-sm acceso-rol-btn" data-rol="tutor"
+                  onclick="setRolAcceso('tutor',this)">
+            <i class="fa-solid fa-person-breastfeeding" style="color:var(--warning)"></i> Tutor
+          </button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table class="table">
+          <thead><tr><th>Fecha y hora</th><th>Evento</th><th>Email</th><th>Rol</th><th>IP</th></tr></thead>
+          <tbody id="accesos-tbody">
+            <tr><td colspan="5" class="text-center text-muted" style="padding:24px">Cargando…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -211,22 +233,6 @@
         <span class="badge badge-secondary fs-sm">MongoDB · busquedas_gps</span>
       </div>
       <div class="card-body"><div id="chart-gps" style="height:300px"></div></div>
-    </div>
-  </div>
-
-  <!-- Tabla últimos accesos -->
-  <div class="card mb-28">
-    <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-clock-rotate-left" style="color:var(--primary)"></i> Últimos accesos registrados</span>
-      <span class="badge badge-secondary fs-sm">MongoDB · logs_acceso</span>
-    </div>
-    <div class="table-wrapper">
-      <table class="table">
-        <thead><tr><th>Timestamp</th><th>Evento</th><th>Email</th><th>Rol</th><th>IP</th></tr></thead>
-        <tbody id="accesos-tbody">
-          <tr><td colspan="5" class="text-center text-muted" style="padding:30px">Cargando…</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 
@@ -502,23 +508,49 @@ function loadAvanzado() {
 }
 
 // MongoDB charts ──────────────────────────────────────────────────────────────
-function loadMongoCharts() {
-  fetch('/admin/api/mongo/aplicaciones-por-mes')
-    .then(r=>r.json()).then(data=>{
-      if(!data.length){emptyChart('chart-serie-tiempo','Sin datos aún.');return;}
-      Highcharts.chart('chart-serie-tiempo',{
-        chart:{type:'areaspline',backgroundColor:'transparent',style:{fontFamily:'inherit'}},
-        title:{text:null},credits:{enabled:false},
-        xAxis:{categories:data.map(d=>d.label),labels:{style:{fontSize:'11px'}}},
-        yAxis:{min:0,title:{text:'Aplicaciones'},allowDecimals:false},
-        tooltip:{shared:true,valueSuffix:' aplicaciones'},legend:{enabled:false},
-        series:[{name:'Aplicaciones',data:data.map(d=>d.total),color:'#7C3AED',
-          fillColor:{linearGradient:{x1:0,y1:0,x2:0,y2:1},stops:[[0,'rgba(124,58,237,0.35)'],[1,'rgba(124,58,237,0.02)']]},
-          marker:{enabled:true,radius:4}}],
-        plotOptions:{areaspline:{dataLabels:{enabled:true,style:{fontSize:'10px'}}}}
-      });
-    }).catch(()=>emptyChart('chart-serie-tiempo','Error al conectar con MongoDB.'));
+const ROL_BADGE = {
+  admin:       '<span class="badge" style="background:transparent;color:var(--primary)"><i class="fa-solid fa-user-shield"></i> Admin</span>',
+  responsable: '<span class="badge" style="background:var(--success-light);color:var(--success)"><i class="fa-solid fa-user-nurse"></i> Responsable</span>',
+  tutor:       '<span class="badge" style="background:var(--warning-light);color:var(--warning)"><i class="fa-solid fa-person-breastfeeding"></i> Tutor</span>',
+};
 
+let _rolAcceso = 'admin';
+function setRolAcceso(rol, btn) {
+  _rolAcceso = rol;
+  document.querySelectorAll('.acceso-rol-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadAccesosTable(rol);
+}
+
+function loadAccesosTable(rol) {
+  const tbody = document.getElementById('accesos-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px"><i class="fa-solid fa-spinner fa-spin"></i></td></tr>';
+  fetch('/admin/api/mongo/ultimos-accesos?rol=' + rol)
+    .then(r => r.json()).then(data => {
+      if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px">Sin accesos registrados para este rol.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.map(d => {
+        const ts = d.timestamp ? new Date(d.timestamp).toLocaleString('es-MX') : '—';
+        const ev = d.evento === 'login'  ? '<span class="badge badge-success">login</span>'
+                 : d.evento === 'logout' ? '<span class="badge badge-secondary">logout</span>'
+                 :                         '<span class="badge badge-danger">fallido</span>';
+        const rolBadge = ROL_BADGE[d.rol] || `<span class="badge badge-primary">${d.rol||'—'}</span>`;
+        return `<tr>
+          <td class="fs-sm" style="font-family:monospace">${ts}</td>
+          <td>${ev}</td>
+          <td class="fs-sm">${d.email||'—'}</td>
+          <td>${rolBadge}</td>
+          <td class="fs-sm text-muted">${d.ip||'—'}</td>
+        </tr>`;
+      }).join('');
+    }).catch(() => {
+      tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted" style="padding:20px">Error al conectar con MongoDB.</td></tr>';
+    });
+}
+
+function loadMongoCharts() {
   fetch('/admin/api/mongo/top-vacunas')
     .then(r=>r.json()).then(data=>{
       if(!data.length){emptyChart('chart-vacunas-pie','Sin datos aún.');return;}
@@ -563,20 +595,9 @@ function loadMongoCharts() {
         legend:{enabled:true,layout:'vertical',align:'right',verticalAlign:'middle',itemStyle:{fontSize:'11px'}},
         series:[{name:'Accesos',colorByPoint:true,data:series}],
       });
-      // tabla accesos
-      const tbody=document.getElementById('accesos-tbody');
-      tbody.innerHTML=data.map(d=>{
-        const ts=d.timestamp?new Date(d.timestamp).toLocaleString('es-MX'):'—';
-        const ev=d.evento==='login'?'<span class="badge badge-success">login</span>'
-                :d.evento==='logout'?'<span class="badge badge-secondary">logout</span>'
-                :'<span class="badge badge-danger">fallido</span>';
-        return `<tr><td class="fs-sm" style="font-family:monospace">${ts}</td><td>${ev}</td>
-          <td class="fs-sm">${d.email||'—'}</td>
-          <td>${d.rol?`<span class="badge badge-primary">${d.rol}</span>`:'—'}</td>
-          <td class="fs-sm text-muted">${d.ip||'—'}</td></tr>`;
-      }).join('');
     }).catch(()=>emptyChart('chart-accesos-donut','Error al conectar con MongoDB.'));
 
+  loadAccesosTable(_rolAcceso);
   loadBeaconChart();
   loadGpsChart();
 

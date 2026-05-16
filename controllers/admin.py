@@ -1781,7 +1781,9 @@ def api_mongo_ultimos_accesos():
     redir = _require_admin()
     if redir:
         return jsonify({'error': 'No autorizado'}), 401
-    docs = mdb.ultimos_accesos(20)
+    rol   = request.args.get('rol') or None
+    limit = 5 if rol else 50
+    docs  = mdb.ultimos_accesos(limit, rol=rol)
     for d in docs:
         if hasattr(d.get('timestamp'), 'isoformat'):
             d['timestamp'] = d['timestamp'].isoformat()

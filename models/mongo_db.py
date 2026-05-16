@@ -252,12 +252,15 @@ def aplicaciones_por_centro(limit: int = 10) -> list[dict]:
         return []
 
 
-def ultimos_accesos(limit: int = 50) -> list[dict]:
-    """Return the most recent login events."""
+def ultimos_accesos(limit: int = 50, rol: str | None = None) -> list[dict]:
+    """Return the most recent access events, optionally filtered by role."""
     try:
+        filtro: dict = {}
+        if rol:
+            filtro['rol'] = rol
         docs = (
             get_db().logs_acceso
-            .find({'evento': 'login'}, {'_id': 0})
+            .find(filtro, {'_id': 0})
             .sort('timestamp', -1)
             .limit(limit)
         )
