@@ -12,7 +12,7 @@
 -- Ejecutar como superusuario (postgres)
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE USER vacunatrack_user WITH PASSWORD 'changeme' CREATEDB;
+CREATE USER vacunatrack_user WITH PASSWORD '666' CREATEDB;
 CREATE DATABASE vacunatrack OWNER vacunatrack_user;
 
 \c vacunatrack
