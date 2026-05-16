@@ -188,3 +188,47 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_bloquear_eliminar_lote_con_stock
 BEFORE DELETE ON lotes
 FOR EACH ROW EXECUTE FUNCTION fn_bloquear_eliminar_lote_con_stock();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 8. NORMALIZAR RFC (usuarios)
+--    Elimina espacios y convierte a mayúsculas antes de persistir.
+--    Corre en orden alfabético antes que trg_validar_rfc.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION fn_normalizar_rfc()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.usuario_rfc IS NOT NULL THEN
+        NEW.usuario_rfc := UPPER(TRIM(NEW.usuario_rfc));
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_normalizar_rfc
+BEFORE INSERT OR UPDATE OF usuario_rfc ON usuarios
+FOR EACH ROW EXECUTE FUNCTION fn_normalizar_rfc();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 9. VALIDAR RFC (usuarios)
+--    Persona física:  13 chars — 4 letras + 6 dígitos (fecha) + 3 homoclave
+--    Persona moral:   12 chars — 3 letras + 6 dígitos (fecha) + 3 homoclave
+--    Corre después de trg_normalizar_rfc (orden alfabético: n < v).
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION fn_validar_rfc()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.usuario_rfc IS NOT NULL
+       AND NEW.usuario_rfc !~ '^([A-ZÑ&]{3,4})[0-9]{6}[A-Z0-9]{3}$'
+    THEN
+        RAISE EXCEPTION 'RFC inválido: el valor "%" no corresponde al formato estándar mexicano (12 o 13 caracteres).',
+            NEW.usuario_rfc;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_validar_rfc
+BEFORE INSERT OR UPDATE OF usuario_rfc ON usuarios
+FOR EACH ROW EXECUTE FUNCTION fn_validar_rfc();
