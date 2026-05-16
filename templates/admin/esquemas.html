@@ -66,10 +66,10 @@
                      {% if d.dosis_id in dosis_esquema_actual_ids %}checked{% endif %}>
               <div style="flex:1;min-width:0">
                 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-                  <span class="badge badge-primary">{{ d.dosis_tipo }}</span>
+                  <span class="badge badge-primary">{{ d.dosis_tipo|dosis_label }}</span>
                   <span class="fw-600 fs-sm">{{ d.vacuna_nombre }}</span>
                 </div>
-                <div class="text-muted" style="font-size:0.78rem;margin-top:2px">
+                <div class="text-muted" style="font-size:0.78rem;margin-top:2px;word-break:break-word">
                   Edad oportuna: {{ days_to_human(d.dosis_edad_oportuna_dias) }}
                   {% if d.dosis_limite_edad_dias %}
                     · Límite: {{ days_to_human(d.dosis_limite_edad_dias) }}
@@ -236,7 +236,7 @@
           {% for dosis in c.dosis %}
           <div style="display:flex;align-items:center;gap:6px;padding:5px 8px;
                       background:var(--bg);border-radius:var(--radius-sm);margin-bottom:4px">
-            <span class="badge badge-warning" style="font-size:0.7rem">{{ dosis.dosis_tipo }}</span>
+            <span class="badge badge-warning" style="font-size:0.7rem">{{ dosis.dosis_tipo|dosis_label }}</span>
             <span class="fs-sm">{{ dosis.vacuna_nombre }}</span>
             <span class="text-muted fs-sm" style="margin-left:auto">
               {% if dosis.limite_dias %}

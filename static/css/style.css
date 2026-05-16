@@ -70,7 +70,7 @@ a:hover{color:var(--primary-dark)}
 .badge-count{position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center}
 
 .main-wrapper{margin-left:var(--sidebar-w);padding-top:var(--topbar-h);min-height:100vh;transition:margin-left 0.3s ease}
-.page-content{padding:24px 28px;max-width:1400px}
+.page-content{padding:24px 28px;max-width:1400px;word-break:break-word;overflow-wrap:break-word}
 .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap}
 .page-title{font-size:1.4rem;font-weight:700;color:var(--text)}
 .page-subtitle{font-size:0.85rem;color:var(--text-secondary);margin-top:2px}
@@ -320,15 +320,18 @@ tr.inv-ok{background:#F0FDF4}
   .profile-info-grid{grid-template-columns:1fr 1fr}
 }
 
+@media(max-width:768px){
+  /* Landing nav: logo en primera línea, botones en segunda */
+  .landing-nav{height:auto;flex-wrap:wrap;padding:10px 16px;gap:8px}
+  .landing-nav-brand{font-size:1rem}
+  .landing-nav-actions{width:100%;justify-content:flex-end;gap:8px}
+}
+
 @media(max-width:640px){
   /* Collapsa TODOS los grids con columnas fijas o múltiples definidas inline */
   [style*="grid-template-columns"]:not([style*="auto-fill"]):not([style*="auto-fit"]){
     grid-template-columns:1fr !important;
   }
-  /* Landing nav: permite wrap cuando no caben logo + botones en una fila */
-  .landing-nav{height:auto;flex-wrap:wrap;padding:10px 16px;gap:10px}
-  .landing-nav-brand{font-size:1rem}
-  .landing-nav-actions{width:100%;justify-content:flex-end}
 }
 
 @media(max-width:480px){
