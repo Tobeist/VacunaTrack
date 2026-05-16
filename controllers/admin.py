@@ -1793,9 +1793,19 @@ def api_mongo_eventos_beacon():
     redir = _require_admin()
     if redir:
         return jsonify({'error': 'No autorizado'}), 401
-    raw = mdb.eventos_beacon_por_centro(10)
-    data = [{'centro_id': r['_id'], 'total': r['total']} for r in raw]
-    return jsonify(data)
+    dias = request.args.get('dias', 30, type=int)
+    raw = mdb.beacon_por_centro_reciente(dias)
+    centros_map = {c['centro_id']: c['centro_nombre'] for c in repo.listar_centros()}
+    result = []
+    for r in raw:
+        cid = r['_id']
+        ult = r.get('ultima_deteccion')
+        result.append({
+            'centro': centros_map.get(cid, f'Centro #{cid}'),
+            'total': r['total'],
+            'ultima_deteccion': ult.isoformat() if hasattr(ult, 'isoformat') else None,
+        })
+    return jsonify(result)
 
 
 @admin_bp.route('/admin/api/mongo/busquedas-gps')
@@ -1808,6 +1818,29 @@ def api_mongo_busquedas_gps():
         if hasattr(d.get('timestamp'), 'isoformat'):
             d['timestamp'] = d['timestamp'].isoformat()
     return jsonify(docs)
+
+
+@admin_bp.route('/admin/api/mongo/gps-accesibilidad')
+def api_mongo_gps_accesibilidad():
+    redir = _require_admin()
+    if redir:
+        return jsonify({'error': 'No autorizado'}), 401
+    raw = mdb.gps_accesibilidad_por_vacuna()
+    vacunas_map = {v['vacuna_id']: v['vacuna_nombre'] for v in repo.listar_vacunas()}
+    result = []
+    for r in raw:
+        vid = r['_id']
+        total = r['total_busquedas']
+        con = r['con_resultado']
+        result.append({
+            'vacuna': vacunas_map.get(vid, f'Vacuna #{vid}'),
+            'total_busquedas': total,
+            'pct_con_resultado': round(con / total * 100, 1) if total else 0,
+            'pct_sin_resultado': round((total - con) / total * 100, 1) if total else 0,
+            'promedio_centros': round(float(r['promedio_centros'] or 0), 2),
+        })
+    result.sort(key=lambda x: x['pct_sin_resultado'], reverse=True)
+    return jsonify(result)
 
 
 @admin_bp.route('/admin/api/mongo/ultimas-aplicaciones')

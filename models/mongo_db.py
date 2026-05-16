@@ -19,7 +19,7 @@ Collections:
 
 from __future__ import annotations
 import os
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
@@ -317,6 +317,44 @@ def busquedas_gps_recientes(limit: int = 20) -> list[dict]:
             .limit(limit)
         )
         return list(docs)
+    except PyMongoError:
+        return []
+
+
+def beacon_por_centro_reciente(dias: int = 30) -> list[dict]:
+    """Return beacon detections grouped by center for the last N days."""
+    try:
+        desde = datetime.now(timezone.utc) - timedelta(days=dias)
+        pipeline = [
+            {'$match': {'timestamp': {'$gte': desde}}},
+            {'$group': {
+                '_id': '$pg_centro_id',
+                'total': {'$sum': 1},
+                'ultima_deteccion': {'$max': '$timestamp'},
+            }},
+            {'$sort': {'total': -1}},
+        ]
+        return list(get_db().eventos_beacon.aggregate(pipeline))
+    except PyMongoError:
+        return []
+
+
+def gps_accesibilidad_por_vacuna() -> list[dict]:
+    """Return GPS search accessibility stats grouped by vacuna_id."""
+    try:
+        pipeline = [
+            {'$match': {'vacuna_id': {'$ne': None}}},
+            {'$group': {
+                '_id': '$vacuna_id',
+                'total_busquedas': {'$sum': 1},
+                'con_resultado': {
+                    '$sum': {'$cond': [{'$gt': ['$centros_encontrados', 0]}, 1, 0]}
+                },
+                'promedio_centros': {'$avg': '$centros_encontrados'},
+            }},
+            {'$sort': {'total_busquedas': -1}},
+        ]
+        return list(get_db().busquedas_gps.aggregate(pipeline))
     except PyMongoError:
         return []
 

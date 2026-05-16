@@ -188,6 +188,32 @@
     <div class="card-body"><div id="chart-colecciones" style="height:260px"></div></div>
   </div>
 
+  <!-- Fila IoT: Beacon + GPS -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-tower-broadcast" style="color:var(--primary)"></i> Actividad beacon por centro</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · eventos_beacon</span>
+        <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+          <label class="form-label mb-0 fs-sm">Últimos</label>
+          <select id="sel-dias-beacon" class="form-select" style="width:110px;padding:5px 8px">
+            <option value="7">7 días</option>
+            <option value="30" selected>30 días</option>
+            <option value="90">90 días</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body"><div id="chart-beacon" style="height:300px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-map-location-dot" style="color:var(--success)"></i> Accesibilidad GPS por vacuna</span>
+        <span class="badge badge-secondary fs-sm">MongoDB · busquedas_gps</span>
+      </div>
+      <div class="card-body"><div id="chart-gps" style="height:300px"></div></div>
+    </div>
+  </div>
+
   <!-- Tabla últimos accesos -->
   <div class="card mb-28">
     <div class="card-header">
@@ -469,6 +495,7 @@ function loadAvanzado() {
   loadRanking();
   loadCobertura();
   loadUrgencias();
+  document.getElementById('sel-dias-beacon').addEventListener('change', loadBeaconChart);
   document.getElementById('sel-meses-ranking').addEventListener('change', loadRanking);
   document.getElementById('sel-esquema-cob').addEventListener('change', loadCobertura);
   document.getElementById('sel-centro-urg').addEventListener('change', loadUrgencias);
@@ -550,6 +577,9 @@ function loadMongoCharts() {
       }).join('');
     }).catch(()=>emptyChart('chart-accesos-donut','Error al conectar con MongoDB.'));
 
+  loadBeaconChart();
+  loadGpsChart();
+
   fetch('/admin/api/mongo/resumen-logs')
     .then(r=>r.json()).then(data=>{
       document.getElementById('badge-aplicaciones').textContent=data.aplicaciones+' aplicaciones';
@@ -574,6 +604,64 @@ function loadMongoCharts() {
         plotOptions:{column:{borderRadius:4}}
       });
     }).catch(()=>emptyChart('chart-colecciones','Error al conectar con MongoDB.'));
+}
+
+// IoT charts ──────────────────────────────────────────────────────────────────
+function loadBeaconChart() {
+  const dias = document.getElementById('sel-dias-beacon').value;
+  fetch('/admin/api/mongo/eventos-beacon?dias=' + dias)
+    .then(r => r.json()).then(data => {
+      if (!data.length) { emptyChart('chart-beacon', 'Sin detecciones beacon en este período.'); return; }
+      Highcharts.chart('chart-beacon', {
+        chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+        title: { text: null }, credits: { enabled: false },
+        xAxis: { categories: data.map(d => d.centro), labels: { style: { fontSize: '11px' } } },
+        yAxis: { min: 0, title: { text: 'Detecciones' }, allowDecimals: false },
+        legend: { enabled: false },
+        tooltip: {
+          formatter() {
+            const d = data[this.point.index];
+            const ult = d.ultima_deteccion ? new Date(d.ultima_deteccion).toLocaleString('es-MX') : '—';
+            return `<b>${d.centro}</b><br>${this.y} detecciones<br><span style="color:var(--text-muted);font-size:11px">Última: ${ult}</span>`;
+          }
+        },
+        series: [{ name: 'Detecciones', data: data.map((d, i) => ({ y: d.total, color: HC_COLORS[i % HC_COLORS.length] })),
+          dataLabels: { enabled: true, style: { fontSize: '10px' } } }],
+        plotOptions: { bar: { borderRadius: 3 } }
+      });
+    }).catch(() => emptyChart('chart-beacon', 'Error al conectar con MongoDB.'));
+}
+
+function loadGpsChart() {
+  fetch('/admin/api/mongo/gps-accesibilidad')
+    .then(r => r.json()).then(data => {
+      if (!data.length) { emptyChart('chart-gps', 'Sin búsquedas GPS registradas aún.'); return; }
+      Highcharts.chart('chart-gps', {
+        chart: { type: 'bar', backgroundColor: 'transparent', style: { fontFamily: 'inherit' } },
+        title: { text: null }, credits: { enabled: false },
+        xAxis: { categories: data.map(d => d.vacuna), labels: { style: { fontSize: '11px' } } },
+        yAxis: { min: 0, max: 100, title: { text: '% búsquedas' },
+          plotLines: [{ value: 50, color: '#D97706', dashStyle: 'Dash', width: 1 }] },
+        tooltip: {
+          shared: true,
+          formatter() {
+            const d = data[this.points[0].point.index];
+            return `<b>${d.vacuna}</b><br>
+              <span style="color:#16A34A">●</span> Con resultado: <b>${d.pct_con_resultado}%</b><br>
+              <span style="color:#DC2626">●</span> Sin resultado: <b>${d.pct_sin_resultado}%</b><br>
+              <span style="color:var(--text-muted);font-size:11px">${d.total_busquedas} búsquedas · prom. ${d.promedio_centros} centros</span>`;
+          }
+        },
+        legend: { enabled: true },
+        series: [
+          { name: 'Con centros cercanos', data: data.map(d => d.pct_con_resultado), color: '#16A34A',
+            dataLabels: { enabled: false } },
+          { name: 'Sin centros cercanos', data: data.map(d => d.pct_sin_resultado), color: '#DC2626',
+            dataLabels: { enabled: false } },
+        ],
+        plotOptions: { bar: { stacking: 'normal', borderRadius: 3 } }
+      });
+    }).catch(() => emptyChart('chart-gps', 'Error al conectar con MongoDB.'));
 }
 
 // PostgreSQL temp-table reports ───────────────────────────────────────────────

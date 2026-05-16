@@ -2728,30 +2728,30 @@ BEGIN
         (SELECT COUNT(*) FROM vw_responsables)                                                AS total_responsables,
         -- 4-5: Centros
         (SELECT COUNT(*) FROM vw_centros_detalle)                                             AS total_centros,
-        (SELECT COUNT(DISTINCT centro_id) FROM aplicaciones
+        (SELECT COUNT(DISTINCT centro_id) FROM vw_aplicaciones
          WHERE aplicacion_timestamp >= NOW() - INTERVAL '30 days')                            AS centros_activos_30d,
         -- 6-9: Aplicaciones
-        (SELECT COUNT(*) FROM aplicaciones)                                                   AS total_aplicaciones,
-        (SELECT COUNT(*) FROM aplicaciones
+        (SELECT COUNT(*) FROM vw_aplicaciones)                                                AS total_aplicaciones,
+        (SELECT COUNT(*) FROM vw_aplicaciones
          WHERE DATE(aplicacion_timestamp) = CURRENT_DATE)                                     AS aplicaciones_hoy,
-        (SELECT COUNT(*) FROM aplicaciones
+        (SELECT COUNT(*) FROM vw_aplicaciones
          WHERE DATE_TRUNC('month', aplicacion_timestamp) = DATE_TRUNC('month', NOW()))        AS aplicaciones_mes,
         ROUND(
-            (SELECT COUNT(*) FROM aplicaciones
+            (SELECT COUNT(*) FROM vw_aplicaciones
              WHERE DATE_TRUNC('month', aplicacion_timestamp) = DATE_TRUNC('month', NOW()))
             ::NUMERIC
             / NULLIF(EXTRACT(DAY FROM NOW())::INTEGER, 0), 1)                                 AS promedio_diario_mes,
         -- 10-11: Cobertura y pacientes sin vacunar
         ROUND(
-            (SELECT COUNT(DISTINCT paciente_id) FROM aplicaciones)::NUMERIC
-            / NULLIF((SELECT COUNT(*) FROM pacientes), 0) * 100, 1)                           AS pct_cobertura_global,
-        (SELECT COUNT(*) FROM pacientes p
-         WHERE NOT EXISTS (SELECT 1 FROM aplicaciones a
+            (SELECT COUNT(DISTINCT paciente_id) FROM vw_aplicaciones)::NUMERIC
+            / NULLIF((SELECT COUNT(*) FROM vw_pacientes), 0) * 100, 1)                        AS pct_cobertura_global,
+        (SELECT COUNT(*) FROM vw_pacientes p
+         WHERE NOT EXISTS (SELECT 1 FROM vw_aplicaciones a
                            WHERE a.paciente_id = p.paciente_id))                              AS pacientes_sin_aplicaciones,
         -- 12-14: Catálogo clínico
-        (SELECT COUNT(*) FROM vacunas)                                                        AS total_vacunas,
-        (SELECT COUNT(*) FROM esquemas)                                                       AS total_esquemas,
-        (SELECT COUNT(*) FROM padecimientos)                                                  AS total_padecimientos,
+        (SELECT COUNT(*) FROM vw_vacunas)                                                     AS total_vacunas,
+        (SELECT COUNT(*) FROM vw_esquemas)                                                    AS total_esquemas,
+        (SELECT COUNT(*) FROM vw_padecimientos)                                               AS total_padecimientos,
         -- 15-17: Inventario / lotes
         (SELECT COUNT(DISTINCT inventario_id) FROM vw_inventarios
          WHERE inventario_stock_actual > 0
@@ -2767,7 +2767,7 @@ BEGIN
         (SELECT COUNT(*) FROM vw_alertas_dosis)                                               AS total_alertas_dosis,
         -- 20: % centros activos en últimos 30 días
         ROUND(
-            (SELECT COUNT(DISTINCT centro_id) FROM aplicaciones
+            (SELECT COUNT(DISTINCT centro_id) FROM vw_aplicaciones
              WHERE aplicacion_timestamp >= NOW() - INTERVAL '30 days')::NUMERIC
             / NULLIF((SELECT COUNT(*) FROM vw_centros_detalle), 0) * 100, 1)                  AS pct_centros_activos_30d;
 END; $$;
@@ -2849,19 +2849,18 @@ BEGIN
     -- Tabla temporal: conteos por centro
     CREATE TEMP TABLE tmp_ranking_centros ON COMMIT DROP AS
     SELECT
-        cs.centro_id,
-        cs.centro_nombre,
-        ci.ciudad_nombre,
+        cd.centro_id,
+        cd.centro_nombre,
+        cd.ciudad_nombre,
         COUNT(a.aplicacion_id)                                              AS total_aplicaciones,
         COUNT(a.aplicacion_id)
             FILTER (WHERE a.aplicacion_timestamp >= NOW() - (p_meses || ' months')::INTERVAL)
                                                                             AS aplicaciones_periodo,
         COUNT(DISTINCT a.paciente_id)                                       AS pacientes_atendidos,
         COUNT(DISTINCT DATE(a.aplicacion_timestamp))                        AS dias_con_actividad
-    FROM centros_salud cs
-    LEFT JOIN aplicaciones  a  ON a.centro_id  = cs.centro_id
-    JOIN      ciudades      ci ON ci.ciudad_id  = cs.ciudad_id
-    GROUP BY cs.centro_id, cs.centro_nombre, ci.ciudad_nombre;
+    FROM vw_centros cd
+    LEFT JOIN vw_aplicaciones a ON a.centro_id = cd.centro_id
+    GROUP BY cd.centro_id, cd.centro_nombre, cd.ciudad_nombre;
 
     -- Cursor: agrega ranking y porcentaje sobre la tabla temporal
     OPEN p_resultados FOR
@@ -2882,28 +2881,26 @@ DECLARE
     v_total_pacientes INTEGER;
 BEGIN
     SELECT COUNT(*) INTO v_total_pacientes
-    FROM pacientes WHERE esquema_id = p_esquema_id;
+    FROM vw_pacientes WHERE esquema_id = p_esquema_id;
 
     -- Tabla temporal: aplicaciones por dosis del esquema
     CREATE TEMP TABLE tmp_cobertura ON COMMIT DROP AS
     SELECT
-        v.vacuna_id,
-        v.vacuna_nombre,
-        d.dosis_id,
-        d.dosis_tipo,
-        d.dosis_edad_oportuna_dias,
+        de.vacuna_id,
+        de.vacuna_nombre,
+        de.dosis_id,
+        de.dosis_tipo,
+        de.dosis_edad_oportuna_dias,
         v_total_pacientes                                                   AS total_pacientes,
         COUNT(DISTINCT a.paciente_id)                                       AS pacientes_con_dosis,
         COUNT(a.aplicacion_id)                                              AS total_aplicaciones
-    FROM dosis_esquemas de
-    JOIN dosis        d  ON d.dosis_id   = de.dosis_id
-    JOIN vacunas      v  ON v.vacuna_id  = d.vacuna_id
-    LEFT JOIN aplicaciones a ON a.dosis_id = d.dosis_id
+    FROM vw_dosis_esquemas_detalle de
+    LEFT JOIN vw_aplicaciones a ON a.dosis_id = de.dosis_id
         AND a.paciente_id IN (
-            SELECT paciente_id FROM pacientes WHERE esquema_id = p_esquema_id
+            SELECT paciente_id FROM vw_pacientes WHERE esquema_id = p_esquema_id
         )
     WHERE de.esquema_id = p_esquema_id
-    GROUP BY v.vacuna_id, v.vacuna_nombre, d.dosis_id, d.dosis_tipo, d.dosis_edad_oportuna_dias;
+    GROUP BY de.vacuna_id, de.vacuna_nombre, de.dosis_id, de.dosis_tipo, de.dosis_edad_oportuna_dias;
 
     -- Cursor: calcula porcentaje y clasifica nivel de cobertura
     OPEN p_resultados FOR
@@ -2932,32 +2929,30 @@ BEGIN
         INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat)::VARCHAR(100) AS paciente_nombre,
         p.paciente_fecha_nac,
         EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER                    AS edad_dias,
-        v.vacuna_nombre,
-        d.dosis_id,
-        d.dosis_tipo,
-        d.dosis_edad_oportuna_dias,
-        d.dosis_limite_edad_dias,
+        de.vacuna_nombre,
+        de.dosis_id,
+        de.dosis_tipo,
+        de.dosis_edad_oportuna_dias,
+        de.dosis_limite_edad_dias,
         (EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER
-            - d.dosis_edad_oportuna_dias)                                          AS dias_atraso,
-        (d.dosis_limite_edad_dias
+            - de.dosis_edad_oportuna_dias)                                         AS dias_atraso,
+        (de.dosis_limite_edad_dias
             - EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac)::INTEGER)            AS dias_para_limite
-    FROM pacientes       p
-    JOIN dosis_esquemas  de ON de.esquema_id = p.esquema_id
-    JOIN dosis           d  ON d.dosis_id    = de.dosis_id
-    JOIN vacunas         v  ON v.vacuna_id   = d.vacuna_id
+    FROM vw_pacientes p
+    JOIN vw_dosis_esquemas_detalle de ON de.esquema_id = p.esquema_id
     -- La dosis no ha sido aplicada
     WHERE NOT EXISTS (
-        SELECT 1 FROM aplicaciones a
-        WHERE a.paciente_id = p.paciente_id AND a.dosis_id = d.dosis_id
+        SELECT 1 FROM vw_aplicaciones a
+        WHERE a.paciente_id = p.paciente_id AND a.dosis_id = de.dosis_id
     )
     -- El paciente ya superó la edad oportuna de la dosis
-    AND EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac) > d.dosis_edad_oportuna_dias
+    AND EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac) > de.dosis_edad_oportuna_dias
     -- La dosis aún está dentro del límite de edad (o no tiene límite)
-    AND (d.dosis_limite_edad_dias IS NULL
-         OR EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac) <= d.dosis_limite_edad_dias)
+    AND (de.dosis_limite_edad_dias IS NULL
+         OR EXTRACT(DAY FROM NOW() - p.paciente_fecha_nac) <= de.dosis_limite_edad_dias)
     -- Filtro por centro (si se proporciona)
     AND (p_centro_id IS NULL OR EXISTS (
-        SELECT 1 FROM aplicaciones a2
+        SELECT 1 FROM vw_aplicaciones a2
         WHERE a2.paciente_id = p.paciente_id AND a2.centro_id = p_centro_id
     ));
 
