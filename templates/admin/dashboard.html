@@ -62,7 +62,7 @@
         <a href="{{ url_for('admin.inventario') }}" class="btn btn-secondary btn-sm">📦 Inventario</a>
       </div>
     </div>
-    <div class="card-body" style="padding:0">
+    <div class="card-body" style="padding:0;max-height:360px;overflow-y:auto">
       {% if alertas %}
         {% for a in alertas %}
         <div style="padding:12px 18px;border-bottom:1px solid var(--border-light);display:flex;gap:12px;align-items:flex-start">
