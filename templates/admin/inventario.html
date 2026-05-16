@@ -27,11 +27,6 @@
     <div class="sc-label">Alertas de inventario</div>
     <div class="sc-value">{{ alertas_inv|length }}</div>
   </div>
-  <div class="stat-card">
-    <div class="sc-icon red"><i class="fa-solid fa-bell" style="font-size:18px;color:var(--danger)"></i></div>
-    <div class="sc-label">Alertas dosis</div>
-    <div class="sc-value">{{ alertas_dosis|length }}</div>
-  </div>
 </div>
 
 <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px;font-size:0.8rem;color:var(--text-secondary)">
@@ -46,7 +41,6 @@
   <button class="tab-btn active" data-tab="tab-inv">📦 Inventario</button>
   <button class="tab-btn" data-tab="tab-transferencias">🔄 Transferencias ({{ transferencias|length }})</button>
   <button class="tab-btn" data-tab="tab-alertas-inv">⚠️ Alertas Inventario ({{ alertas_inv|length }})</button>
-  <button class="tab-btn" data-tab="tab-alertas-dosis">💉 Alertas Dosis ({{ alertas_dosis|length }})</button>
 </div>
 
 <div class="tab-panel active" id="tab-inv">
@@ -273,45 +267,6 @@
           <tr><td colspan="4" class="text-center text-muted" style="padding:40px">
             <i class="fa-solid fa-circle-check" style="color:var(--success);font-size:24px"></i>
             <p class="mt-8">No alertas de inventario</p>
-          </td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<div class="tab-panel" id="tab-alertas-dosis">
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-bell" style="color:var(--danger)"></i> Alertas de dosis por paciente</span>
-    </div>
-    <div class="table-wrapper">
-      <table class="table">
-        <thead><tr><th>Estado</th><th>Paciente</th><th>Vacuna</th><th>Tipo dosis</th><th>Fecha alerta</th></tr></thead>
-        <tbody>
-          {% for a in alertas_dosis %}
-          <tr>
-            <td>
-              {% set badge_map = {
-                'aplicable': 'applicable',
-                'atrasada': 'overdue',
-                'cerca_del_limite': 'near',
-                'proxima': 'upcoming'
-              } %}
-              <span class="badge badge-{{ badge_map.get(a.alerta_dosis_pac_tipo, 'gray') }}">
-                {{ a.alerta_dosis_pac_tipo|replace('_',' ')|title }}
-              </span>
-            </td>
-            <td class="fw-600">{{ a.paciente }}</td>
-            <td>{{ a.vacuna_nombre }}</td>
-            <td>{{ a.dosis_tipo }}</td>
-            <td class="fs-sm text-muted">{{ a.alerta_dosis_pac_timestamp|format_datetime }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="5" class="text-center text-muted" style="padding:40px">
-            <i class="fa-solid fa-circle-check" style="color:var(--success);font-size:24px"></i>
-            <p class="mt-8">No alertas de dosis</p>
           </td></tr>
           {% endfor %}
         </tbody>

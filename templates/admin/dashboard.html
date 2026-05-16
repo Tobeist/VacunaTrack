@@ -57,7 +57,10 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-bell" style="color:var(--danger)"></i> Alertas recientes</span>
-      <a href="{{ url_for('admin.inventario') }}" class="btn btn-secondary btn-sm">Todas</a>
+      <div style="display:flex;gap:6px">
+        <a href="{{ url_for('admin.pacientes') }}" class="btn btn-secondary btn-sm">💉 Dosis</a>
+        <a href="{{ url_for('admin.inventario') }}" class="btn btn-secondary btn-sm">📦 Inventario</a>
+      </div>
     </div>
     <div class="card-body" style="padding:0">
       {% if alertas %}

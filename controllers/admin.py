@@ -503,9 +503,11 @@ def pacientes():
         except Exception as e:
             _flash_error(e)
         return redirect(url_for('admin.pacientes'))
+    repo.recalcular_alertas_dosis()
     return render_template('admin/pacientes.html',
                            pacientes=repo.listar_pacientes(),
-                           esquemas=repo.listar_esquemas())
+                           esquemas=repo.listar_esquemas(),
+                           alertas_dosis=repo.listar_alertas_dosis())
 
 
 @admin_bp.route('/admin/pacientes/<int:pid>/editar', methods=['POST'])
@@ -1274,13 +1276,11 @@ def inventario():
         return redirect(url_for('admin.inventario'))
 
     repo.recalcular_alertas_inventario()
-    repo.recalcular_alertas_dosis()
     return render_template('admin/inventario.html',
                            inventarios=repo.listar_inventarios(),
                            transferencias=repo.listar_transferencias(),
                            centros=repo.listar_centros(),
                            alertas_inv=repo.listar_alertas_inventario(),
-                           alertas_dosis=repo.listar_alertas_dosis(),
                            today=date.today())
 
 

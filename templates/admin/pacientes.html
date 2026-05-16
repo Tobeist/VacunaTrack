@@ -240,6 +240,40 @@
       </div>
     </div>
   </div>
+
+  {% if alertas_dosis %}
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning)"></i> Alertas clínicas ({{ alertas_dosis|length }})</span>
+    </div>
+    <div class="table-wrapper">
+      <table class="table">
+        <thead><tr><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for a in alertas_dosis %}
+          <tr>
+            <td class="fw-600">{{ a.paciente }}</td>
+            <td>{{ a.vacuna_nombre }}</td>
+            <td><span class="badge badge-primary">{{ a.dosis_tipo|dosis_label }}</span></td>
+            <td>
+              {% if a.alerta_dosis_pac_tipo == 'APLICABLE' %}
+                <span class="badge badge-aplicable">Aplicable</span>
+              {% elif a.alerta_dosis_pac_tipo == 'ATRASADA' %}
+                <span class="badge badge-atrasada">Atrasada</span>
+              {% elif a.alerta_dosis_pac_tipo == 'CERCA_LIMITE' %}
+                <span class="badge badge-cerca_limite">Cerca del límite</span>
+              {% elif a.alerta_dosis_pac_tipo == 'FALTANTE' %}
+                <span class="badge badge-faltante">Faltante</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 
