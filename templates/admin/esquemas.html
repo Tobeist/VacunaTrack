@@ -69,7 +69,7 @@
                   <span class="badge badge-primary">{{ d.dosis_tipo|dosis_label }}</span>
                   <span class="fw-600 fs-sm">{{ d.vacuna_nombre }}</span>
                 </div>
-                <div class="text-muted" style="font-size:0.78rem;margin-top:2px;word-break:break-word">
+                <div class="text-muted" style="font-size:0.78rem;margin-top:2px">
                   Edad oportuna: {{ days_to_human(d.dosis_edad_oportuna_dias) }}
                   {% if d.dosis_limite_edad_dias %}
                     · Límite: {{ days_to_human(d.dosis_limite_edad_dias) }}
