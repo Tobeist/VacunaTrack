@@ -155,6 +155,7 @@ a:hover{color:var(--primary-dark)}
 .search-input-wrap input{padding-left:34px}
 
 .crud-layout{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start}
+.crud-layout > *{min-width:0}
 
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;animation:fadeIn 0.2s ease;padding:16px}
 .modal-overlay.open{display:flex}
