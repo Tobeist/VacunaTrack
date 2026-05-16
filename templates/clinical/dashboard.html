@@ -4,7 +4,7 @@
 
 {% block content %}
 
-{% set nombre_resp = responsable.usuario_prim_nombre.title() if responsable else 'Responsable' %}
+{% set nombre_resp = responsable.responsable_prim_nombre if responsable else 'Responsable' %}
 
 <!-- Bienvenida -->
 <p class="text-muted fs-sm" style="margin-bottom:20px">
