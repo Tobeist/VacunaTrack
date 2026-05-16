@@ -1,3 +1,13 @@
+const DOSIS_TIPO_LABELS = {
+  'UNICA':          'Única',
+  'SERIE_PRIMARIA': 'Serie primaria',
+  'REFUERZO':       'Refuerzo',
+};
+function dosisLabel(v) {
+  if (!v) return '—';
+  return DOSIS_TIPO_LABELS[v] || v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 // convierte dias a texto legible
 function days_to_human(days) {
   if (!days && days !== 0) return '—';
@@ -237,7 +247,7 @@ function renderHistoryTable(historial, pacienteId) {
   const rows = historial.map(d => `
     <tr class="status-${d.status}">
       <td class="fw-600">${d.vacuna_nombre}</td>
-      <td>${d.dosis_tipo}</td>
+      <td><span class="badge badge-primary">${dosisLabel(d.dosis_tipo)}</span></td>
       <td>${d.edad_texto || '—'}</td>
       <td><span class="badge badge-${d.status}">${d.status_label}</span></td>
       <td>${d.aplicacion_timestamp ? formatDatetime(d.aplicacion_timestamp) : '—'}</td>
