@@ -163,7 +163,7 @@ def register_application():
         try:
             result = repo.registrar_aplicacion(datos)
             mdb.log_aplicacion(
-                pg_aplicacion_id=result.get('p_id') if result else None,
+                pg_aplicacion_id=result.get('aplicacion_id') if result else None,
                 pg_paciente_id=paciente_id,
                 pg_usuario_id=responsable_id,
                 pg_centro_id=centro_id,

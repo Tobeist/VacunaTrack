@@ -526,15 +526,6 @@ def pacientes():
                 file.save(os.path.join(upload_dir, filename))
                 repo.actualizar_imagen_paciente(nuevo['paciente_id'], f"uploads/fotos/{filename}")
             result = nuevo
-            mdb.log_sistema(
-                evento='paciente_creado',
-                entidad='paciente',
-                pg_entidad_id=result.get('p_id') if result else None,
-                pg_usuario_id=session.get('user_id'),
-                descripcion=(f"Paciente {datos['paciente_prim_nombre']} "
-                             f"{datos['paciente_apellido_pat']} registrado"),
-                meta={'curp': datos.get('paciente_curp'), 'sexo': datos['paciente_sexo']},
-            )
             flash('Paciente registrado.', 'success')
         except Exception as e:
             _flash_error(e)
@@ -1427,7 +1418,7 @@ def aplicaciones():
             result = repo.registrar_aplicacion(datos)
             try:
                 mdb.log_aplicacion(
-                    pg_aplicacion_id=result.get('p_id') if result else None,
+                    pg_aplicacion_id=result.get('aplicacion_id') if result else None,
                     pg_paciente_id=pid,
                     pg_usuario_id=resp_id,
                     pg_centro_id=inv['centro_id'],

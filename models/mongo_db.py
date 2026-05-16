@@ -12,7 +12,6 @@ Collections:
   logs_aplicaciones  — one document per vaccine application event
   eventos_inventario — one document per inventory assignment or transfer
   logs_acceso        — one document per login / logout event
-  logs_sistema       — general operational events (patient created, etc.)
   eventos_beacon     — one document per beacon detection / center check-in
   busquedas_gps      — one document per GPS-based center search (high-volume geospatial)
 """
@@ -134,31 +133,6 @@ def log_acceso(
     except PyMongoError:
         pass
 
-
-def log_sistema(
-    *,
-    evento: str,                    # e.g. 'paciente_creado', 'paciente_eliminado'
-    pg_entidad_id: int | None,
-    entidad: str,                   # e.g. 'paciente', 'centro', 'usuario'
-    pg_usuario_id: int | None,
-    descripcion: str,
-    meta: dict | None = None,
-) -> None:
-    """Log a general system event to MongoDB."""
-    try:
-        doc = {
-            'timestamp':      _now(),
-            'evento':         evento,
-            'entidad':        entidad,
-            'pg_entidad_id':  pg_entidad_id,
-            'pg_usuario_id':  pg_usuario_id,
-            'descripcion':    descripcion,
-        }
-        if meta:
-            doc.update(meta)
-        get_db().logs_sistema.insert_one(doc)
-    except PyMongoError:
-        pass
 
 
 def log_beacon(
