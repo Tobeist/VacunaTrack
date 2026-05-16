@@ -233,7 +233,7 @@ fetch('/admin/api/mongo/aplicaciones-por-mes')
   });
 
 // ── Últimas aplicaciones (MongoDB) ───────────────────────────────────────────
-function _capWords(s) { return s ? s.replace(/\b\w/g, c => c.toUpperCase()) : '—'; }
+function _capWords(s) { return s ? s.split(' ').map(w => w ? w[0].toUpperCase() + w.slice(1) : '').join(' ') : '—'; }
 fetch('/admin/api/mongo/ultimas-aplicaciones')
   .then(r => r.json())
   .then(data => {
