@@ -1,15 +1,24 @@
 {% extends 'base.html' %}
-{% block title %}Inventario y Alertas — VacunaTrack{% endblock %}
-{% block page_title %}Inventario y Alertas{% endblock %}
+{% block title %}Inventario — VacunaTrack{% endblock %}
+{% block page_title %}Inventario{% endblock %}
 
 {% block extra_css %}
 <style>
   tr.inv-pending { background: #EFF6FF; }
   tr.inv-pending:hover { background: #DBEAFE; }
+  .inv-filter-btn.active { background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important; }
 </style>
 {% endblock %}
 
 {% block content %}
+
+{# Pre-compute set of inventario_ids with CERCA_CADUCAR or CERCA_AGOTAR alerts #}
+{% set ns = namespace(criticos=[]) %}
+{% for a in alertas_inv %}
+  {% if a.alerta_inv_tipo in ('CERCA_CADUCAR', 'CERCA_AGOTAR') and a.inventario_id not in ns.criticos %}
+    {% set ns.criticos = ns.criticos + [a.inventario_id] %}
+  {% endif %}
+{% endfor %}
 
 <div class="stats-grid" style="margin-bottom:24px">
   <div class="stat-card">
@@ -34,6 +43,7 @@
   <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#F0FDF4;border:1px solid #86EFAC;display:inline-block;border-radius:2px"></span> Stock suficiente</span>
   <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFFBEB;border:1px solid #FDE68A;display:inline-block;border-radius:2px"></span> Stock bajo</span>
   <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFF5F5;border:1px solid #FCA5A5;display:inline-block;border-radius:2px"></span> Sin stock</span>
+  <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#FFF0E6;border:1px solid #FDBA74;display:inline-block;border-radius:2px"></span> Caducado</span>
   <span style="display:flex;align-items:center;gap:6px"><span style="width:12px;height:12px;background:#EFF6FF;border:1px solid #BFDBFE;display:inline-block;border-radius:2px"></span> Pendiente de recepción</span>
 </div>
 
@@ -48,8 +58,15 @@
     <div class="card-header">
       <span class="card-title"><i class="fa-solid fa-warehouse" style="color:var(--warning)"></i> Stock por centro</span>
     </div>
-    <div class="card-body" style="padding:16px 22px 12px">
-      <input type="text" class="form-control" placeholder="🔍 Buscar en inventario…" data-search-table="tabla-inv">
+    <div class="card-body" style="padding:16px 22px 12px;display:flex;flex-direction:column;gap:12px">
+      <input type="text" class="form-control" placeholder="🔍 Buscar en inventario…" id="inv-search">
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="inv-filter-btns">
+        <button class="btn btn-secondary btn-sm inv-filter-btn active" data-filter="all">Todos ({{ inventarios|length }})</button>
+        <button class="btn btn-secondary btn-sm inv-filter-btn" data-filter="active">Activos</button>
+        <button class="btn btn-secondary btn-sm inv-filter-btn" data-filter="inactive">Inactivos</button>
+        <button class="btn btn-secondary btn-sm inv-filter-btn" data-filter="pending">Pendientes</button>
+        <button class="btn btn-secondary btn-sm inv-filter-btn" data-filter="critical">Críticos ({{ ns.criticos|length }})</button>
+      </div>
     </div>
     <div class="table-wrapper">
       <table class="table" id="tabla-inv">
@@ -60,15 +77,28 @@
         <tbody>
           {% for inv in inventarios %}
           {% set caducado = inv.lote_fecha_caducidad and inv.lote_fecha_caducidad < today %}
+          {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
+          {% set es_critico = inv.inventario_id in ns.criticos %}
           {% if not inv.inventario_activo %}
+            {% set row_status = 'pending' %}
             {% set row_class = 'inv-pending' %}
           {% elif caducado %}
+            {% set row_status = 'inactive' %}
+            {% set row_class = 'inv-caducado' %}
+          {% elif (inv.inventario_stock_actual or 0) == 0 %}
+            {% set row_status = 'inactive' %}
             {% set row_class = 'inv-expired' %}
+          {% elif es_critico %}
+            {% set row_status = 'critical' %}
+            {% set row_class = 'inv-low' if pct < 20 else 'inv-ok' %}
+          {% elif pct < 20 %}
+            {% set row_status = 'active' %}
+            {% set row_class = 'inv-low' %}
           {% else %}
-            {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
-            {% set row_class = 'inv-expired' if pct == 0 else ('inv-low' if pct < 20 else 'inv-ok') %}
+            {% set row_status = 'active' %}
+            {% set row_class = 'inv-ok' %}
           {% endif %}
-          <tr class="{{ row_class }}">
+          <tr class="{{ row_class }}" data-status="{{ row_status }}">
             <td class="fw-600">{{ inv.centro_nombre }}</td>
             <td>{{ inv.vacuna_nombre }}</td>
             <td class="fs-sm" style="font-family:monospace">{{ inv.lote_codigo }}</td>
@@ -80,7 +110,6 @@
             <td class="text-center">{{ inv.inventario_stock_inicial }}</td>
             <td>
               {% if inv.inventario_activo %}
-                {% set pct = (inv.inventario_stock_actual / inv.inventario_stock_inicial * 100)|int if inv.inventario_stock_inicial else 0 %}
                 <div style="display:flex;align-items:center;gap:8px">
                   <div style="flex:1;background:var(--border);border-radius:3px;height:6px;min-width:60px">
                     <div style="width:{{ [pct,100]|min }}%;height:100%;background:{{ 'var(--danger)' if pct < 10 else ('var(--warning)' if pct < 30 else 'var(--success)') }};border-radius:3px"></div>
@@ -96,6 +125,10 @@
                 <span class="badge badge-proxima">Pendiente</span>
               {% elif caducado %}
                 <span class="badge badge-atrasada">Caducado</span>
+              {% elif (inv.inventario_stock_actual or 0) == 0 %}
+                <span class="badge badge-atrasada">Sin stock</span>
+              {% elif es_critico %}
+                <span class="badge badge-cerca_limite">Crítico</span>
               {% else %}
                 <span class="badge badge-aplicada">Activo</span>
               {% endif %}
@@ -289,6 +322,36 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById(btn.dataset.tab).classList.add('active');
     });
   });
+
+  // Inventory filter buttons
+  const filterBtns = document.querySelectorAll('.inv-filter-btn');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyFilters();
+    });
+  });
+
+  // Search respects active filter
+  const searchInput = document.getElementById('inv-search');
+  function applyFilters() {
+    const q = searchInput ? searchInput.value.toLowerCase() : '';
+    const activeBtn = document.querySelector('.inv-filter-btn.active');
+    const filter = activeBtn ? activeBtn.dataset.filter : 'all';
+    document.querySelectorAll('#tabla-inv tbody tr[data-status]').forEach(row => {
+      const s = row.dataset.status;
+      let filterOk = false;
+      if      (filter === 'all')      filterOk = true;
+      else if (filter === 'active')   filterOk = s === 'active';
+      else if (filter === 'inactive') filterOk = s === 'inactive';
+      else if (filter === 'pending')  filterOk = s === 'pending';
+      else if (filter === 'critical') filterOk = s === 'critical';
+      const searchOk = !q || row.textContent.toLowerCase().includes(q);
+      row.style.display = (filterOk && searchOk) ? '' : 'none';
+    });
+  }
+  if (searchInput) searchInput.addEventListener('input', applyFilters);
 
   // Transferencia: carga dinámica de inventarios por centro origen
   const selOrigen  = document.getElementById('sel-centro-origen');

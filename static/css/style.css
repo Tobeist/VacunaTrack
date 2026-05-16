@@ -179,6 +179,7 @@ tr.status-cerca_limite td:first-child{border-left:3px solid var(--orange)}
 tr.status-atrasada td:first-child{border-left:3px solid var(--danger)}
 tr.status-proxima td:first-child{border-left:3px solid var(--secondary)}
 tr.inv-expired{background:#FFF5F5}
+tr.inv-caducado{background:#FFF0E6}
 tr.inv-low{background:#FFFBEB}
 tr.inv-ok{background:#F0FDF4}
 

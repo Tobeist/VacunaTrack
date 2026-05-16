@@ -2,250 +2,253 @@
 {% block title %}Pacientes — VacunaTrack{% endblock %}
 {% block page_title %}Gestión de Pacientes{% endblock %}
 
+{% block extra_css %}
+<style>
+  .pac-filter-btn.active { background: var(--primary) !important; color: #fff !important; border-color: var(--primary) !important; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="display:flex;flex-direction:column;gap:20px">
 
-  <div class="card">
-    <div class="card-header"><span class="card-title"><i class="fa-solid fa-baby" style="color:var(--primary)"></i> Registrar Paciente</span></div>
-    <div class="card-body">
-      <form method="POST" action="{{ url_for('admin.pacientes') }}" enctype="multipart/form-data">
+<div class="tabs" id="pac-tabs">
+  <button class="tab-btn active" data-tab="tab-pacientes">👶 Pacientes ({{ pacientes|length }})</button>
+  <button class="tab-btn" data-tab="tab-alertas-dosis">💉 Alertas dosis ({{ alertas_dosis|length }})</button>
+</div>
 
-        <div class="form-group" style="display:flex;flex-direction:column;align-items:center;gap:8px">
-          <div style="position:relative;cursor:pointer" onclick="document.getElementById('foto-pac-crear').click()">
-            <div id="pac-avatar-preview" style="width:72px;height:72px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;border:2px solid var(--border)">
-              <i class="fa-solid fa-baby" style="color:var(--text-muted)"></i>
+<div class="tab-panel active" id="tab-pacientes">
+  <div style="display:flex;flex-direction:column;gap:20px">
+
+    <div class="card">
+      <div class="card-header"><span class="card-title"><i class="fa-solid fa-baby" style="color:var(--primary)"></i> Registrar Paciente</span></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin.pacientes') }}" enctype="multipart/form-data">
+
+          <div class="form-group" style="display:flex;flex-direction:column;align-items:center;gap:8px">
+            <div style="position:relative;cursor:pointer" onclick="document.getElementById('foto-pac-crear').click()">
+              <div id="pac-avatar-preview" style="width:72px;height:72px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:28px;overflow:hidden;border:2px solid var(--border)">
+                <i class="fa-solid fa-baby" style="color:var(--text-muted)"></i>
+              </div>
+              <div style="position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+                <i class="fa-solid fa-camera" style="font-size:10px;color:#fff"></i>
+              </div>
             </div>
-            <div style="position:absolute;bottom:0;right:0;width:22px;height:22px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
-              <i class="fa-solid fa-camera" style="font-size:10px;color:#fff"></i>
+            <input type="file" name="foto" id="foto-pac-crear" accept="image/*" style="display:none"
+                   onchange="previewPacAvatar(this,'pac-avatar-preview')">
+            <span style="font-size:0.75rem;color:var(--text-muted)">Foto (opcional)</span>
+          </div>
+
+          <div class="form-row form-row-2">
+            <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
+              <input type="text" name="prim_nombre" class="form-control" required></div>
+            <div class="form-group"><label class="form-label">Segundo nombre</label>
+              <input type="text" name="seg_nombre" class="form-control"></div>
+          </div>
+          <div class="form-row form-row-2">
+            <div class="form-group"><label class="form-label">Apellido paterno <span class="required">*</span></label>
+              <input type="text" name="apellido_pat" class="form-control" required></div>
+            <div class="form-group"><label class="form-label">Apellido materno</label>
+              <input type="text" name="apellido_mat" class="form-control"></div>
+          </div>
+          <div class="form-group"><label class="form-label">N° Certificado de Nacimiento</label>
+            <input type="text" name="num_cert_nac" class="form-control"></div>
+          <div class="form-row form-row-2">
+            <div class="form-group"><label class="form-label">CURP</label>
+              <input type="text" name="curp" class="form-control" maxlength="18" style="text-transform:uppercase">
+              <p class="text-muted fs-sm">Llena al menos uno: CURP o Cert. Nacimiento.</p></div>
+            <div class="form-group"><label class="form-label">Fecha de nacimiento <span class="required">*</span></label>
+              <input type="date" name="fecha_nac" class="form-control" required></div>
+          </div>
+          <div class="form-row form-row-2">
+            <div class="form-group"><label class="form-label">Sexo <span class="required">*</span></label>
+              <select name="sexo" class="form-select" required>
+                <option value="">—</option>
+                <option value="M">Masculino</option>
+                <option value="F">Femenino</option>
+              </select>
+            </div>
+            <div class="form-group"><label class="form-label">UID NFC (pulsera)</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="text" name="nfc" id="nfc-uid-admin" class="form-control" style="flex:1;min-width:0;width:auto" placeholder="Ej: 04:A3:2B:1C:5D:6E">
+                <button type="button" class="btn btn-outline btn-sm" style="flex-shrink:0;padding:9px 10px" title="Escanear NFC" onclick="scanNfcIntoField('nfc-uid-admin')">
+                  <i class="fa-solid fa-wifi"></i>
+                </button>
+              </div>
+              <p class="text-muted fs-sm mt-4">Opcional. En Android Chrome puedes escanear el tag directamente; en otros dispositivos escribe el UID manualmente.</p>
             </div>
           </div>
-          <input type="file" name="foto" id="foto-pac-crear" accept="image/*" style="display:none"
-                 onchange="previewPacAvatar(this,'pac-avatar-preview')">
-          <span style="font-size:0.75rem;color:var(--text-muted)">Foto (opcional)</span>
-        </div>
-
-        <div class="form-row form-row-2">
-          <div class="form-group"><label class="form-label">Primer nombre <span class="required">*</span></label>
-            <input type="text" name="prim_nombre" class="form-control" required></div>
-          <div class="form-group"><label class="form-label">Segundo nombre</label>
-            <input type="text" name="seg_nombre" class="form-control"></div>
-        </div>
-        <div class="form-row form-row-2">
-          <div class="form-group"><label class="form-label">Apellido paterno <span class="required">*</span></label>
-            <input type="text" name="apellido_pat" class="form-control" required></div>
-          <div class="form-group"><label class="form-label">Apellido materno</label>
-            <input type="text" name="apellido_mat" class="form-control"></div>
-        </div>
-        <div class="form-group"><label class="form-label">N° Certificado de Nacimiento</label>
-          <input type="text" name="num_cert_nac" class="form-control"></div>
-        <div class="form-row form-row-2">
-          <div class="form-group"><label class="form-label">CURP</label>
-            <input type="text" name="curp" class="form-control" maxlength="18" style="text-transform:uppercase">
-            <p class="text-muted fs-sm">Llena al menos uno: CURP o Cert. Nacimiento.</p></div>
-          <div class="form-group"><label class="form-label">Fecha de nacimiento <span class="required">*</span></label>
-            <input type="date" name="fecha_nac" class="form-control" required></div>
-        </div>
-        <div class="form-row form-row-2">
-          <div class="form-group"><label class="form-label">Sexo <span class="required">*</span></label>
-            <select name="sexo" class="form-select" required>
-              <option value="">—</option>
-              <option value="M">Masculino</option>
-              <option value="F">Femenino</option>
+          <div class="form-group"><label class="form-label">Esquema de vacunación <span class="required">*</span></label>
+            <select name="esquema_id" class="form-select" required>
+              <option value="">— Selecciona esquema —</option>
+              {% for e in esquemas %}
+              <option value="{{ e.esquema_id }}">{{ e.esquema_nombre }}</option>
+              {% endfor %}
             </select>
           </div>
-          <div class="form-group"><label class="form-label">UID NFC (pulsera)</label>
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" name="nfc" id="nfc-uid-admin" class="form-control" style="flex:1;min-width:0;width:auto" placeholder="Ej: 04:A3:2B:1C:5D:6E">
-              <button type="button" class="btn btn-outline btn-sm" style="flex-shrink:0;padding:9px 10px" title="Escanear NFC" onclick="scanNfcIntoField('nfc-uid-admin')">
-                <i class="fa-solid fa-wifi"></i>
-              </button>
-            </div>
-            <p class="text-muted fs-sm mt-4">Opcional. En Android Chrome puedes escanear el tag directamente; en otros dispositivos escribe el UID manualmente.</p>
-          </div>
-        </div>
-        <div class="form-group"><label class="form-label">Esquema de vacunación <span class="required">*</span></label>
-          <select name="esquema_id" class="form-select" required>
-            <option value="">— Selecciona esquema —</option>
-            {% for e in esquemas %}
-            <option value="{{ e.esquema_id }}">{{ e.esquema_nombre }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <button type="submit" class="btn btn-primary btn-full mt-8">
-          <i class="fa-solid fa-plus"></i> Registrar Paciente
-        </button>
-      </form>
+          <button type="submit" class="btn btn-primary btn-full mt-8">
+            <i class="fa-solid fa-plus"></i> Registrar Paciente
+          </button>
+        </form>
+      </div>
     </div>
-  </div>
 
-  <div class="card">
-    <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-baby" style="color:var(--primary)"></i> Pacientes ({{ pacientes|length }})</span>
-    </div>
-    <div class="card-body" style="padding:16px 22px 12px">
-      <input type="text" class="form-control" placeholder="🔍 Buscar paciente…" data-search-table="tabla-pacientes">
-    </div>
-    <div class="table-wrapper">
-      <table class="table" id="tabla-pacientes">
-        <thead><tr>
-          <th>Nombre</th><th>CURP</th><th>Nac.</th><th>Sexo</th><th>NFC</th><th>Esquema</th><th>Acciones</th>
-        </tr></thead>
-        <tbody>
-          {% for p in pacientes %}
-          <tr>
-            <td class="fw-600">
-              <div style="display:flex;align-items:center;gap:8px">
-                {% if p.paciente_imagen %}
-                <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover">
-                {% endif %}
-                <span>{{ p.paciente_prim_nombre|cap }}
-                {% if p.paciente_nombre %}{{ p.paciente_nombre|cap }} {% endif %}
-                {{ p.paciente_apellido_pat|cap }}</span>
-              </div>
-            </td>
-            <td class="fs-sm" style="font-family:monospace">{{ p.paciente_curp }}</td>
-            <td class="fs-sm">{{ p.paciente_fecha_nac|format_date }}</td>
-            <td>{{ '👦 M' if p.paciente_sexo == 'M' else '👧 F' }}</td>
-            <td class="fs-sm" style="font-family:monospace">{{ p.paciente_nfc or '—' }}</td>
-            <td><span class="badge badge-primary">{{ p.esquema_nombre }}</span></td>
-            <td>
-              <div style="display:flex;gap:6px;align-items:center">
-                <button class="btn btn-secondary btn-sm btn-detail-paciente" title="Ver detalle"
-                        data-det='{{ {
-                          "id":           p.paciente_id,
-                          "prim_nombre":  p.paciente_prim_nombre,
-                          "seg_nombre":   p.paciente_seg_nombre or "",
-                          "apellido_pat": p.paciente_apellido_pat,
-                          "apellido_mat": p.paciente_apellido_mat or "",
-                          "curp":         p.paciente_curp or "",
-                          "num_cert_nac": p.paciente_num_cert_nac or "",
-                          "fecha_nac":    p.paciente_fecha_nac|string,
-                          "sexo":         p.paciente_sexo,
-                          "nfc":          p.paciente_nfc or "",
-                          "esquema":      p.esquema_nombre,
-                          "imagen":       p.paciente_imagen or ""
-                        } | tojson }}'>👁️</button>
-                <a href="{{ url_for('admin.historial_paciente', pid=p.paciente_id) }}"
-                   class="btn btn-secondary btn-sm" title="Ver historial">
-                  <i class="fa-solid fa-notes-medical"></i>
-                </a>
-                <button class="btn btn-secondary btn-sm" data-open-modal="edit-paciente-{{ p.paciente_id }}"
-                        title="Editar">✏️</button>
-                <form method="POST" action="{{ url_for('admin.eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
-                  <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
-                          data-confirm="¿Eliminar al paciente {{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
-                </form>
-              </div>
-            </td>
-          </tr>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-baby" style="color:var(--primary)"></i> Pacientes registrados</span>
+      </div>
+      <div class="card-body" style="padding:16px 22px 12px">
+        <input type="text" class="form-control" placeholder="🔍 Buscar paciente…" data-search-table="tabla-pacientes">
+      </div>
+      <div class="table-wrapper">
+        <table class="table" id="tabla-pacientes">
+          <thead><tr>
+            <th>Nombre</th><th>CURP</th><th>Nac.</th><th>Sexo</th><th>NFC</th><th>Esquema</th><th>Acciones</th>
+          </tr></thead>
+          <tbody>
+            {% for p in pacientes %}
+            <tr>
+              <td class="fw-600">
+                <div style="display:flex;align-items:center;gap:8px">
+                  {% if p.paciente_imagen %}
+                  <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt="" style="width:28px;height:28px;border-radius:50%;object-fit:cover">
+                  {% endif %}
+                  <span>{{ p.paciente_prim_nombre|cap }}
+                  {% if p.paciente_nombre %}{{ p.paciente_nombre|cap }} {% endif %}
+                  {{ p.paciente_apellido_pat|cap }}</span>
+                </div>
+              </td>
+              <td class="fs-sm" style="font-family:monospace">{{ p.paciente_curp }}</td>
+              <td class="fs-sm">{{ p.paciente_fecha_nac|format_date }}</td>
+              <td>{{ '👦 M' if p.paciente_sexo == 'M' else '👧 F' }}</td>
+              <td class="fs-sm" style="font-family:monospace">{{ p.paciente_nfc or '—' }}</td>
+              <td><span class="badge badge-primary">{{ p.esquema_nombre }}</span></td>
+              <td>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <button class="btn btn-secondary btn-sm btn-detail-paciente" title="Ver detalle"
+                          data-det='{{ {
+                            "id":           p.paciente_id,
+                            "prim_nombre":  p.paciente_prim_nombre,
+                            "seg_nombre":   p.paciente_seg_nombre or "",
+                            "apellido_pat": p.paciente_apellido_pat,
+                            "apellido_mat": p.paciente_apellido_mat or "",
+                            "curp":         p.paciente_curp or "",
+                            "num_cert_nac": p.paciente_num_cert_nac or "",
+                            "fecha_nac":    p.paciente_fecha_nac|string,
+                            "sexo":         p.paciente_sexo,
+                            "nfc":          p.paciente_nfc or "",
+                            "esquema":      p.esquema_nombre,
+                            "imagen":       p.paciente_imagen or ""
+                          } | tojson }}'>👁️</button>
+                  <a href="{{ url_for('admin.historial_paciente', pid=p.paciente_id) }}"
+                     class="btn btn-secondary btn-sm" title="Ver historial">
+                    <i class="fa-solid fa-notes-medical"></i>
+                  </a>
+                  <button class="btn btn-secondary btn-sm" data-open-modal="edit-paciente-{{ p.paciente_id }}"
+                          title="Editar">✏️</button>
+                  <form method="POST" action="{{ url_for('admin.eliminar_paciente', pid=p.paciente_id) }}" style="display:inline">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Eliminar"
+                            data-confirm="¿Eliminar al paciente {{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}? Esta acción no se puede deshacer."><i class="fa-solid fa-trash"></i></button>
+                  </form>
+                </div>
+              </td>
+            </tr>
 
-          <div class="modal-overlay" id="edit-paciente-{{ p.paciente_id }}">
-            <div class="modal">
-              <div class="modal-header">
-                <span class="modal-title">✏️ Editar Paciente</span>
-                <button class="btn-close" data-close-modal="edit-paciente-{{ p.paciente_id }}">✕</button>
-              </div>
-              <form method="POST" action="{{ url_for('admin.editar_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data">
-                <div class="modal-body">
-                  <div style="display:flex;align-items:center;gap:16px;padding:4px 0 12px;border-bottom:1px solid var(--border-light);margin-bottom:12px">
-                    <div style="position:relative;cursor:pointer;flex-shrink:0"
-                         onclick="document.getElementById('foto-edit-pac-{{ p.paciente_id }}').click()">
-                      {% if p.paciente_imagen %}
-                      <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt=""
-                           id="pac-edit-preview-{{ p.paciente_id }}"
-                           style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
-                      {% else %}
-                      <div id="pac-edit-preview-{{ p.paciente_id }}"
-                           style="width:56px;height:56px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center">
-                        <i class="fa-solid fa-baby" style="font-size:22px;color:var(--text-muted)"></i>
+            <div class="modal-overlay" id="edit-paciente-{{ p.paciente_id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <span class="modal-title">✏️ Editar Paciente</span>
+                  <button class="btn-close" data-close-modal="edit-paciente-{{ p.paciente_id }}">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('admin.editar_paciente', pid=p.paciente_id) }}" enctype="multipart/form-data">
+                  <div class="modal-body">
+                    <div style="display:flex;align-items:center;gap:16px;padding:4px 0 12px;border-bottom:1px solid var(--border-light);margin-bottom:12px">
+                      <div style="position:relative;cursor:pointer;flex-shrink:0"
+                           onclick="document.getElementById('foto-edit-pac-{{ p.paciente_id }}').click()">
+                        {% if p.paciente_imagen %}
+                        <img src="{{ url_for('static', filename=p.paciente_imagen) }}" alt=""
+                             id="pac-edit-preview-{{ p.paciente_id }}"
+                             style="width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--border)">
+                        {% else %}
+                        <div id="pac-edit-preview-{{ p.paciente_id }}"
+                             style="width:56px;height:56px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center">
+                          <i class="fa-solid fa-baby" style="font-size:22px;color:var(--text-muted)"></i>
+                        </div>
+                        {% endif %}
+                        <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
+                          <i class="fa-solid fa-camera" style="font-size:9px;color:#fff"></i>
+                        </div>
                       </div>
-                      {% endif %}
-                      <div style="position:absolute;bottom:0;right:0;width:20px;height:20px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff">
-                        <i class="fa-solid fa-camera" style="font-size:9px;color:#fff"></i>
+                      <div>
+                        <div class="fw-600">{{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}</div>
+                        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">Haz clic en la foto para cambiarla</div>
+                        <input type="file" name="foto" accept="image/*" style="display:none"
+                               id="foto-edit-pac-{{ p.paciente_id }}"
+                               onchange="previewPacAvatar(this,'pac-edit-preview-{{ p.paciente_id }}')">
                       </div>
                     </div>
-                    <div>
-                      <div class="fw-600">{{ p.paciente_prim_nombre|cap }} {{ p.paciente_apellido_pat|cap }}</div>
-                      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">Haz clic en la foto para cambiarla</div>
-                      <input type="file" name="foto" accept="image/*" style="display:none"
-                             id="foto-edit-pac-{{ p.paciente_id }}"
-                             onchange="previewPacAvatar(this,'pac-edit-preview-{{ p.paciente_id }}')">
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">Primer nombre</label>
+                        <input type="text" name="prim_nombre" class="form-control" value="{{ p.paciente_prim_nombre|cap }}" required></div>
+                      <div class="form-group"><label class="form-label">Segundo nombre</label>
+                        <input type="text" name="seg_nombre" class="form-control" value="{{ (p.paciente_seg_nombre or '')|cap }}"></div>
                     </div>
-                  </div>
-                  <div class="form-row form-row-2">
-                    <div class="form-group"><label class="form-label">Primer nombre</label>
-                      <input type="text" name="prim_nombre" class="form-control" value="{{ p.paciente_prim_nombre|cap }}" required></div>
-                    <div class="form-group"><label class="form-label">Segundo nombre</label>
-                      <input type="text" name="seg_nombre" class="form-control" value="{{ (p.paciente_seg_nombre or '')|cap }}"></div>
-                  </div>
-                  <div class="form-row form-row-2">
-                    <div class="form-group"><label class="form-label">Apellido paterno</label>
-                      <input type="text" name="apellido_pat" class="form-control" value="{{ p.paciente_apellido_pat|cap }}" required></div>
-                    <div class="form-group"><label class="form-label">Apellido materno</label>
-                      <input type="text" name="apellido_mat" class="form-control" value="{{ (p.paciente_apellido_mat or '')|cap }}"></div>
-                  </div>
-                  <div class="form-group"><label class="form-label">N° Certificado de Nacimiento</label>
-                    <input type="text" name="num_cert_nac" class="form-control" value="{{ p.paciente_num_cert_nac or '' }}"></div>
-                  <div class="form-row form-row-2">
-                    <div class="form-group"><label class="form-label">CURP</label>
-                      <input type="text" name="curp" class="form-control" value="{{ p.paciente_curp or '' }}" maxlength="18" style="text-transform:uppercase"></div>
-                    <div class="form-group"><label class="form-label">Fecha de nacimiento</label>
-                      <input type="date" name="fecha_nac" class="form-control" value="{{ p.paciente_fecha_nac }}" required></div>
-                  </div>
-                  <div class="form-row form-row-2">
-                    <div class="form-group"><label class="form-label">Sexo</label>
-                      <select name="sexo" class="form-select" required>
-                        <option value="M" {% if p.paciente_sexo == 'M' %}selected{% endif %}>Masculino</option>
-                        <option value="F" {% if p.paciente_sexo == 'F' %}selected{% endif %}>Femenino</option>
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">Apellido paterno</label>
+                        <input type="text" name="apellido_pat" class="form-control" value="{{ p.paciente_apellido_pat|cap }}" required></div>
+                      <div class="form-group"><label class="form-label">Apellido materno</label>
+                        <input type="text" name="apellido_mat" class="form-control" value="{{ (p.paciente_apellido_mat or '')|cap }}"></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">N° Certificado de Nacimiento</label>
+                      <input type="text" name="num_cert_nac" class="form-control" value="{{ p.paciente_num_cert_nac or '' }}"></div>
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">CURP</label>
+                        <input type="text" name="curp" class="form-control" value="{{ p.paciente_curp or '' }}" maxlength="18" style="text-transform:uppercase"></div>
+                      <div class="form-group"><label class="form-label">Fecha de nacimiento</label>
+                        <input type="date" name="fecha_nac" class="form-control" value="{{ p.paciente_fecha_nac }}" required></div>
+                    </div>
+                    <div class="form-row form-row-2">
+                      <div class="form-group"><label class="form-label">Sexo</label>
+                        <select name="sexo" class="form-select" required>
+                          <option value="M" {% if p.paciente_sexo == 'M' %}selected{% endif %}>Masculino</option>
+                          <option value="F" {% if p.paciente_sexo == 'F' %}selected{% endif %}>Femenino</option>
+                        </select>
+                      </div>
+                      <div class="form-group"><label class="form-label">UID NFC</label>
+                        <input type="text" name="nfc" class="form-control" value="{{ p.paciente_nfc or '' }}"></div>
+                    </div>
+                    <div class="form-group"><label class="form-label">Esquema de vacunación</label>
+                      <select name="esquema_id" class="form-select" required>
+                        <option value="">— Selecciona esquema —</option>
+                        {% for e in esquemas %}
+                        <option value="{{ e.esquema_id }}" {% if e.esquema_id == p.esquema_id %}selected{% endif %}>{{ e.esquema_nombre }}</option>
+                        {% endfor %}
                       </select>
                     </div>
-                    <div class="form-group"><label class="form-label">UID NFC</label>
-                      <input type="text" name="nfc" class="form-control" value="{{ p.paciente_nfc or '' }}"></div>
                   </div>
-                  <div class="form-group"><label class="form-label">Esquema de vacunación</label>
-                    <select name="esquema_id" class="form-select" required>
-                      <option value="">— Selecciona esquema —</option>
-                      {% for e in esquemas %}
-                      <option value="{{ e.esquema_id }}" {% if e.esquema_id == p.esquema_id %}selected{% endif %}>{{ e.esquema_nombre }}</option>
-                      {% endfor %}
-                    </select>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-close-modal="edit-paciente-{{ p.paciente_id }}">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar cambios</button>
                   </div>
-                </div>
-                <div class="modal-footer">
-                  <button type="button" class="btn btn-secondary" data-close-modal="edit-paciente-{{ p.paciente_id }}">Cancelar</button>
-                  <button type="submit" class="btn btn-primary">Guardar cambios</button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
 
-          {% else %}
-          <tr><td colspan="7" class="text-center text-muted" style="padding:40px">No pacientes registrados.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  {# ── Modal Detalle Paciente ──────────────────────────────────────────────── #}
-  <div class="modal-overlay" id="modal-detalle-paciente">
-    <div class="modal" style="max-width:520px">
-      <div class="modal-header">
-        <span class="modal-title">👁️ Detalle de Paciente</span>
-        <button class="btn-close" onclick="document.getElementById('modal-detalle-paciente').classList.remove('open')">✕</button>
-      </div>
-      <div class="modal-body" id="detalle-paciente-body"></div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-paciente').classList.remove('open')">Cerrar</button>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted" style="padding:40px">No pacientes registrados.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
-  </div>
 
-  {% if alertas_dosis %}
+  </div>
+</div>
+
+<div class="tab-panel" id="tab-alertas-dosis">
   <div class="card">
     <div class="card-header">
-      <span class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning)"></i> Alertas clínicas ({{ alertas_dosis|length }})</span>
+      <span class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--warning)"></i> Alertas clínicas de dosis</span>
     </div>
+    {% if alertas_dosis %}
     <div class="table-wrapper">
       <table class="table">
         <thead><tr><th>Paciente</th><th>Vacuna</th><th>Dosis</th><th>Estado</th></tr></thead>
@@ -271,14 +274,44 @@
         </tbody>
       </table>
     </div>
+    {% else %}
+    <div class="card-body text-center" style="padding:48px 20px">
+      <i class="fa-solid fa-circle-check" style="font-size:36px;color:var(--success)"></i>
+      <p class="fw-600 mt-8">Sin alertas de dosis activas</p>
+      <p class="text-muted fs-sm">Todos los pacientes están al día con su esquema de vacunación.</p>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
-
 </div>
+
+{# ── Modal Detalle Paciente ──────────────────────────────────────────────── #}
+<div class="modal-overlay" id="modal-detalle-paciente">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title">👁️ Detalle de Paciente</span>
+      <button class="btn-close" onclick="document.getElementById('modal-detalle-paciente').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body" id="detalle-paciente-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-detalle-paciente').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
+// Tabs
+document.querySelectorAll('#pac-tabs .tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#pac-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById(btn.dataset.tab).classList.add('active');
+  });
+});
+
 function previewPacAvatar(input, previewId) {
   const el = document.getElementById(previewId);
   if (!input.files || !input.files[0] || !el) return;
