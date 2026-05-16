@@ -396,10 +396,10 @@ let chartMes = null;
 let chartVac = null;
 
 function fetchReporteData() {
-  const desde  = document.getElementById('filter-desde').value;
-  const hasta  = document.getElementById('filter-hasta').value;
-  const centro = document.getElementById('filter-centro').value;
-  const vacuna = document.getElementById('filter-vacuna').value;
+  const desde  = (document.getElementById('filter-desde')  || {}).value || '2024-01-01';
+  const hasta  = (document.getElementById('filter-hasta')  || {}).value || new Date().toISOString().split('T')[0];
+  const centro = (document.getElementById('filter-centro') || {}).value || '';
+  const vacuna = (document.getElementById('filter-vacuna') || {}).value || '';
   const params = new URLSearchParams({ desde, hasta });
   if (centro) params.set('centro', centro);
   if (vacuna) params.set('vacuna', vacuna);
@@ -451,6 +451,7 @@ function fetchReporteData() {
 // TAB 2: ANÁLISIS (Reportes + MongoDB + SPs)
 // ═════════════════════════════════════════════════════════════════════════════
 function loadAvanzado() {
+  fetchReporteData();
   loadMongoCharts();
   loadRanking();
   loadCobertura();
