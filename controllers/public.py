@@ -60,7 +60,12 @@ def scheme_doses(esquema_id):
 
 @public_bp.route('/api/stats-publicas')
 def api_stats_publicas():
-    desde = '2000-01-01'
+    from datetime import date, timedelta
+    meses = request.args.get('meses', type=int)
+    if meses and meses > 0:
+        desde = (date.today().replace(day=1) - timedelta(days=meses * 30)).strftime('%Y-%m-%d')
+    else:
+        desde = '2000-01-01'
     hasta = '2099-12-31'
     por_mes     = repo.chart_por_mes(desde, hasta)
     top_vacunas = repo.chart_top_vacunas(desde, hasta)

@@ -99,7 +99,16 @@
     <p style="color:var(--text-muted);font-size:0.875rem;margin-bottom:24px">Datos agregados y anónimos del programa nacional de vacunación infantil.</p>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
       <div class="card">
-        <div class="card-header"><span class="card-title"><i class="fa-solid fa-chart-column"></i> Aplicaciones por mes</span></div>
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-chart-column"></i> Aplicaciones por mes</span>
+          <select id="sel-meses-public" class="form-select" style="width:auto;font-size:0.8rem;padding:4px 8px">
+            <option value="0">Todo el tiempo</option>
+            <option value="3">Últimos 3 meses</option>
+            <option value="6">Últimos 6 meses</option>
+            <option value="12" selected>Últimos 12 meses</option>
+            <option value="24">Últimos 24 meses</option>
+          </select>
+        </div>
         <div class="card-body"><div id="chart-public-bar" style="height:260px"></div></div>
       </div>
       <div class="card">
@@ -150,12 +159,11 @@
 <script>
 const HC_COLORS = ['#7C3AED','#2563EB','#16A34A','#D97706','#EA580C','#DC2626','#8B5CF6','#0891B2','#BE185D','#0D9488'];
 
-document.addEventListener('DOMContentLoaded', () => {
-  fetch('/api/stats-publicas')
+function loadPublicBarChart(meses) {
+  const url = '/api/stats-publicas' + (meses ? '?meses=' + meses : '');
+  fetch(url)
     .then(r => r.json())
     .then(data => {
-
-      // ── Aplicaciones por mes ──────────────────────────────────────────────
       if (data.por_mes && data.por_mes.length) {
         Highcharts.chart('chart-public-bar', {
           chart: { type:'column', backgroundColor:'transparent', style:{fontFamily:'inherit'} },
@@ -172,6 +180,17 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('chart-public-bar').innerHTML =
           '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:0.85rem">Sin datos disponibles aún.</div>';
       }
+    }).catch(() => {});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const selPublic = document.getElementById('sel-meses-public');
+  loadPublicBarChart(selPublic ? selPublic.value : 12);
+  if (selPublic) selPublic.addEventListener('change', () => loadPublicBarChart(selPublic.value));
+
+  fetch('/api/stats-publicas')
+    .then(r => r.json())
+    .then(data => {
 
       // ── Distribución por vacuna ───────────────────────────────────────────
       if (data.top_vacunas && data.top_vacunas.length) {

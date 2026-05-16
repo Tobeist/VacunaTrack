@@ -105,7 +105,13 @@
     <div class="card">
       <div class="card-header">
         <span class="card-title"><i class="fa-solid fa-chart-column" style="color:var(--primary)"></i> Aplicaciones por mes</span>
-        <span class="badge badge-secondary fs-sm">PostgreSQL · sp_chart_por_mes</span>
+        <select id="sel-meses-reporte" class="form-select" style="width:auto;font-size:0.8rem;padding:4px 8px">
+          <option value="0">Todo el tiempo</option>
+          <option value="3">Últimos 3 meses</option>
+          <option value="6">Últimos 6 meses</option>
+          <option value="12" selected>Últimos 12 meses</option>
+          <option value="24">Últimos 24 meses</option>
+        </select>
       </div>
       <div class="card-body"><div id="chart-por-mes" style="height:300px"></div></div>
     </div>
@@ -396,13 +402,16 @@ let chartMes = null;
 let chartVac = null;
 
 function fetchReporteData() {
-  const desde  = (document.getElementById('filter-desde')  || {}).value || '2024-01-01';
-  const hasta  = (document.getElementById('filter-hasta')  || {}).value || new Date().toISOString().split('T')[0];
-  const centro = (document.getElementById('filter-centro') || {}).value || '';
-  const vacuna = (document.getElementById('filter-vacuna') || {}).value || '';
+  const meses = parseInt((document.getElementById('sel-meses-reporte') || {}).value || '12');
+  const hasta = new Date().toISOString().split('T')[0];
+  let desde;
+  if (meses > 0) {
+    const d = new Date(); d.setMonth(d.getMonth() - meses); d.setDate(1);
+    desde = d.toISOString().split('T')[0];
+  } else {
+    desde = '2000-01-01';
+  }
   const params = new URLSearchParams({ desde, hasta });
-  if (centro) params.set('centro', centro);
-  if (vacuna) params.set('vacuna', vacuna);
 
   fetch('/admin/api/reporte-datos?' + params)
     .then(r => r.json())
@@ -452,6 +461,8 @@ function fetchReporteData() {
 // ═════════════════════════════════════════════════════════════════════════════
 function loadAvanzado() {
   fetchReporteData();
+  const selMeses = document.getElementById('sel-meses-reporte');
+  if (selMeses) selMeses.addEventListener('change', fetchReporteData);
   loadMongoCharts();
   loadRanking();
   loadCobertura();
