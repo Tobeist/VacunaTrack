@@ -195,9 +195,6 @@
                 <span>
                   {{ u.usuario_apellido_pat|cap }}, {{ u.usuario_prim_nombre|cap }}
                   {% if u.usuario_seg_nombre %} {{ u.usuario_seg_nombre|cap }}{% endif %}
-                  {% if not u.usuario_activo %}
-                    <span class="badge badge-gray" style="font-size:10px;margin-left:4px">inactivo</span>
-                  {% endif %}
                 </span>
               </div>
             </td>
