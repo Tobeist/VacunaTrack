@@ -57,6 +57,25 @@ def _patient_response(paciente):
     })
 
 
+@clinical_bp.route('/clinico/dashboard')
+def dashboard():
+    redir = _require_responsable()
+    if redir:
+        return redir
+    responsable_id = session['user_id']
+    responsable    = repo.obtener_responsable(responsable_id)
+    centro_id      = responsable['centro_id'] if responsable else None
+    stats          = repo.dashboard_responsable_stats(responsable_id, centro_id) if centro_id else {}
+    inventario     = repo.inventario_con_alertas_de_centro(centro_id) if centro_id else []
+    lotes_proximos = repo.lotes_proximos_caducar_centro(centro_id) if centro_id else []
+    return render_template('clinical/dashboard.html',
+                           responsable=responsable,
+                           stats=stats,
+                           inventario=inventario,
+                           lotes_proximos=lotes_proximos,
+                           today=date.today())
+
+
 @clinical_bp.route('/clinico')
 def lookup():
     redir = _require_responsable()

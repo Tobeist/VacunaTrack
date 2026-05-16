@@ -13,7 +13,7 @@ generate_password_hash = partial(_gph, method='pbkdf2:sha256')
 
 _ROLE_REDIRECT = {
     'admin':       'admin.dashboard',
-    'responsable': 'clinical.lookup',
+    'responsable': 'clinical.dashboard',
     'tutor':       'public.tutor_dashboard',
 }
 

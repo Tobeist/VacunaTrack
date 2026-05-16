@@ -3000,3 +3000,75 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN p_ok := 0; p_msg := 'No se pudieron resincronizar los sequences.';
 END; $$;
+
+-- ═══ DASHBOARD RESPONSABLE ═══
+
+CREATE OR REPLACE PROCEDURE sp_dashboard_responsable_stats(
+    IN  p_usuario_id INTEGER,
+    IN  p_centro_id  INTEGER,
+    INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+    SELECT
+        (SELECT COUNT(*)
+         FROM aplicaciones
+         WHERE usuario_id = p_usuario_id
+           AND DATE(aplicacion_timestamp) = CURRENT_DATE
+        ) AS aplicaciones_hoy,
+        (SELECT COUNT(DISTINCT paciente_id)
+         FROM aplicaciones
+         WHERE usuario_id = p_usuario_id
+           AND DATE(aplicacion_timestamp) = CURRENT_DATE
+        ) AS pacientes_hoy,
+        (SELECT COUNT(*)
+         FROM inventarios
+         WHERE centro_id = p_centro_id
+           AND inventario_activo_desde IS NULL
+        ) AS pendientes_confirmacion;
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_inventario_con_alertas_de_centro(
+    IN  p_centro_id  INTEGER,
+    INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+    SELECT
+        v.inventario_id,
+        v.vacuna_nombre,
+        v.lote_codigo,
+        v.lote_fecha_caducidad,
+        v.inventario_stock_actual,
+        v.inventario_activo,
+        (SELECT ai.alerta_inv_tipo::text
+         FROM alertas_inventario ai
+         WHERE ai.inventario_id = v.inventario_id
+         ORDER BY ai.alerta_inv_timestamp DESC
+         LIMIT 1) AS alerta_tipo
+    FROM vw_inventarios v
+    WHERE v.centro_id = p_centro_id
+      AND v.inventario_activo_desde IS NOT NULL
+    ORDER BY v.vacuna_nombre;
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_lotes_proximos_caducar_centro(
+    IN  p_centro_id INTEGER,
+    IN  p_dias      INTEGER,
+    INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+    SELECT
+        v.vacuna_nombre,
+        v.lote_codigo,
+        v.lote_fecha_caducidad,
+        v.inventario_stock_actual,
+        (v.lote_fecha_caducidad - CURRENT_DATE) AS dias_restantes
+    FROM vw_inventarios v
+    WHERE v.centro_id = p_centro_id
+      AND v.inventario_activo_desde IS NOT NULL
+      AND v.inventario_stock_actual > 0
+      AND v.lote_fecha_caducidad BETWEEN CURRENT_DATE AND (CURRENT_DATE + p_dias)
+    ORDER BY v.lote_fecha_caducidad;
+END; $$;

@@ -1011,3 +1011,31 @@ def kpis_generales() -> dict:
         if row.get(k) is not None:
             row[k] = float(row[k])
     return row
+
+
+# ─────────────────────────────────────────────
+# DASHBOARD RESPONSABLE
+# ─────────────────────────────────────────────
+
+def dashboard_responsable_stats(usuario_id: int, centro_id: int) -> dict:
+    rows = db.call_read_sp('sp_dashboard_responsable_stats', [usuario_id, centro_id])
+    if not rows:
+        return {'aplicaciones_hoy': 0, 'pacientes_hoy': 0, 'pendientes_confirmacion': 0}
+    row = rows[0]
+    for k in ('aplicaciones_hoy', 'pacientes_hoy', 'pendientes_confirmacion'):
+        row[k] = int(row.get(k) or 0)
+    return row
+
+
+def inventario_con_alertas_de_centro(centro_id: int) -> list[dict]:
+    return db.call_read_sp('sp_inventario_con_alertas_de_centro', [centro_id])
+
+
+def lotes_proximos_caducar_centro(centro_id: int, dias: int = 30) -> list[dict]:
+    rows = db.call_read_sp('sp_lotes_proximos_caducar_centro', [centro_id, dias])
+    for r in rows:
+        if r.get('lote_fecha_caducidad'):
+            r['lote_fecha_caducidad'] = str(r['lote_fecha_caducidad'])
+        if r.get('dias_restantes') is not None:
+            r['dias_restantes'] = int(r['dias_restantes'])
+    return rows
