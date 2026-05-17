@@ -15,7 +15,7 @@ BEGIN
         SELECT usuario_id AS id, email, password,
                INITCAP(first_name) AS first_name,
                INITCAP(last_name)  AS last_name,
-               role
+               role, activo
         FROM vw_usuarios_auth WHERE email = LOWER(TRIM(p_email))
         ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'responsable' THEN 1 ELSE 2 END
         LIMIT 1;
