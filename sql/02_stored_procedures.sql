@@ -1102,7 +1102,7 @@ CREATE OR REPLACE PROCEDURE sp_obtener_centro_por_beacon(
     IN p_beacon_id VARCHAR(100), INOUT p_resultados REFCURSOR)
 LANGUAGE plpgsql AS $$
 BEGIN
-    OPEN p_resultados FOR SELECT * FROM vw_centros_detalle WHERE centro_beacon = p_beacon_id;
+    OPEN p_resultados FOR SELECT * FROM vw_centros_detalle WHERE LOWER(centro_beacon) = LOWER(p_beacon_id);
 END; $$;
 
 CREATE OR REPLACE PROCEDURE sp_crear_centro(
