@@ -214,11 +214,11 @@ INSERT INTO usuarios_roles (usuario_id, rol_id) VALUES
 
 -- ─── CÉDULAS PROFESIONALES ───────────────────────────────────────────────────
 INSERT INTO cedulas (cedula_numero, cedula_especialidad, usuario_id) VALUES
-    ('CED-MG-2020-001', 'Medicina General y Familiar',  2),
-    ('CED-PE-2019-002', 'Pediatría',                    3),
-    ('CED-MG-2018-003', 'Medicina General y Familiar',  4),
-    ('CED-PE-2021-004', 'Pediatría',                    5),
-    ('CED-MG-2022-005', 'Medicina General y Familiar',  6);
+    ('3847291',  'Medicina General y Familiar',  2),
+    ('92048371', 'Pediatría',                    3),
+    ('5610284',  'Medicina General y Familiar',  4),
+    ('74829103', 'Pediatría',                    5),
+    ('8203947',  'Medicina General y Familiar',  6);
 
 -- ─── PACIENTES (18) ──────────────────────────────────────────────────────────
 -- Todos asignados a esquema 1 (2024). El trigger asigna el más reciente activo
