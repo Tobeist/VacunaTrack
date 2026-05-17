@@ -132,13 +132,7 @@ sudo -u postgres psql -d vacunatrack -f sql/04_triggers.sql
 sudo -u postgres psql -d vacunatrack -f sql/05_indexes.sql
 ```
 
-### 3.7 Transferir ownership a vacunatrack_user
-
-```bash
-sudo -u postgres psql -d vacunatrack -f sql/06_ownership.sql
-```
-
-### 3.8 Verificar que todo quedó correcto
+### 3.7 Verificar que todo quedó correcto
 
 ```bash
 sudo -u postgres psql -d vacunatrack -c "\dt"   # listar tablas
@@ -424,8 +418,6 @@ sudo -u postgres psql -d vacunatrack -f sql/02_stored_procedures.sql
 sudo -u postgres psql -d vacunatrack -f sql/03_views.sql
 sudo -u postgres psql -d vacunatrack -f sql/04_triggers.sql
 sudo -u postgres psql -d vacunatrack -f sql/05_indexes.sql
-sudo -u postgres psql -d vacunatrack -f sql/05_indexes.sql
-sudo -u postgres psql -d vacunatrack -f sql/06_ownership.sql
 sudo -u postgres psql -d vacunatrack -f seed_final.sql
 
 # MongoDB
