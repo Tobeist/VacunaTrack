@@ -661,3 +661,23 @@ DROP TRIGGER IF EXISTS trg_restaurar_stock ON aplicaciones;
 CREATE TRIGGER trg_restaurar_stock
 AFTER DELETE ON aplicaciones
 FOR EACH ROW EXECUTE FUNCTION fn_restaurar_stock();
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- OWNERSHIP — transferir todas las funciones de trigger a vacunatrack_user
+-- ═════════════════════════════════════════════════════════════════════════════
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN
+        SELECT p.oid::regprocedure::text AS sig
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+    LOOP
+        BEGIN
+            EXECUTE 'ALTER ROUTINE ' || r.sig || ' OWNER TO vacunatrack_user';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;

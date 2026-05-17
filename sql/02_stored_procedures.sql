@@ -3097,3 +3097,23 @@ BEGIN
       AND v.lote_fecha_caducidad BETWEEN CURRENT_DATE AND (CURRENT_DATE + p_dias)
     ORDER BY v.lote_fecha_caducidad;
 END; $$;
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- OWNERSHIP — transferir todas las funciones y procedimientos a vacunatrack_user
+-- ═════════════════════════════════════════════════════════════════════════════
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN
+        SELECT p.oid::regprocedure::text AS sig
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+    LOOP
+        BEGIN
+            EXECUTE 'ALTER ROUTINE ' || r.sig || ' OWNER TO vacunatrack_user';
+        EXCEPTION WHEN OTHERS THEN NULL;
+        END;
+    END LOOP;
+END $$;

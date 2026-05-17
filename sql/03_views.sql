@@ -609,3 +609,15 @@ WHERE
           AND  ep.esquema_id            = p.esquema_id
           AND  ep.esq_pac_motivo_cambio LIKE 'conflicto_resuelto:%'
     );
+
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- OWNERSHIP — transferir todas las vistas a vacunatrack_user
+-- ═════════════════════════════════════════════════════════════════════════════
+DO $$
+DECLARE r RECORD;
+BEGIN
+    FOR r IN SELECT viewname FROM pg_views WHERE schemaname = 'public' LOOP
+        EXECUTE 'ALTER VIEW public.' || quote_ident(r.viewname) || ' OWNER TO vacunatrack_user';
+    END LOOP;
+END $$;
