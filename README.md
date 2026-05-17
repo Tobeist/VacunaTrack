@@ -245,6 +245,14 @@ El seed `seed_final.sql` limpia todas las tablas, reinicia secuencias e inserta 
 sudo -u postgres psql -d vacunatrack -f seed_final.sql
 ```
 
+Después del seed, actualiza los hashes de contraseñas con la versión de Werkzeug instalada en la VM:
+
+```bash
+python3 seed_passwords.py
+```
+
+> Este paso es obligatorio. Los hashes de contraseñas dependen de la versión de Werkzeug instalada; `seed_passwords.py` los genera directamente en la máquina para garantizar compatibilidad.
+
 > Para empezar de cero en cualquier momento, basta con volver a ejecutar este mismo archivo — ya incluye `TRUNCATE ... RESTART IDENTITY CASCADE` al inicio.
 
 ### 7.2 Seed de MongoDB
@@ -414,6 +422,9 @@ sudo -u postgres psql -d vacunatrack -f seed_final.sql
 
 # MongoDB
 python3 seed_mongo.py
+
+# Hashes de contraseñas
+python3 seed_passwords.py
 ```
 
 ---

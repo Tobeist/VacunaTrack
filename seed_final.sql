@@ -170,41 +170,41 @@ VALUES
 -- Contraseña Admin2024!
 INSERT INTO login (usuario_id, login_correo, login_contrasena) VALUES
 (1, 'admin@vacunatrack.mx',
- 'pbkdf2:sha256:600000$8RTrouFB5J9YLQ6b$68495ba1488f0cf18a613482d17eabef7e8045b65e5e8fa32940d7620017ab38');
+ 'pbkdf2:sha256:1000000$eaKdBrMwAkNzFlbl$77b507ae015ac1209e74f2ef6a6a0b6e6df0599c865b6dbd075e34c77e4e6eb6');
 
 -- Contraseña Resp2024!
 INSERT INTO login (usuario_id, login_correo, login_contrasena) VALUES
 (2, 'diego@vacunatrack.mx',
- 'pbkdf2:sha256:600000$EbunBmcTleKquDqZ$02da4288d39e3e5070d1f8de052114319357bb2993dd47b5628ced9e1119eda6'),
+ 'pbkdf2:sha256:1000000$zS4EmpsRzQj2DyCR$ac9da319a96105ea6de4e66c231ecdee2ce535dfea382fd9a47c39b36c142268'),
 (3, 'ana@vacunatrack.mx',
- 'pbkdf2:sha256:600000$EbunBmcTleKquDqZ$02da4288d39e3e5070d1f8de052114319357bb2993dd47b5628ced9e1119eda6'),
+ 'pbkdf2:sha256:1000000$zS4EmpsRzQj2DyCR$ac9da319a96105ea6de4e66c231ecdee2ce535dfea382fd9a47c39b36c142268'),
 (4, 'roberto.chavez@vacunatrack.mx',
- 'pbkdf2:sha256:600000$EbunBmcTleKquDqZ$02da4288d39e3e5070d1f8de052114319357bb2993dd47b5628ced9e1119eda6'),
+ 'pbkdf2:sha256:1000000$zS4EmpsRzQj2DyCR$ac9da319a96105ea6de4e66c231ecdee2ce535dfea382fd9a47c39b36c142268'),
 (5, 'maria@vacunatrack.mx',
- 'pbkdf2:sha256:600000$EbunBmcTleKquDqZ$02da4288d39e3e5070d1f8de052114319357bb2993dd47b5628ced9e1119eda6'),
+ 'pbkdf2:sha256:1000000$zS4EmpsRzQj2DyCR$ac9da319a96105ea6de4e66c231ecdee2ce535dfea382fd9a47c39b36c142268'),
 (6, 'luis@vacunatrack.mx',
- 'pbkdf2:sha256:600000$EbunBmcTleKquDqZ$02da4288d39e3e5070d1f8de052114319357bb2993dd47b5628ced9e1119eda6');
+ 'pbkdf2:sha256:1000000$zS4EmpsRzQj2DyCR$ac9da319a96105ea6de4e66c231ecdee2ce535dfea382fd9a47c39b36c142268');
 
 -- Contraseña Tutor2024!
 INSERT INTO login (usuario_id, login_correo, login_contrasena) VALUES
 (7,  'juan@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (8,  'carmen@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (9,  'roberto.garcia@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (10, 'sofia.martinez@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (11, 'eduardo@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (12, 'patricia@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (13, 'fernando@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (14, 'alejandra@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846'),
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67'),
 (15, 'hector@correo.mx',
- 'pbkdf2:sha256:600000$PtIINqubBppt2cNj$9ff0bb057cb153995b9ab3147cb4bc6d0dd117fe6a1a70d51a53d53f5748e846');
+ 'pbkdf2:sha256:1000000$KpWChCafz5COVPE4$19640afbfd0a369e6653d1e0dbba95894ffbfe889c2348ba8fbd3269fe59ff67');
 
 -- ─── ROLES DE USUARIOS ───────────────────────────────────────────────────────
 INSERT INTO usuarios_roles (usuario_id, rol_id) VALUES

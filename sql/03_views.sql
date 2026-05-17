@@ -391,7 +391,7 @@ JOIN esquemas e  ON e.esquema_id = de.esquema_id;
 CREATE OR REPLACE VIEW vw_vacunas AS
 SELECT v.*,
     COUNT(DISTINCT vp.padecimiento_id)                                          AS total_padecimientos,
-    COALESCE(STRING_AGG(p.padecimiento_nombre, ', ' ORDER BY p.padecimiento_nombre), '—') AS padecimientos,
+    COALESCE(STRING_AGG(DISTINCT p.padecimiento_nombre, ', '), '—') AS padecimientos,
     COUNT(DISTINCT a.aplicacion_id)                                             AS total_aplicaciones
 FROM vacunas v
 LEFT JOIN vacunas_padecimientos vp ON vp.vacuna_id       = v.vacuna_id
