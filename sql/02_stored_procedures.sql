@@ -2690,6 +2690,36 @@ BEGIN
     p_msg := 'OK';
 END; $$;
 
+CREATE OR REPLACE PROCEDURE sp_vacunas_en_centro(
+    IN p_centro_id INTEGER, INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+        SELECT l.vacuna_id,
+               v.vacuna_nombre,
+               SUM(i.inventario_stock_actual) AS stock_total
+        FROM inventarios i
+        JOIN lotes   l ON l.lote_id   = i.lote_id
+        JOIN vacunas v ON v.vacuna_id = l.vacuna_id
+        WHERE i.centro_id = p_centro_id
+          AND i.inventario_activo_desde IS NOT NULL
+          AND i.inventario_stock_actual > 0
+          AND (l.lote_fecha_caducidad IS NULL OR l.lote_fecha_caducidad > CURRENT_DATE)
+        GROUP BY l.vacuna_id, v.vacuna_nombre
+        ORDER BY v.vacuna_nombre;
+END; $$;
+
+CREATE OR REPLACE PROCEDURE sp_tutores_esperando_en_centro(
+    IN p_centro_id INTEGER, INOUT p_resultados REFCURSOR)
+LANGUAGE plpgsql AS $$
+BEGIN
+    OPEN p_resultados FOR
+        SELECT DISTINCT tutor_id
+        FROM lecturas_beacon
+        WHERE centro_id = p_centro_id
+          AND lectura_timestamp > NOW() - INTERVAL '1 hour';
+END; $$;
+
 CREATE OR REPLACE PROCEDURE sp_registrar_evento_gps(
     IN  p_tutor_id  INTEGER,
     IN  p_latitud   NUMERIC(11,8),
