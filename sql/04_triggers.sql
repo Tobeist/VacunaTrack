@@ -1,7 +1,6 @@
 -- ═════════════════════════════════════════════════════════════════════════════
 -- VacunaTrack — 04_triggers.sql
 -- Todas las funciones de trigger y sus CREATE TRIGGER correspondientes.
--- Versiones más recientes de triggers parchados ya están incorporadas aquí.
 -- Ejecutar después de 01_schema.sql, 02_views.sql y 03_stored_procedures.sql:
 --   psql -U vacunatrack_user -d vacunatrack -f 04_triggers.sql
 -- ═════════════════════════════════════════════════════════════════════════════
@@ -18,7 +17,6 @@
 --    Si se intenta insertar un paciente sin esquema_id, asigna automáticamente
 --    el esquema activo más reciente según esquema_fecha_vigencia.
 --    Corre antes de trg_normalizar_curp (orden alfabético: a < n).
---    Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_asignar_esquema_default()
@@ -53,7 +51,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_asignar_esquema_default();
 -- 2. NORMALIZAR CURP (BEFORE INSERT/UPDATE)
 --    Elimina espacios y convierte a mayúsculas antes de persistir.
 --    Corre en orden alfabético antes que trg_validar_curp.
---    Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_normalizar_curp()
@@ -76,7 +73,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_normalizar_curp();
 -- 3. VALIDAR CURP (BEFORE INSERT/UPDATE)
 --    Verifica que el CURP cumpla el formato oficial mexicano de 18 caracteres.
 --    Corre después de trg_normalizar_curp (orden alfabético: n < v).
---    Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_validar_curp()
@@ -102,7 +98,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_validar_curp();
 -- 4. VALIDAR FECHA DE NACIMIENTO (BEFORE INSERT/UPDATE)
 --    La tabla ya tiene CHECK (paciente_fecha_nac <= current_date).
 --    Este trigger agrega la cota inferior: no más de 120 años atrás.
---    Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_validar_fecha_nac()
@@ -125,7 +120,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_validar_fecha_nac();
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. NORMALIZAR NOMBRES DE PACIENTE (BEFORE INSERT/UPDATE)
 --    Convierte nombres y apellidos a minúsculas con trim.
---    Fuente: vacunatrack_diaitc.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_normalizar_nombres_paciente()
@@ -150,7 +144,6 @@ EXECUTE FUNCTION trg_normalizar_nombres_paciente();
 -- 6. HISTORIAL AUTOMÁTICO DE ASIGNACIÓN DE ESQUEMA (AFTER INSERT/UPDATE)
 --    Registra en esquemas_pacientes cada vez que se asigna o cambia
 --    el esquema de un paciente.
---    Fuente: vacunatrack_diaitc.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_registrar_historial_esquema()
@@ -190,7 +183,6 @@ EXECUTE FUNCTION trg_registrar_historial_esquema();
 -- 7. NORMALIZAR RFC (BEFORE INSERT/UPDATE)
 --    Elimina espacios y convierte a mayúsculas antes de persistir.
 --    Corre en orden alfabético antes que trg_validar_rfc.
---    Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_normalizar_rfc()
@@ -214,7 +206,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_normalizar_rfc();
 --    Persona física:  13 chars — 4 letras + 6 dígitos (fecha) + 3 homoclave.
 --    Persona moral:   12 chars — 3 letras + 6 dígitos (fecha) + 3 homoclave.
 --    Corre después de trg_normalizar_rfc (orden alfabético: n < v).
---    Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_validar_rfc()
@@ -239,7 +230,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_validar_rfc();
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 9. NORMALIZAR NOMBRES DE USUARIO (BEFORE INSERT/UPDATE)
 --    Convierte nombres y apellidos a minúsculas con trim.
---    Fuente: vacunatrack_diaitc.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_normalizar_nombres_usuario()
@@ -267,7 +257,6 @@ EXECUTE FUNCTION trg_normalizar_nombres_usuario();
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 10. FORZAR LOWERCASE EN login_correo (BEFORE INSERT/UPDATE)
 --     Evita que "Usuario@correo.mx" y "usuario@correo.mx" sean cuentas distintas.
---     Fuente: patch_postgres.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_fn_email_lower()
@@ -293,7 +282,6 @@ EXECUTE FUNCTION trg_fn_email_lower();
 -- 11. NORMALIZAR centro_beacon (BEFORE INSERT/UPDATE)
 --     Trim + lowercase al guardar un centro.
 --     Evita que "ABC123" y " abc123 " sean beacons distintos y el matching falle.
---     Fuente: patch_postgres.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_fn_normalizar_beacon()
@@ -321,7 +309,6 @@ EXECUTE FUNCTION trg_fn_normalizar_beacon();
 -- 12. BLOQUEAR ELIMINACIÓN DE LOTE CON STOCK (BEFORE DELETE)
 --     Previene borrar un lote que aún tiene unidades en algún inventario,
 --     evitando inconsistencias de stock.
---     Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_bloquear_eliminar_lote_con_stock()
@@ -355,7 +342,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_bloquear_eliminar_lote_con_stock();
 -- 13. VALIDAR LOTE CADUCADO EN INVENTARIO (AFTER INSERT/UPDATE)
 --     Defensa en profundidad: aunque Python no valide, la BD rechaza
 --     movimientos de stock sobre lotes caducados.
---     Fuente: sps_riesgos_serios.sql (RIESGO 1B)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_validar_lote_caducidad()
@@ -390,7 +376,6 @@ EXECUTE FUNCTION trg_validar_lote_caducidad();
 -- 14. ALERTAS DE STOCK AUTOMÁTICAS EN INVENTARIO (AFTER INSERT/UPDATE)
 --     Trigger reactivo: cuando baja el stock, genera alerta inmediata
 --     de tipo AGOTADO o CERCA_AGOTAR según umbrales.
---     Fuente: sps_riesgos_serios.sql (RIESGO 2)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_alerta_stock_inventario()
@@ -426,7 +411,6 @@ EXECUTE FUNCTION trg_alerta_stock_inventario();
 -- 15. BLOQUEAR LOTE CADUCADO AL REGISTRAR APLICACIÓN (BEFORE INSERT)
 --     Impide registrar una aplicación si la fecha de caducidad del lote
 --     ya pasó al momento del INSERT.
---     Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_bloquear_lote_caducado()
@@ -459,7 +443,6 @@ FOR EACH ROW EXECUTE FUNCTION fn_bloquear_lote_caducado();
 --     Complementa trg_validar_intervalo_dosis, que sólo verifica el intervalo
 --     mínimo. Este trigger verifica que el paciente tenga la edad mínima
 --     recomendada y que no haya superado el límite de edad para la dosis.
---     Fuente: patch_postgres.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_fn_validar_edad_paciente_dosis()
@@ -506,7 +489,6 @@ EXECUTE FUNCTION trg_fn_validar_edad_paciente_dosis();
 -- 17. PREVENIR DOBLE APLICACIÓN DE LA MISMA DOSIS (BEFORE INSERT)
 --     Flask ya hace esta comprobación vía sp_dosis_ya_aplicada, pero sin
 --     restricción en la BD cualquier acceso directo podría duplicar.
---     Fuente: patch_postgres.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_fn_prevenir_doble_aplicacion()
@@ -535,7 +517,6 @@ EXECUTE FUNCTION trg_fn_prevenir_doble_aplicacion();
 -- 18. VALIDAR INTERVALO MÍNIMO ENTRE DOSIS (BEFORE INSERT)
 --     Verifica que hayan transcurrido los días mínimos requeridos entre
 --     aplicaciones de la misma vacuna para un paciente.
---     Fuente: vacunatrack_diaitc.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_validar_intervalo_dosis()
@@ -587,7 +568,6 @@ EXECUTE FUNCTION trg_validar_intervalo_dosis();
 -- 19. DESCUENTO AUTOMÁTICO DE INVENTARIO AL APLICAR VACUNA (AFTER INSERT)
 --     Selecciona el inventario activo más reciente con stock disponible para
 --     el lote y centro especificados, excluyendo lotes caducados.
---     VERSIÓN MÁS RECIENTE: patch_caducidad.sql (reemplaza vacunatrack_diaitc.sql).
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION trg_descontar_inventario()
@@ -631,7 +611,6 @@ EXECUTE FUNCTION trg_descontar_inventario();
 -- 20. RESTAURAR STOCK AL ELIMINAR APLICACIÓN (AFTER DELETE)
 --     Espejo de trg_descontar_inventario: al borrar una aplicación devuelve
 --     la unidad al inventario activo correspondiente al lote y centro.
---     Fuente: patch_nuevos_triggers.sql
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION fn_restaurar_stock()
