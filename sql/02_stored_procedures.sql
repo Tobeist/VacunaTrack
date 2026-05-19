@@ -929,6 +929,7 @@ BEGIN
     IF EXISTS(SELECT 1 FROM aplicaciones WHERE paciente_id = p_paciente_id) THEN
         p_ok := 0; p_msg := 'No se puede eliminar: el paciente tiene aplicaciones registradas'; RETURN;
     END IF;
+    DELETE FROM esquemas_pacientes WHERE paciente_id = p_paciente_id;
     DELETE FROM pacientes WHERE paciente_id = p_paciente_id;
     p_ok := 1; p_msg := 'Paciente eliminado correctamente';
 EXCEPTION
