@@ -1,19 +1,11 @@
 -- ═══════════════════════════════════════════════════════════════════════════════
 -- VacunaTrack — Vistas del sistema
 -- Archivo:  sql/03_views.sql
--- Fuentes:  vacunatrack_diaitc.sql  (definiciones originales)
---           patch_postgres.sql      (anula y extiende definiciones originales)
---           patch_caducidad.sql     (anula vw_centros_stock_vacuna)
--- Regla:    cuando una vista aparece en un parche, se usa ÚNICAMENTE la versión
---           del parche (la más reciente). No se incluyen duplicados.
 -- ═══════════════════════════════════════════════════════════════════════════════
 
 
 -- ═══ AUTENTICACIÓN Y USUARIOS ═══
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: agrega INITCAP en first_name/last_name; expone usuario_activo;
---          elimina el filtro WHERE usuario_activo = true (lo delega a la app).
 CREATE OR REPLACE VIEW vw_usuarios_auth AS
 SELECT u.usuario_id,
        l.login_correo                  AS email,
@@ -28,8 +20,6 @@ JOIN usuarios_roles ur ON ur.usuario_id = u.usuario_id
 JOIN roles          r  ON r.rol_id      = ur.rol_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: aplica INITCAP a todos los campos de nombre.
 CREATE OR REPLACE VIEW vw_administradores AS
 SELECT u.usuario_id                        AS admin_id,
        INITCAP(u.usuario_prim_nombre)::VARCHAR(100)      AS admin_prim_nombre,
@@ -48,8 +38,6 @@ JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'admin'
 JOIN login          l  ON l.usuario_id  = u.usuario_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: aplica INITCAP a todos los campos de nombre.
 CREATE OR REPLACE VIEW vw_tutores AS
 SELECT u.usuario_id                        AS tutor_id,
        INITCAP(u.usuario_prim_nombre)::VARCHAR(100)      AS tutor_prim_nombre,
@@ -67,8 +55,6 @@ JOIN roles          r  ON r.rol_id      = ur.rol_id AND r.rol_nombre = 'tutor'
 JOIN login          l  ON l.usuario_id  = u.usuario_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: aplica INITCAP a todos los campos de nombre.
 CREATE OR REPLACE VIEW vw_responsables AS
 SELECT u.usuario_id                        AS responsable_id,
        INITCAP(u.usuario_prim_nombre)::VARCHAR(100)      AS responsable_prim_nombre,
@@ -90,8 +76,6 @@ JOIN login          l  ON l.usuario_id  = u.usuario_id
 LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: agrega cast ::VARCHAR(100) en la concatenación de responsable_nombre.
 CREATE OR REPLACE VIEW vw_cedulas AS
 SELECT c.*,
     INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS responsable_nombre,
@@ -102,8 +86,6 @@ JOIN usuarios  u  ON u.usuario_id  = c.usuario_id
 LEFT JOIN centros_salud cs ON cs.centro_id = u.centro_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: expande p.* en columnas explícitas con INITCAP en campos de nombre.
 CREATE OR REPLACE VIEW vw_usuarios_completo AS
 SELECT
     u.usuario_id,
@@ -140,8 +122,7 @@ GROUP BY u.usuario_id, u.usuario_prim_nombre, u.usuario_seg_nombre,
 
 -- ═══ PACIENTES Y RELACIONES ═══
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: expande p.* en columnas explícitas con INITCAP en campos de nombre.
+
 CREATE OR REPLACE VIEW vw_pacientes AS
 SELECT p.paciente_id,
        INITCAP(p.paciente_prim_nombre)::VARCHAR(100)  AS paciente_prim_nombre,
@@ -160,7 +141,6 @@ FROM pacientes p
 JOIN esquemas e ON e.esquema_id = p.esquema_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_relaciones AS
 SELECT pt.*,
     INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
@@ -170,9 +150,6 @@ JOIN pacientes p ON p.paciente_id = pt.paciente_id
 JOIN usuarios  u ON u.usuario_id  = pt.tutor_id;
 
 
--- Fuente: patch_postgres.sql — versión final (anula vacunatrack_diaitc.sql y
---         versión anterior del mismo parche en línea 67)
--- Cambios: expande p.* en columnas explícitas con INITCAP en campos de nombre.
 CREATE OR REPLACE VIEW vw_pacientes_por_tutor AS
 SELECT p.paciente_id,
        INITCAP(p.paciente_prim_nombre)::VARCHAR(100)  AS paciente_prim_nombre,
@@ -201,7 +178,7 @@ JOIN login              l  ON l.usuario_id  = u.usuario_id;
 
 -- ═══ APLICACIONES ═══
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
+
 CREATE OR REPLACE VIEW vw_aplicaciones AS
 SELECT a.*,
     INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
@@ -237,7 +214,7 @@ JOIN centros_salud cs ON cs.centro_id = a.centro_id;
 
 -- ═══ INVENTARIO Y LOTES ═══
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
+
 CREATE OR REPLACE VIEW vw_inventarios AS
 SELECT i.inventario_id,
        i.centro_id,
@@ -260,9 +237,6 @@ JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id
 JOIN fabricantes   f  ON f.fabricante_id = l.fabricante_id;
 
 
--- Fuente: patch_caducidad.sql (anula vacunatrack_diaitc.sql)
--- Cambios: agrega filtro AND (l.lote_fecha_caducidad IS NULL OR l.lote_fecha_caducidad > CURRENT_DATE)
---          para excluir lotes caducados del cómputo de stock.
 CREATE OR REPLACE VIEW vw_centros_stock_vacuna AS
 SELECT cs.centro_id,
        cs.centro_nombre,
@@ -289,7 +263,6 @@ WHERE i.inventario_activo_desde IS NOT NULL
 GROUP BY cs.centro_id, ci.ciudad_nombre, l.vacuna_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_lotes AS
 SELECT l.*,
     v.vacuna_nombre,
@@ -301,7 +274,6 @@ JOIN fabricantes f ON f.fabricante_id = l.fabricante_id
 JOIN proveedores p ON p.proveedor_id  = l.proveedor_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_proveedores AS
 SELECT p.*, f.fabricante_nombre
 FROM proveedores p
@@ -310,15 +282,13 @@ JOIN fabricantes f ON f.fabricante_id = p.fabricante_id;
 
 -- ═══ VACUNAS Y DOSIS ═══
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
+
 CREATE OR REPLACE VIEW vw_dosis AS
 SELECT d.*, v.vacuna_nombre
 FROM dosis   d
 JOIN vacunas v ON v.vacuna_id = d.vacuna_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
--- Nota: vw_dosis_esquemas_detalle debe crearse antes que vw_historial_vacunacion.
 CREATE OR REPLACE VIEW vw_dosis_esquemas_detalle AS
 SELECT d.dosis_id,
        d.vacuna_id,
@@ -338,8 +308,6 @@ JOIN dosis_esquemas de ON de.dosis_id = d.dosis_id
 JOIN vacunas        v  ON v.vacuna_id = d.vacuna_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: ninguno de fondo; la versión del parche es idéntica en lógica.
 CREATE OR REPLACE VIEW vw_dosis_esquemas AS
 SELECT de.*,
     d.dosis_tipo,
@@ -357,8 +325,6 @@ JOIN vacunas  v  ON v.vacuna_id  = d.vacuna_id
 JOIN esquemas e  ON e.esquema_id = de.esquema_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: agrega cast ::VARCHAR(100) en la concatenación del responsable.
 CREATE OR REPLACE VIEW vw_historial_vacunacion AS
 SELECT
     vde.dosis_id,
@@ -386,8 +352,6 @@ LEFT JOIN usuarios       u  ON u.usuario_id  = a.usuario_id
 LEFT JOIN centros_salud  cs ON cs.centro_id  = a.centro_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: ninguno de fondo; la versión del parche es idéntica en lógica.
 CREATE OR REPLACE VIEW vw_vacunas AS
 SELECT v.*,
     COUNT(DISTINCT vp.padecimiento_id)                                          AS total_padecimientos,
@@ -401,8 +365,6 @@ LEFT JOIN aplicaciones          a  ON a.dosis_id          = d.dosis_id
 GROUP BY v.vacuna_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: ninguno de fondo; la versión del parche es idéntica en lógica.
 CREATE OR REPLACE VIEW vw_esquemas AS
 SELECT e.*,
     COUNT(DISTINCT de.dosis_id)                                        AS total_dosis,
@@ -416,7 +378,6 @@ LEFT JOIN aplicaciones   a  ON a.dosis_id     = de.dosis_id
 GROUP BY e.esquema_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_padecimientos AS
 SELECT p.*,
     STRING_AGG(v.vacuna_nombre, ', ' ORDER BY v.vacuna_nombre) AS vacunas
@@ -426,7 +387,6 @@ LEFT JOIN vacunas v ON v.vacuna_id = vp.vacuna_id
 GROUP BY p.padecimiento_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_fabricantes AS
 SELECT f.*, p.pais_nombre
 FROM fabricantes f
@@ -435,15 +395,13 @@ JOIN paises p ON p.pais_id = f.pais_id;
 
 -- ═══ GEOGRAFÍA Y CENTROS ═══
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
+
 CREATE OR REPLACE VIEW vw_centros AS
 SELECT cs.*, ci.ciudad_nombre
 FROM centros_salud cs
 JOIN ciudades ci ON ci.ciudad_id = cs.ciudad_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: ninguno de fondo; la versión del parche es idéntica en lógica.
 CREATE OR REPLACE VIEW vw_centros_detalle AS
 SELECT
     cs.*,
@@ -463,8 +421,6 @@ LEFT JOIN aplicaciones  a ON a.centro_id = cs.centro_id
 GROUP BY cs.centro_id, ci.ciudad_nombre, e.estado_id, e.estado_nombre, pa.pais_id, pa.pais_nombre;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: ninguno de fondo; la versión del parche es idéntica en lógica.
 CREATE OR REPLACE VIEW vw_paises AS
 SELECT p.*,
     COUNT(DISTINCT e.estado_id)  AS total_estados,
@@ -475,14 +431,12 @@ LEFT JOIN ciudades  c ON c.estado_id = e.estado_id
 GROUP BY p.pais_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_estados AS
 SELECT e.*, p.pais_nombre
 FROM estados e
 JOIN paises p ON p.pais_id = e.pais_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_ciudades AS
 SELECT c.*, e.estado_nombre
 FROM ciudades c
@@ -491,7 +445,7 @@ JOIN estados e ON e.estado_id = c.estado_id;
 
 -- ═══ ALERTAS ═══
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
+
 CREATE OR REPLACE VIEW vw_alertas_inventario AS
 SELECT ai.*,
     i.inventario_stock_actual,
@@ -505,7 +459,6 @@ JOIN lotes         l  ON l.lote_id       = i.lote_id
 JOIN vacunas       v  ON v.vacuna_id     = l.vacuna_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_alertas_dosis AS
 SELECT ad.*,
     INITCAP(p.paciente_prim_nombre) || ' ' || INITCAP(p.paciente_apellido_pat) AS paciente,
@@ -519,8 +472,7 @@ JOIN vacunas   v ON v.vacuna_id   = d.vacuna_id;
 
 -- ═══ DASHBOARD Y REPORTES ═══
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: ninguno de fondo; la versión del parche es idéntica en lógica.
+
 CREATE OR REPLACE VIEW vw_stats_dashboard AS
 SELECT
     (SELECT COUNT(*) FROM vw_pacientes)    AS pacientes,
@@ -533,7 +485,6 @@ SELECT
     (SELECT COUNT(*) FROM vw_alertas_dosis)      AS alertas_dosis;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_transferencias AS
 SELECT
     t.transf_id,
@@ -557,7 +508,6 @@ JOIN lotes           lo  ON lo.lote_id        = io.lote_id
 JOIN vacunas         v   ON v.vacuna_id       = lo.vacuna_id;
 
 
--- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
 CREATE OR REPLACE VIEW vw_conflictos_esquema AS
 WITH esquema_activo AS (
     SELECT esquema_id, esquema_nombre
