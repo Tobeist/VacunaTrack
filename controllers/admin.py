@@ -1219,6 +1219,21 @@ def lotes():
                 centro_id_inv = _get_int(f, 'centro_id', 'centro de salud', required=True)
                 lote_id_inv   = _get_int(f, 'lote_id',   'lote',            required=True)
                 stock_inv     = _get_int(f, 'stock',     'stock',           required=True, min_value=1)
+                lote_obj = repo.obtener_lote(lote_id_inv)
+                if lote_obj:
+                    cant_inicial  = lote_obj.get('lote_cant_inicial') or 0
+                    ya_asignado   = sum(
+                        (inv.get('inventario_stock_inicial') or 0)
+                        for inv in repo.listar_inventarios()
+                        if inv.get('lote_id') == lote_id_inv
+                    )
+                    disponible = cant_inicial - ya_asignado
+                    if stock_inv > disponible:
+                        raise FormError(
+                            f'Stock insuficiente: el lote tiene {cant_inicial} unidades, '
+                            f'{ya_asignado} ya asignadas a otros centros. '
+                            f'Máximo disponible: {disponible}.'
+                        )
                 result_inv = repo.asignar_inventario({
                     'centro_id':               centro_id_inv,
                     'lote_id':                 lote_id_inv,
