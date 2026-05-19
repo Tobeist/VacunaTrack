@@ -122,7 +122,7 @@ CREATE TABLE dosis (
     dosis_limite_edad_dias integer CHECK (dosis_limite_edad_dias >= 0),
     dosis_vigente_desde date not null default current_date,
     dosis_vigente_hasta date,
-    CHECK (dosis_vigente_hasta IS NULL OR dosis_vigente_hasta > dosis_vigente_desde),
+    CHECK (dosis_vigente_hasta IS NULL OR dosis_vigente_hasta >= dosis_vigente_desde),
     -- No se puede eliminar una vacuna con dosis definidas.
     FOREIGN KEY (vacuna_id) REFERENCES vacunas (vacuna_id) ON DELETE RESTRICT ON UPDATE CASCADE
 );

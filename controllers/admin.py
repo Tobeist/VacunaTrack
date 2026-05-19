@@ -99,6 +99,20 @@ def _user_error_msg(exc: Exception) -> str:
             return 'Uno de los campos numéricos tiene un valor inválido. Verifica los datos.'
         if 'invalid isoformat' in msg.lower() or 'unconverted data' in msg.lower():
             return 'La fecha tiene un formato inválido. Usa el selector de fecha.'
+        # Mensajes crudos de PostgreSQL (SQLERRM) — traducir a mensajes amigables
+        ml = msg.lower()
+        if 'viola la restricción' in ml and 'check' in ml:
+            return 'Uno de los valores ingresados no cumple las reglas de validación. Verifica los datos.'
+        if 'viola la restricción' in ml and ('unique' in ml or 'único' in ml or 'llave duplicada' in ml or 'duplicate' in ml):
+            return 'Ya existe un registro con esos datos. Verifica los campos únicos.'
+        if 'llave duplicada' in ml or 'duplicate key' in ml:
+            return 'Ya existe un registro con esos datos. Verifica los campos únicos.'
+        if 'viola la restricción de llave foránea' in ml or 'foreign key' in ml:
+            return 'No se puede completar la operación porque hay registros relacionados que dependen de este elemento.'
+        if 'valor nulo en la columna' in ml or 'null value in column' in ml:
+            return 'Faltan campos obligatorios. Verifica que hayas llenado todos los campos requeridos.'
+        if 'está fuera de rango' in ml or 'out of range' in ml:
+            return 'Un valor numérico está fuera del rango permitido.'
         if msg and not msg.startswith('<'):
             return msg
         return 'No se pudo completar la operación. Verifica los datos ingresados.'
@@ -140,9 +154,16 @@ def _user_error_msg(exc: Exception) -> str:
         return 'Faltan campos obligatorios. Verifica que hayas llenado todos los campos requeridos.'
 
     if sqlstate == '23514':  # check_violation
-        if constraint:
-            return f'El dato no cumple con la validación "{constraint.replace("_", " ")}". Verifica los valores.'
-        return 'Los datos no cumplen las reglas de validación. Verifica los valores ingresados.'
+        _CHECK_MSGS = {
+            'dosis_check':        'Las fechas de vigencia de la dosis son inválidas.',
+            'dosis_cant_ml':      'La cantidad en ml debe ser mayor a 0.',
+            'inventario_stock':   'El stock no puede ser negativo.',
+            'evento_latitud':     'La latitud debe estar entre -90 y 90.',
+            'evento_longitud':    'La longitud debe estar entre -180 y 180.',
+        }
+        if constraint and constraint in _CHECK_MSGS:
+            return _CHECK_MSGS[constraint]
+        return 'Uno de los valores ingresados no cumple las reglas de validación. Verifica los datos.'
 
     if sqlstate == '22P02':
         return 'Uno de los datos tiene un formato inválido. Verifica los campos numéricos y fechas.'
