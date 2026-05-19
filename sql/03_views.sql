@@ -235,35 +235,6 @@ JOIN usuarios      u  ON u.usuario_id = a.usuario_id
 JOIN centros_salud cs ON cs.centro_id = a.centro_id;
 
 
--- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
--- Cambios: agrega cast ::VARCHAR(100) en la concatenación del responsable.
-CREATE OR REPLACE VIEW vw_historial_vacunacion AS
-SELECT
-    vde.dosis_id,
-    vde.vacuna_id,
-    vde.vacuna_nombre,
-    vde.dosis_tipo,
-    vde.dosis_cant_ml,
-    vde.dosis_area_aplicacion,
-    vde.dosis_edad_oportuna_dias,
-    vde.dosis_intervalo_min_dias,
-    vde.dosis_limite_edad_dias,
-    vde.dosis_vigente_desde,
-    vde.dosis_vigente_hasta,
-    vde.esquema_id,
-    vde.dosis_esq_id,
-    a.paciente_id,
-    a.aplicacion_id,
-    a.aplicacion_timestamp,
-    a.aplicacion_observaciones,
-    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS responsable,
-    cs.centro_nombre
-FROM vw_dosis_esquemas_detalle vde
-LEFT JOIN aplicaciones   a  ON a.dosis_id    = vde.dosis_id
-LEFT JOIN usuarios       u  ON u.usuario_id  = a.usuario_id
-LEFT JOIN centros_salud  cs ON cs.centro_id  = a.centro_id;
-
-
 -- ═══ INVENTARIO Y LOTES ═══
 
 -- Fuente: vacunatrack_diaitc.sql (no existe versión en parche)
@@ -384,6 +355,35 @@ FROM dosis_esquemas de
 JOIN dosis    d  ON d.dosis_id   = de.dosis_id
 JOIN vacunas  v  ON v.vacuna_id  = d.vacuna_id
 JOIN esquemas e  ON e.esquema_id = de.esquema_id;
+
+
+-- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)
+-- Cambios: agrega cast ::VARCHAR(100) en la concatenación del responsable.
+CREATE OR REPLACE VIEW vw_historial_vacunacion AS
+SELECT
+    vde.dosis_id,
+    vde.vacuna_id,
+    vde.vacuna_nombre,
+    vde.dosis_tipo,
+    vde.dosis_cant_ml,
+    vde.dosis_area_aplicacion,
+    vde.dosis_edad_oportuna_dias,
+    vde.dosis_intervalo_min_dias,
+    vde.dosis_limite_edad_dias,
+    vde.dosis_vigente_desde,
+    vde.dosis_vigente_hasta,
+    vde.esquema_id,
+    vde.dosis_esq_id,
+    a.paciente_id,
+    a.aplicacion_id,
+    a.aplicacion_timestamp,
+    a.aplicacion_observaciones,
+    INITCAP(u.usuario_prim_nombre) || ' ' || INITCAP(u.usuario_apellido_pat)::VARCHAR(100) AS responsable,
+    cs.centro_nombre
+FROM vw_dosis_esquemas_detalle vde
+LEFT JOIN aplicaciones   a  ON a.dosis_id    = vde.dosis_id
+LEFT JOIN usuarios       u  ON u.usuario_id  = a.usuario_id
+LEFT JOIN centros_salud  cs ON cs.centro_id  = a.centro_id;
 
 
 -- Fuente: patch_postgres.sql (anula vacunatrack_diaitc.sql)

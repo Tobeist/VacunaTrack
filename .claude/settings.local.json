@@ -19,7 +19,10 @@
       "Bash(sed -n '1,50p' /Users/cesarrodriguezrodriguez/Desktop/vacunatrack_diaitc/templates/admin/perfil.html)",
       "Bash(sed -n '1,55p' /Users/cesarrodriguezrodriguez/Desktop/vacunatrack_diaitc/templates/public/profile.html)",
       "Bash(sed -n '1,55p' /Users/cesarrodriguezrodriguez/Desktop/vacunatrack_diaitc/templates/clinical/profile.html)",
-      "Bash(grep -A 500 '\"content\":\\\\[{\"type\":\"text\",\"text\":\"Objetivo: Integrar completamente todos los componentes' \"/Users/cesarrodriguezrodriguez/.claude/projects/-Users-cesarrodriguezrodriguez-Desktop-vacunatrack-diaitc/a9e79f3b-b06f-4ed3-9f88-ffea6464254c.jsonl\")"
+      "Bash(grep -A 500 '\"content\":\\\\[{\"type\":\"text\",\"text\":\"Objetivo: Integrar completamente todos los componentes' \"/Users/cesarrodriguezrodriguez/.claude/projects/-Users-cesarrodriguezrodriguez-Desktop-vacunatrack-diaitc/a9e79f3b-b06f-4ed3-9f88-ffea6464254c.jsonl\")",
+      "Bash(pip3 install *)",
+      "Bash(/tmp/venv/bin/pip install *)",
+      "Bash(/tmp/venv/bin/python3 -c ' *)"
     ]
   }
 }
